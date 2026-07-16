@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="WARCHOCKI RPG — gra przygodowa o Edwardzie Warchockim, pierwszym polskim robocie-influencerze. 7 postaci, żywioły, domeny, bossowie, 5 regionów Polski.">
+<meta property="og:title" content="WARCHOCKI RPG — Warchocki Impact">
+<meta property="og:description" content="No i elegancko! Graj Edkiem i ekipą: żywioły, gacha, domeny z muzyką bitewną, bossowie.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐗</text></svg>">
+<title>WARCHOCKI RPG — Warchocki Impact</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="wrap">
+<div id="stage" aria-label="WARCHOCKI RPG">
+  <canvas id="game" width="1440" height="900"></canvas>
+
+  <div id="hud" class="px hidden">
+    <span id="dia">💎 0</span>
+    <span id="subs">👥 0</span>
+    <span id="questHint"></span>
+    <button class="hudbtn" id="btnChar" title="Zmiana postaci (C)">🤖</button>
+    <button class="hudbtn" id="btnChars" title="Postacie i drużyna">🎴</button>
+    <button class="hudbtn" id="btnGacha" title="Paczki od Fanów">🎁</button>
+    <button class="hudbtn" id="btnBag" title="Plecak (jedzenie: Q)">🎒</button>
+    <button class="hudbtn" id="btnPhone" title="Kanał Edka">📱</button>
+    <button class="hudbtn" id="btnFit">🧥</button>
+    <button class="hudbtn" id="btnQuest">📜</button>
+    <button class="hudbtn" id="btnFS">⛶</button>
+    <button class="hudbtn" id="btnMute">🔊</button>
+  </div>
+  <button id="actBtn" class="px" aria-label="Akcja">E</button>
+  <button id="atkBtn" class="px" aria-label="Cios">👊</button>
+  <button id="spcBtn" class="px" aria-label="Super">⚡</button>
+
+  <div id="title" class="ov">
+    <h1 class="px">WARCHOCKI&nbsp;RPG</h1>
+    <p class="sub px" style="color:var(--gold)">⭐ WARCHOCKI IMPACT ⭐</p>
+    <p class="sub px mut">7 postaci · żywioły i reakcje · bronie i artefakty · 5 regionów · domeny · bossowie</p>
+    <div class="btnrow">
+      <button id="btnNew" class="bigbtn px">▶ NOWA GRA</button>
+      <button id="btnCont" class="ghostbtn px hidden">↻ KONTYNUUJ</button>
+    </div>
+    <p class="hint px">ruch: WASD / dotyk · akcja: E · CIOS: spacja/X/👊 · super: Z/⚡<br>postać: 1-2-3 / C · jedzenie: Q · pauza: P<br><br>🎧 graj z dźwiękiem — Edek gada swoim głosem!</p>
+  </div>
+
+  <div id="dlg" class="px hidden">
+    <canvas id="dlgPortrait" width="32" height="32"></canvas>
+    <div id="dlgBody">
+      <p id="dlgName"></p>
+      <p id="dlgText"></p>
+    </div>
+    <span id="dlgMore">▼</span>
+  </div>
+
+  <div id="fit" class="panel px hidden">
+    <div class="panelHead">
+      <h2 id="fitTitle">🧥 SZAFA EDKA</h2>
+      <span class="dia" id="fitDia">💎 0</span>
+      <button class="xbtn" data-close="fit">✕</button>
+    </div>
+    <div class="panelBody">
+      <div id="fitPrev">
+        <canvas id="prevCv" width="96" height="128"></canvas>
+        <p id="prevName">Edward Warchocki</p>
+      </div>
+      <div id="itemGrid"></div>
+    </div>
+  </div>
+
+  <div id="quests" class="panel px hidden">
+    <div class="panelHead">
+      <h2>📜 QUESTY</h2>
+      <button class="xbtn" data-close="quests">✕</button>
+    </div>
+    <div class="panelBody"><div id="questList"></div></div>
+  </div>
+
+  <div id="phone" class="panel px hidden">
+    <div class="panelHead">
+      <h2>📱 KANAŁ EDKA</h2>
+      <button class="xbtn" data-close="phone">✕</button>
+    </div>
+    <div class="panelBody"><div id="phoneBody"></div></div>
+  </div>
+
+  <div id="chars" class="panel px hidden">
+    <div class="panelHead">
+      <h2>🎴 POSTACIE — DRUŻYNA (max 3)</h2>
+      <span class="dia" id="charsDia">💎 0</span>
+      <button class="xbtn" data-close="chars">✕</button>
+    </div>
+    <div class="panelBody" style="flex-direction:column">
+      <div class="matbar" id="matBar"></div>
+      <div id="charGrid"></div>
+    </div>
+  </div>
+
+  <div id="gacha" class="panel px hidden">
+    <div class="panelHead">
+      <h2>🎁 PACZKI OD FANÓW</h2>
+      <span class="dia" id="gachaDia">💎 0</span>
+      <button class="xbtn" data-close="gacha">✕</button>
+    </div>
+    <div class="panelBody"><div id="gachaBody"></div></div>
+  </div>
+
+  <div id="hero" class="panel px hidden">
+    <div class="panelHead">
+      <h2 id="heroTitle">POSTAĆ</h2>
+      <button class="xbtn" data-close="hero">✕</button>
+    </div>
+    <div class="panelBody"><div id="heroBody"></div></div>
+  </div>
+
+  <div id="bag" class="panel px hidden">
+    <div class="panelHead">
+      <h2>🎒 PLECAK — JEDZENIE I SPRZĘT</h2>
+      <span class="dia" id="bagDia">💎 0</span>
+      <button class="xbtn" data-close="bag">✕</button>
+    </div>
+    <div class="panelBody"><div id="bagBody"></div></div>
+  </div>
+
+  <div id="shop" class="panel px hidden">
+    <div class="panelHead">
+      <h2 id="shopTitle">SKLEP</h2>
+      <span class="dia" id="shopDia">💎 0</span>
+      <button class="xbtn" data-close="shop">✕</button>
+    </div>
+    <div class="panelBody"><div id="shopBody"></div></div>
+  </div>
+
+  <div id="travel" class="panel px hidden">
+    <div class="panelHead">
+      <h2>🚌 PKS — DOKĄD JEDZIEMY, BYKU?</h2>
+      <button class="xbtn" data-close="travel">✕</button>
+    </div>
+    <div class="panelBody"><div id="travelList"></div></div>
+  </div>
+
+  <div id="mgEnd" class="ov hidden">
+    <h1 id="mgEndTitle" class="px">✔</h1>
+    <p id="mgEndTxt" class="sub px"></p>
+    <div class="btnrow">
+      <button id="mgRetry" class="ghostbtn px">↻ JESZCZE RAZ</button>
+      <button id="mgBack" class="bigbtn px">▶ NA MAPĘ</button>
+    </div>
+  </div>
+
+  <div id="finale" class="ov hidden" style="background:rgba(14,12,28,.5)">
+    <h1 class="px" style="font-size:clamp(13px,3.4vw,22px)">👑 LEGENDA INTERNETU 👑</h1>
+    <p class="sub px">Warszawa jest Twoja, Edek!<br><br><span class="mut">Wszystkie questy ukończone.<br>Korona Króla Internetu trafia do szafy.</span></p>
+    <div class="btnrow">
+      <button id="btnShare" class="bigbtn px">📋 POCHWAL SIĘ</button>
+      <button id="btnFinClose" class="ghostbtn px">▶ GRAJ DALEJ</button>
+    </div>
+    <p id="shareNote" class="hint px"></p>
+  </div>
+
+  <div id="toast" class="px"></div>
+</div>
+
+<footer>
+  Fanowska parodia • Edward Warchocki — pierwszy polski robot-influencer.
+  Głos i muzyka: prawdziwe fragmenty z przygód Edka. 🤖⌚🐗
+</footer>
+</div>
+
+<script src="js/game.js"></script>
+</body>
+</html>
