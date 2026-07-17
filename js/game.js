@@ -295,24 +295,66 @@ addEventListener('keydown',()=>{if(scene==='title')initAudio().then(startMenuMus
 
 /* ---------------- PRZEDMIOTY ---------------- */
 const ITEMS={
+  /* --- WĄSY --- */
   was_klasyk:{n:'Wąs klasyczny',slot:'mustache',price:0,desc:'Legenda sama w sobie'},
   was_pod:{n:'Wąs podkręcony',slot:'mustache',price:45,desc:'Elegancja francja'},
+  was_blond:{n:'Wąs blond',slot:'mustache',price:90,col:'#d8b04a',desc:'Skandynawski vibe'},
+  was_szpakowaty:{n:'Wąs szpakowaty',slot:'mustache',price:140,col:'#b8b4c8',desc:'Doświadczenie widać'},
   was_gigant:{n:'Mega Wąsisko',slot:'mustache',price:150,desc:'Widać go z kosmosu'},
+  was_neon:{n:'Wąs neonowy',slot:'mustache',price:800,col:'#6fd8e8',desc:'Świeci na streamie'},
+  was_diamentowy:{n:'Wąs diamentowy',slot:'mustache',price:3000,col:'#f4f2ff',desc:'Pasuje do rolexa. Oczywiście.'},
+  /* --- ZEGARKI --- */
   rolex_d:{n:'Rolex z diamentami',slot:'watch',price:0,desc:'Od Jarka za filmik na TikToku'},
+  casio:{n:'Casio dzielnicowe',slot:'watch',price:25,col:'#4a7ac8',desc:'Klasyk spod bloku'},
+  smartwatch:{n:'Smartwatch PRO',slot:'watch',price:200,col:'#1a1a24',desc:'Liczy kroki i wyświetlenia'},
+  rolex_zloty:{n:'Rolex pełne złoto',slot:'watch',price:1000,col:'#ffd75e',desc:'Cięższy niż fama'},
+  rolex_teczowy:{n:'Rolex TĘCZOWY',slot:'watch',price:4500,col:'rainbow',desc:'Prototyp. Jeden na świecie.'},
+  /* --- CZAPKI --- */
   czapka:{n:'Czapka z daszkiem',slot:'hat',price:30,desc:'Dzielnicowy szyk'},
+  czapka_zimowa:{n:'Czapka zimowa',slot:'hat',price:40,desc:'Z pomponem, na Tatry'},
   kapelusz:{n:'Kapelusz eleganta',slot:'hat',price:60,desc:'No i elegancko'},
+  bandana:{n:'Bandana',slot:'hat',price:65,desc:'Rap z Chodzieży'},
+  beret:{n:'Beret artysty',slot:'hat',price:95,desc:'Edek w wersji vernisage'},
   irokez:{n:'Neonowy irokez',slot:'hat',price:100,desc:'Rockowy Edek'},
+  kaszkiet:{n:'Kaszkiet gentlemana',slot:'hat',price:120,desc:'Peaky Blinders z Warszawy'},
+  kask:{n:'Kask budowlany',slot:'hat',price:150,desc:'BHP na planie filmowym'},
+  fedora_biala:{n:'Biała fedora',slot:'hat',price:400,desc:'Boss internetu'},
+  cylinder:{n:'Cylinder milionera',slot:'hat',price:900,desc:'Monopoly? Nie, monetyzacja'},
+  korona_diamentowa:{n:'Korona diamentowa',slot:'hat',price:5000,desc:'Droższa niż mieszkanie w Chodzieży'},
   snapback:{n:'Snapback Ziomala',slot:'hat',price:0,locked:true,desc:'Nagroda od Żabsona'},
   korona:{n:'Korona Króla Internetu',slot:'hat',price:0,locked:true,desc:'Za wszystkie questy'},
+  /* --- OKULARY --- */
   okulary:{n:'Czarne okulary',slot:'glasses',price:40,desc:'Incognito (nie działa)'},
   pilotki:{n:'Złote pilotki',slot:'glasses',price:80,desc:'Odbija się w nich sława'},
-  lancuch:{n:'Złoty łańcuch',slot:'neck',price:70,desc:'Ciężki jak fama'},
+  okulary_serca:{n:'Okulary-serduszka',slot:'glasses',price:120,desc:'Pozdro dla Julki'},
+  okulary_neon:{n:'Okulary neonowe',slot:'glasses',price:250,desc:'Rave w Ujściu'},
+  monokl:{n:'Złoty monokl',slot:'glasses',price:600,desc:'Hm, interesujące, byku'},
+  okulary_vr:{n:'Gogle VR',slot:'glasses',price:1500,desc:'Streaming z metaverse'},
+  /* --- NA SZYJĘ --- */
   szalik:{n:'Szalik kibica',slot:'neck',price:25,desc:'Polska górą!'},
-  peleryna:{n:'Peleryna influencera',slot:'back',price:120,desc:'Powiewa nawet bez wiatru'},
-  sneakersy:{n:'Złote sneakersy',slot:'shoes',price:90,desc:'+15% do szybkości!'},
-  ring_light:{n:'Ring light',slot:'back',price:0,locked:true,desc:'Za 10 tys. subów — pro oświetlenie'},
+  krawat:{n:'Czerwony krawat',slot:'neck',price:50,desc:'Na spotkanie w ministerstwie'},
+  lancuch:{n:'Złoty łańcuch',slot:'neck',price:70,desc:'Ciężki jak fama'},
+  mucha:{n:'Elegancka mucha',slot:'neck',price:75,desc:'Gala rozdania nagród'},
+  lancuch_gruby:{n:'Łańcuch GRUBY',slot:'neck',price:350,desc:'Cuban link. Szacunek na dzielni'},
+  medalion_67:{n:'Medalion 67',slot:'neck',price:670,desc:'SIX SEVEN!!! 6️⃣7️⃣'},
+  naszyjnik_diament:{n:'Diament na szyję',slot:'neck',price:2500,desc:'Do kompletu z rolexem'},
   zloty_play:{n:'Złoty Przycisk',slot:'neck',price:0,locked:true,desc:'Za 100 tys. subów!'},
+  /* --- PLECY --- */
+  plecak:{n:'Plecak streamera',slot:'back',price:60,desc:'Powerbank i tripod zawsze przy sobie'},
+  peleryna:{n:'Peleryna influencera',slot:'back',price:120,desc:'Powiewa nawet bez wiatru'},
+  gitara:{n:'Gitara na plecach',slot:'back',price:450,desc:'Do „ELEGANCKO” akustycznie'},
+  skrzydla:{n:'Skrzydła anioła',slot:'back',price:1200,desc:'Edek zesłany internetowi'},
+  peleryna_zlota:{n:'Złota peleryna',slot:'back',price:1800,desc:'Król musi błyszczeć'},
+  jetpack:{n:'JETPACK',slot:'back',price:4000,desc:'Na razie tylko robi psssst'},
+  ring_light:{n:'Ring light',slot:'back',price:0,locked:true,desc:'Za 10 tys. subów — pro oświetlenie'},
+  /* --- BUTY --- */
+  kalosze:{n:'Kalosze wędkarskie',slot:'shoes',price:35,desc:'Od Rybaka Bogdana'},
+  sneakersy:{n:'Złote sneakersy',slot:'shoes',price:90,desc:'+15% do szybkości!'},
+  glany:{n:'Czarne glany',slot:'shoes',price:110,desc:'Rockowa podeszwa'},
+  buty_neon:{n:'Neonowe buty',slot:'shoes',price:700,desc:'+15% szybkości i świecą!'},
+  buty_diament:{n:'Diamentowe buty',slot:'shoes',price:3500,desc:'+20% szybkości. Skarbówka pyta skąd'},
 };
+const SLOT_ORDER={hat:0,glasses:1,mustache:2,neck:3,watch:4,back:5,shoes:6};
 
 /* ---------------- QUESTY (10) ---------------- */
 const QUESTS={
@@ -2307,7 +2349,10 @@ function openFit(shop){
 }
 function renderItems(){
   const g=$('itemGrid');g.innerHTML='';
-  for(const[id,it]of Object.entries(ITEMS)){
+  /* sklep posortowany: slot po slocie, w slocie od najtańszego do flexu */
+  const sorted=Object.entries(ITEMS).sort((a,b)=>
+    (SLOT_ORDER[a[1].slot]-SLOT_ORDER[b[1].slot])||(a[1].price-b[1].price));
+  for(const[id,it]of sorted){
     const owned=S.owned.includes(id),eq=S.equip[it.slot]===id;
     if(!shopMode&&!owned)continue;
     if(shopMode&&it.locked&&!owned)continue;
@@ -2329,8 +2374,18 @@ function renderItems(){
           const clip={kapelusz:'c_elegancko2',sneakersy:'c_buty',lancuch:'c_rolexlewa',
             pilotki:'c_rozchwytywany',was_gigant:'c_elegancko2',peleryna:'c_strach',
             szalik:'c_dwabramki',okulary:'c_kamera',czapka:'c_elegancko2',irokez:'c_krolbalu',
-            was_pod:'c_truskawka'}[id];
-          if(clip)vsay(clip);
+            was_pod:'c_truskawka',
+            cylinder:'c_elegancko2',fedora_biala:'c_elegancko2',kaszkiet:'c_elegancko2',
+            rolex_zloty:'c_rolexlewa',rolex_teczowy:'c_rolexlewa',casio:'c_rolexlewa',
+            lancuch_gruby:'c_rolexlewa',naszyjnik_diament:'c_rolexlewa',
+            glany:'c_buty',buty_neon:'c_buty',buty_diament:'c_buty',kalosze:'c_buty',
+            korona_diamentowa:'c_krolbalu',okulary_neon:'c_kamera',okulary_vr:'c_kamera',
+            okulary_serca:'c_rozchwytywany',monokl:'c_elegancko2',
+            skrzydla:'c_strach',jetpack:'c_strach',peleryna_zlota:'c_strach',
+            was_neon:'c_truskawka',was_diamentowy:'c_elegancko2'}[id];
+          if(id==='medalion_67')check67(67);
+          else if(clip)vsay(clip);
+          if(it.price>=1000)burstConfetti();
         }else{SFX.no();toast('Za mało diamentów! Rób questy, byku 💎');}
       }
     });
@@ -2368,10 +2423,13 @@ function drawEdekHead(c,x,y,s,eq){ // portret, s = szerokość
   drawHat(c,x,y,u,eq.hat);
   drawGlasses(c,x,y,u,eq.glasses);
 }
+const mCol=id=>(ITEMS[id]&&ITEMS[id].col)||'#000';
 function drawMustache(c,x,y,u,id){
+  const col=mCol(id);
   if(id==='was_pod'){R(c,x+u,y,6*u,1.5*u,'#000');R(c,x,y-u,u,u,'#000');R(c,x+7*u,y-u,u,u,'#000');}
   else if(id==='was_gigant'){R(c,x-u,y,10*u,2*u,'#000');R(c,x-2*u,y-u,2*u,2*u,'#000');R(c,x+8*u,y-u,2*u,2*u,'#000');}
-  else{R(c,x,y,8*u,1.5*u,'#000');R(c,x+.5*u,y+1.4*u,7*u,.5*u,'#00000066');}
+  else if(id==='was_neon'||id==='was_diamentowy'){R(c,x,y,8*u,1.5*u,col);R(c,x+u,y-.6*u,6*u,.6*u,'rgba(255,255,255,.55)');}
+  else{R(c,x,y,8*u,1.5*u,col);R(c,x+.5*u,y+1.4*u,7*u,.5*u,'#00000066');}
 }
 function drawHat(c,x,y,u,id){
   if(!id)return;
@@ -2382,19 +2440,74 @@ function drawHat(c,x,y,u,id){
   else if(id==='irokez'){for(let i=0;i<5;i++)R(c,x+(2+i*1.8)*u,y-(3.5-Math.abs(i-2)*.8)*u,1.2*u,(3.5-Math.abs(i-2)*.8)*u,i%2?'#e04848':'#6fd8e8');}
   else if(id==='korona'){R(c,x+1.5*u,y-2.5*u,9*u,2.5*u,'#f5c542');
     for(let i=0;i<3;i++){R(c,x+(2+i*3.4)*u,y-4*u,1.4*u,2*u,'#f5c542');R(c,x+(2.1+i*3.4)*u,y-3.6*u,u,u,'#e04848');}}
+  else if(id==='korona_diamentowa'){R(c,x+1.5*u,y-2.5*u,9*u,2.5*u,'#e8f4ff');
+    for(let i=0;i<3;i++){R(c,x+(2+i*3.4)*u,y-4*u,1.4*u,2*u,'#e8f4ff');R(c,x+(2.1+i*3.4)*u,y-3.6*u,u,u,'#6fd8e8');}}
+  else if(id==='czapka_zimowa'){rr(c,x-.5*u,y-2*u,13*u,3.2*u,u,'#4a7ac8');R(c,x-.5*u,y+.4*u,13*u,u,'#ece9f4');
+    c.fillStyle='#fff';c.beginPath();c.arc(x+6*u,y-2.4*u,1.4*u,0,7);c.fill();}
+  else if(id==='bandana'){R(c,x-.5*u,y-1.2*u,13*u,2.4*u,'#c8384a');R(c,x+10.6*u,y+1*u,1.8*u,2.6*u,'#8a2438');
+    for(let i=0;i<4;i++)R(c,x+(1+i*3)*u,y-.6*u,u,u,'#8a2438');}
+  else if(id==='beret'){rr(c,x+.5*u,y-2.2*u,11*u,2.6*u,u,'#1a1a24');R(c,x+5.5*u,y-3*u,u,u,'#1a1a24');}
+  else if(id==='kaszkiet'){rr(c,x-.5*u,y-2*u,12*u,2.8*u,u,'#8a5a2e');R(c,x+8.5*u,y+.2*u,5.5*u,1.4*u,'#6e4522');}
+  else if(id==='kask'){rr(c,x-.5*u,y-2.6*u,13*u,3.6*u,1.4*u,'#f5c542');R(c,x-1.2*u,y+.6*u,14.4*u,u,'#e0b03a');
+    R(c,x+5*u,y-2.6*u,2*u,3.2*u,'#fff7d6');}
+  else if(id==='fedora_biala'){R(c,x-1.5*u,y-u,15*u,1.5*u,'#ece9f4');rr(c,x+1.5*u,y-4*u,9*u,3.5*u,u,'#ece9f4');
+    R(c,x+1.5*u,y-1.8*u,9*u,u,'#f5c542');}
+  else if(id==='cylinder'){R(c,x-1.5*u,y-u,15*u,1.5*u,'#1a1a24');R(c,x+2*u,y-7*u,8*u,6.5*u,'#1a1a24');
+    R(c,x+2*u,y-2*u,8*u,u,'#f5c542');}
 }
+const GLS_COL={pilotki:'#f5c542',okulary_neon:'#6fd8e8',okulary_serca:'#e88ac8',monokl:'#f5c542',okulary_vr:'#1a1a24'};
 function drawGlasses(c,x,y,u,id){
   if(!id)return;
-  const col=id==='pilotki'?'#f5c542':'#000';
+  if(id==='monokl'){
+    c.strokeStyle='#f5c542';c.lineWidth=.8*u;
+    c.beginPath();c.arc(x+8.5*u,y+3.9*u,2*u,0,7);c.stroke();
+    R(c,x+10.2*u,y+5.6*u,.6*u,3*u,'#f5c542');return;
+  }
+  if(id==='okulary_vr'){
+    rr(c,x+u,y+1.8*u,10*u,4.4*u,u,'#1a1a24');
+    R(c,x+2*u,y+3.2*u,8*u,1.3*u,'#6fd8e8');return;
+  }
+  if(id==='okulary_serca'){
+    const p='#e88ac8';
+    R(c,x+1.5*u,y+2.6*u,4*u,2.6*u,p);R(c,x+6.5*u,y+2.6*u,4*u,2.6*u,p);
+    R(c,x+1.9*u,y+2*u,1.3*u,u,p);R(c,x+3.9*u,y+2*u,1.3*u,u,p);
+    R(c,x+6.9*u,y+2*u,1.3*u,u,p);R(c,x+8.9*u,y+2*u,1.3*u,u,p);
+    R(c,x+5.5*u,y+3.2*u,u,u,p);return;
+  }
+  const col=GLS_COL[id]||'#000';
   R(c,x+1.5*u,y+2.6*u,4*u,2.6*u,col);R(c,x+6.5*u,y+2.6*u,4*u,2.6*u,col);R(c,x+5.5*u,y+3.2*u,u,u,col);
   if(id==='pilotki'){R(c,x+2.2*u,y+3.2*u,2.6*u,1.4*u,'#8a6f1e');R(c,x+7.2*u,y+3.2*u,2.6*u,1.4*u,'#8a6f1e');}
+  if(id==='okulary_neon'){R(c,x+2*u,y+3*u,3*u,.7*u,'#c8f4fc');R(c,x+7*u,y+3*u,3*u,.7*u,'#c8f4fc');}
 }
 /* pełna postać Edka */
+const WATCH_COL=id=>{
+  if(!id)return '#f5c542';
+  if(id==='rolex_teczowy')return 'hsl('+Math.floor(performance.now()/12%360)+',85%,60%)';
+  return (ITEMS[id]&&ITEMS[id].col)||'#f5c542';
+};
+const SHOE_COL={sneakersy:'#f5c542',kalosze:'#4a8a3a',glany:'#16161e',buty_neon:'#6fd8e8',buty_diament:'#f4f2ff'};
+const SHOE_SPD={sneakersy:1.15,buty_neon:1.15,buty_diament:1.2};
 function drawEdekBody(c,x,y,dir,f,sc,eq){
   c.save();c.translate(x,y);c.scale(sc,sc);
   const legL=f?1:0,legR=f?0:1;
   c.fillStyle='rgba(0,0,0,.32)';c.beginPath();c.ellipse(8,24.6,6.5,2.2,0,0,7);c.fill();
-  if(eq.back==='peleryna'&&dir!==3){rr(c,dir===1?9:2,10,5.5,11.5,1.5,'#8a2438');}
+  const isCape=eq.back==='peleryna'||eq.back==='peleryna_zlota';
+  const capeCol=eq.back==='peleryna_zlota'?['#a8842e','#c9971e']:['#8a2438','#a02c44'];
+  if(isCape&&dir!==3){rr(c,dir===1?9:2,10,5.5,11.5,1.5,capeCol[0]);}
+  if(eq.back==='skrzydla'){
+    c.fillStyle='#f4f2ff';
+    if(dir===3){c.beginPath();c.ellipse(3.5,13,3,6,-.35,0,7);c.fill();
+      c.beginPath();c.ellipse(12.5,13,3,6,.35,0,7);c.fill();}
+    else{c.beginPath();c.ellipse(.8,12.5,2.6,5.5,-.4,0,7);c.fill();
+      c.beginPath();c.ellipse(15.2,12.5,2.6,5.5,.4,0,7);c.fill();}
+  }
+  if(eq.back==='jetpack'){
+    if(dir===3){rr(c,3.5,10.5,4,7,1.5,'#8a8aa0');rr(c,8.5,10.5,4,7,1.5,'#8a8aa0');
+      R(c,4.5,17.6,2,1.4,'#f5a032');R(c,9.5,17.6,2,1.4,'#f5a032');}
+    else{rr(c,.4,11,2,6.5,.8,'#8a8aa0');rr(c,13.6,11,2,6.5,.8,'#8a8aa0');
+      if(Math.floor(performance.now()/150)%2){R(c,.8,17.6,1.2,2,'#f5a032');R(c,14,17.6,1.2,2,'#f5a032');}}
+  }
+  if(eq.back==='gitara'&&dir!==3){R(c,12.6,3.6,1.5,7,'#6e4522');R(c,12.2,2.6,2.3,1.4,'#f5c542');}
   if(eq.back==='ring_light'){
     c.strokeStyle='rgba(255,247,214,.85)';c.lineWidth=1.6;
     c.beginPath();c.arc(8,4.5,8.5,0,7);c.stroke();
@@ -2403,7 +2516,7 @@ function drawEdekBody(c,x,y,dir,f,sc,eq){
   // nogi z przegubami
   R(c,4,19+legL,3.4,5-legL,'#3a3454');R(c,9,19+legR,3.4,5-legR,'#3a3454');
   rr(c,4,18.4+legL,3.4,2,1,'#252038');rr(c,9,18.4+legR,3.4,2,1,'#252038');
-  const shoe=eq.shoes==='sneakersy'?'#f5c542':'#252038';
+  const shoe=SHOE_COL[eq.shoes]||'#252038';
   rr(c,3.4,23+legL,4.6,1.8,.8,shoe);rr(c,8.4,23+legR,4.6,1.8,.8,shoe);
   // korpus zaokrąglony + panel
   rr(c,2.6,9.6,10.8,9.8,2,'#ece9f4');
@@ -2411,21 +2524,42 @@ function drawEdekBody(c,x,y,dir,f,sc,eq){
   R(c,7,13,2,1.5,'#6fd8e8');
   rr(c,5.6,17.4,4.8,2,1,'#3a3454');       // biodro-przegub
   // ramiona: białe z ciemnym przegubem
+  const wcol=WATCH_COL(eq.watch);
   if(dir===1){rr(c,1.6,11,3.4,7.4,1.4,'#d6d2e6');rr(c,1.9,13.6,2.8,1.4,.6,'#3a3454');
-    if(eq.watch)R(c,1.8,16.6,3,1.8,'#f5c542');}
+    if(eq.watch)R(c,1.8,16.6,3,1.8,wcol);}
   else if(dir===2){rr(c,11,11,3.4,7.4,1.4,'#d6d2e6');rr(c,11.3,13.6,2.8,1.4,.6,'#3a3454');
-    if(eq.watch)R(c,11.2,16.6,3,1.8,'#f5c542');}
+    if(eq.watch)R(c,11.2,16.6,3,1.8,wcol);}
   else{rr(c,1.2,11,2.8,7.4,1.2,'#d6d2e6');rr(c,12,11,2.8,7.4,1.2,'#d6d2e6');
     rr(c,1.5,13.6,2.2,1.3,.5,'#3a3454');rr(c,12.3,13.6,2.2,1.3,.5,'#3a3454');
-    if(eq.watch){R(c,12.1,16.6,2.7,1.8,'#f5c542');
+    if(eq.watch){R(c,12.1,16.6,2.7,1.8,wcol);
+      if(eq.watch==='smartwatch')R(c,12.5,16.9,1.9,1.2,'#6fd8e8');
       if(Math.floor(performance.now()/300)%3===0)R(c,14.7,16.1,1.2,1.2,'#fff7d6');}}
   if(eq.neck==='lancuch'&&dir!==3){R(c,4,10.2,8,1.2,'#f5c542');R(c,7.2,11.4,1.6,1.6,'#f5c542');}
+  if(eq.neck==='lancuch_gruby'&&dir!==3){R(c,3.8,10,8.4,2,'#f5c542');R(c,6.8,12,2.4,2.4,'#f5c542');
+    R(c,7.4,12.6,1.2,1.2,'#a8842e');}
+  if(eq.neck==='krawat'&&dir!==3){R(c,6.9,10,2.2,1.2,'#8a2438');R(c,7.2,11.2,1.6,4.6,'#c8384a');}
+  if(eq.neck==='mucha'&&dir!==3){R(c,5.6,10.1,2.2,1.9,'#1a1a24');R(c,8.2,10.1,2.2,1.9,'#1a1a24');
+    R(c,7.5,10.5,1,1.1,'#c8384a');}
+  if(eq.neck==='medalion_67'&&dir!==3){R(c,4.5,10.2,7,1,'#f5c542');
+    c.fillStyle='#f5c542';c.beginPath();c.arc(8,13.2,2.1,0,7);c.fill();
+    c.fillStyle='#241b04';c.fillRect(6.9,12.4,.9,1.6);c.fillRect(8.4,12.4,.9,1.6);}
+  if(eq.neck==='naszyjnik_diament'&&dir!==3){R(c,4.5,10.2,7,1,'#c9c4dd');
+    c.fillStyle='#e8f4ff';c.beginPath();c.moveTo(8,11.4);c.lineTo(9.5,13);c.lineTo(8,14.6);c.lineTo(6.5,13);c.fill();
+    if(Math.floor(performance.now()/300)%3===1)R(c,8.6,11.8,.8,.8,'#fff');}
+  if(eq.back==='plecak'&&dir!==3){R(c,4.4,10,1.3,6,'#3a6e2e');R(c,10.3,10,1.3,6,'#3a6e2e');}
   if(eq.neck==='zloty_play'&&dir!==3){R(c,4.5,10.2,7,1,'#c9c4dd');
     rr(c,6.2,11.2,3.6,3,.6,'#f5c542');
     c.fillStyle='#a8842e';c.beginPath();c.moveTo(7.3,12);c.lineTo(9,12.7);c.lineTo(7.3,13.4);c.fill();}
   if(eq.neck==='szalik'){R(c,3.5,9.6,9,2,'#c8384a');R(c,4.5,10,1.5,1.2,'#ece9f4');R(c,7.5,10,1.5,1.2,'#ece9f4');
     if(dir!==3)R(c,10.5,11.6,2,4,'#c8384a');}
-  if(eq.back==='peleryna'&&dir===3){rr(c,2.5,10,11,11,2,'#a02c44');}
+  if(isCape&&dir===3){rr(c,2.5,10,11,11,2,capeCol[1]);}
+  if(eq.back==='plecak'&&dir===3){rr(c,3.8,10.5,8.4,8,1.5,'#4a8a3a');rr(c,5.5,12,5,3,1,'#3a6e2e');}
+  if(eq.back==='gitara'&&dir===3){
+    c.save();c.translate(8,14);c.rotate(-.55);
+    rr(c,-3,-1.5,6,7.5,2,'#8a5a2e');rr(c,-1.4,-1.4,2.8,2.8,1.4,'#503018');
+    R(c,-1,-8.5,2,7.5,'#6e4522');R(c,-1.4,-9.5,2.8,1.4,'#f5c542');
+    c.restore();
+  }
   // GŁOWA v2 — zaokrąglona, duży ciemny ekran jak w G1
   if(dir===3){
     rr(c,2,-.5,12,10.5,3,'#ece9f4');rr(c,4,1.5,8,5.5,2,'#c9c4dd');
@@ -2444,9 +2578,9 @@ function drawEdekBody(c,x,y,dir,f,sc,eq){
     rr(c,fl?2.4:5.6,1,8,7.2,2.4,'#101020');
     rr(c,fl?3.6:10.4,3,1.9,1.9,.9,'#6fd8e8');
     const mw=eq.mustache==='was_gigant'?6:4;
-    R(c,fl?2.4:16-2.4-mw,6.4,mw,1.4,'#000');
+    R(c,fl?2.4:16-2.4-mw,6.4,mw,1.4,mCol(eq.mustache));
     drawHat(c,2,0,1,eq.hat);
-    if(eq.glasses)R(c,fl?2.6:8.6,2.6,5,2.6,eq.glasses==='pilotki'?'#f5c542':'#000');
+    if(eq.glasses)R(c,fl?2.6:8.6,2.6,5,2.6,GLS_COL[eq.glasses]||'#000');
   }
   c.restore();
 }
@@ -2457,6 +2591,15 @@ function drawHatBack(c,id){
   else if(id==='kapelusz'){R(c,.5,-1,15,1.5,'#1a1a24');R(c,3.5,-4,9,3.5,'#1a1a24');}
   else if(id==='irokez')for(let i=0;i<5;i++)R(c,4+i*1.8,-(3.5-Math.abs(i-2)*.8),1.2,(3.5-Math.abs(i-2)*.8),i%2?'#e04848':'#6fd8e8');
   else if(id==='korona')R(c,3.5,-2.5,9,2.5,'#f5c542');
+  else if(id==='korona_diamentowa')R(c,3.5,-2.5,9,2.5,'#e8f4ff');
+  else if(id==='czapka_zimowa'){R(c,1.5,-2,13,3,'#4a7ac8');R(c,1.5,.4,13,1,'#ece9f4');
+    c.fillStyle='#fff';c.beginPath();c.arc(8,-2.4,1.4,0,7);c.fill();}
+  else if(id==='bandana'){R(c,1.5,-1.2,13,2.4,'#c8384a');R(c,6.5,1,3,3.5,'#8a2438');}
+  else if(id==='beret')R(c,2,-2.2,11,2.6,'#1a1a24');
+  else if(id==='kaszkiet')R(c,1.5,-2,12,2.8,'#8a5a2e');
+  else if(id==='kask')R(c,1,-2.6,14,3.6,'#f5c542');
+  else if(id==='fedora_biala'){R(c,.5,-1,15,1.5,'#ece9f4');R(c,3.5,-4,9,3.5,'#ece9f4');}
+  else if(id==='cylinder'){R(c,.5,-1,15,1.5,'#1a1a24');R(c,4,-7,8,6.5,'#1a1a24');}
 }
 function drawItemIcon(c,id){
   c.imageSmoothingEnabled=false;c.clearRect(0,0,28,28);
@@ -2464,17 +2607,50 @@ function drawItemIcon(c,id){
   if(it.slot==='mustache')drawMustache(c,6,13,2,id);
   else if(it.slot==='hat')drawHat(c,2,14,2,id);
   else if(it.slot==='glasses')drawGlasses(c,2,5,2,id);
+  /* --- szyja --- */
   else if(id==='lancuch'){R(c,6,8,16,3,'#f5c542');R(c,12,11,4,4,'#f5c542');}
+  else if(id==='lancuch_gruby'){R(c,5,7,18,5,'#f5c542');R(c,10,12,8,7,'#f5c542');R(c,12,14,4,3,'#a8842e');}
   else if(id==='szalik'){R(c,5,8,18,5,'#c8384a');R(c,17,13,5,9,'#c8384a');}
-  else if(id==='rolex_d'){R(c,9,4,10,4,'#a8842e');R(c,9,20,10,4,'#a8842e');R(c,6,8,16,12,'#f5c542');R(c,10,11,8,6,'#fff7d6');}
-  else if(id==='peleryna'){R(c,6,4,16,20,'#a02c44');R(c,4,4,20,4,'#8a2438');}
-  else if(id==='sneakersy'){R(c,4,16,20,7,'#f5c542');R(c,4,14,8,4,'#fff7d6');}
-  else if(id==='ring_light'){c.strokeStyle='#fff7d6';c.lineWidth=3;
-    c.beginPath();c.arc(14,11,8,0,7);c.stroke();
-    R(c,13,19,2,7,'#8a8aa0');R(c,9,25,10,2,'#8a8aa0');}
+  else if(id==='krawat'){R(c,10,4,8,4,'#8a2438');R(c,11,8,6,14,'#c8384a');
+    c.fillStyle='#c8384a';c.beginPath();c.moveTo(11,22);c.lineTo(14,26);c.lineTo(17,22);c.fill();}
+  else if(id==='mucha'){R(c,4,9,8,9,'#1a1a24');R(c,16,9,8,9,'#1a1a24');R(c,12,11,4,5,'#c8384a');}
+  else if(id==='medalion_67'){R(c,9,4,10,2,'#f5c542');
+    c.fillStyle='#f5c542';c.beginPath();c.arc(14,15,8,0,7);c.fill();
+    c.fillStyle='#241b04';c.fillRect(10,11,3,7);c.fillRect(15,11,3,7);}
+  else if(id==='naszyjnik_diament'){R(c,8,4,12,2,'#c9c4dd');
+    c.fillStyle='#e8f4ff';c.beginPath();c.moveTo(14,8);c.lineTo(21,15);c.lineTo(14,23);c.lineTo(7,15);c.fill();
+    R(c,15,10,2,2,'#fff');}
   else if(id==='zloty_play'){rr(c,5,7,18,14,2,'#f5c542');
     c.fillStyle='#a8842e';c.beginPath();c.moveTo(11,10);c.lineTo(18,14);c.lineTo(11,18);c.fill();
     R(c,12,21,4,3,'#c9c4dd');}
+  /* --- zegarki --- */
+  else if(id==='rolex_d'){R(c,9,4,10,4,'#a8842e');R(c,9,20,10,4,'#a8842e');R(c,6,8,16,12,'#f5c542');R(c,10,11,8,6,'#fff7d6');}
+  else if(id==='rolex_teczowy'){R(c,9,4,10,4,'#555a70');R(c,9,20,10,4,'#555a70');
+    ['#e04848','#f5a032','#f5c542','#7bc950','#6fd8e8','#8a6fc8'].forEach((cl,i)=>R(c,6,8+i*2,16,2,cl));
+    R(c,10,11,8,6,'#fff7d6');}
+  else if(it.slot==='watch'){const wc=it.col||'#f5c542';
+    R(c,9,4,10,4,'#555a70');R(c,9,20,10,4,'#555a70');R(c,6,8,16,12,wc);
+    R(c,10,11,8,6,id==='smartwatch'?'#6fd8e8':'#fff7d6');}
+  /* --- plecy --- */
+  else if(id==='peleryna'){R(c,6,4,16,20,'#a02c44');R(c,4,4,20,4,'#8a2438');}
+  else if(id==='peleryna_zlota'){R(c,6,4,16,20,'#c9971e');R(c,4,4,20,4,'#a8842e');R(c,8,6,3,16,'#f5c542');}
+  else if(id==='plecak'){rr(c,6,6,16,17,3,'#4a8a3a');rr(c,10,10,8,6,2,'#3a6e2e');R(c,8,3,3,5,'#3a6e2e');R(c,17,3,3,5,'#3a6e2e');}
+  else if(id==='gitara'){rr(c,8,12,12,13,4,'#8a5a2e');c.fillStyle='#503018';c.beginPath();c.arc(14,18,3,0,7);c.fill();
+    R(c,12,2,4,12,'#6e4522');R(c,11,1,6,3,'#f5c542');}
+  else if(id==='skrzydla'){c.fillStyle='#f4f2ff';
+    c.beginPath();c.ellipse(8,14,5,10,-.3,0,7);c.fill();
+    c.beginPath();c.ellipse(20,14,5,10,.3,0,7);c.fill();
+    c.fillStyle='#c9c4dd';R(c,13,6,2,16,'#c9c4dd');}
+  else if(id==='jetpack'){rr(c,5,4,8,16,3,'#8a8aa0');rr(c,15,4,8,16,3,'#8a8aa0');
+    R(c,7,20,4,5,'#f5a032');R(c,17,20,4,5,'#f5a032');R(c,7,6,2,10,'#b8bcd0');R(c,17,6,2,10,'#b8bcd0');}
+  else if(id==='ring_light'){c.strokeStyle='#fff7d6';c.lineWidth=3;
+    c.beginPath();c.arc(14,11,8,0,7);c.stroke();
+    R(c,13,19,2,7,'#8a8aa0');R(c,9,25,10,2,'#8a8aa0');}
+  /* --- buty --- */
+  else if(it.slot==='shoes'){const sc2=SHOE_COL[id]||'#252038';
+    R(c,4,16,20,7,sc2);R(c,4,14,8,4,id==='glany'?'#c8384a':'#fff7d6');
+    if(id==='kalosze')R(c,6,8,6,8,sc2);
+    if(id==='buty_diament')R(c,18,17,3,2,'#fff');}
 }
 /* DYCH DZIKI — drugi robot z YT (kanoniczny wygląd z shortów Edka):
    biały robot G1, czarna czapka z daszkiem, czarna koszulka „DYCH DZIKI” */
@@ -2949,7 +3125,7 @@ function updateWorld(dt){
   P.moving=dx!==0||dy!==0;
   if(P.moving){
     if(Math.abs(dx)>Math.abs(dy))P.dir=dx<0?1:2;else P.dir=dy<0?3:0;
-    let sp=P.speed*(S.equip.shoes==='sneakersy'&&S.ch==='edek'?1.15:1)*(P.slow?.55:1)*(BUFF.t>0?1+BUFF.spd:1);
+    let sp=P.speed*(S.ch==='edek'?(SHOE_SPD[S.equip.shoes]||1):1)*(P.slow?.55:1)*(BUFF.t>0?1+BUFF.spd:1);
     const nx=P.x+dx*sp*dt,ny=P.y+dy*sp*dt;
     if(canWalk(nx,P.y))P.x=nx;
     if(canWalk(P.x,ny))P.y=ny;
