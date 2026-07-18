@@ -555,26 +555,40 @@ function buildTatry(){
   for(let x=44;x<=52;x++)if(at(x,15)===0)set(x,15,13);
 }
 const REGIONS={
-  wawa:{n:'WARSZAWA',w:64,h:44,build:buildWawa,spawn:[456,368],pks:[24,24],ic:'🏙',
+  wawa:{n:'WARSZAWA',w:92,h:44,build:buildWawa,spawn:[456,368],pks:[24,24],ic:'🏙',
     tdesc:'stolica · 10 questów · Piwnica Hejterów · Król Dzików',
     cars:true,boars:true,leaves:true,smoke:true,boat:true,
-    foesMax:6,foeTypes:['hejter','dres','pies','oburzona','zlyrobot'],zones:[[38,36,55,42],[2,22,8,32],[12,2,24,8]]},
-  chodziez:{n:'CHODZIEŻ',w:48,h:36,build:buildChodziez,spawn:[20*16,15.5*16],pks:[20,14],ic:'🏡',
+    foesMax:6,foeTypes:['hejter','dres','pies','oburzona','zlyrobot'],zones:[[38,36,55,42],[2,22,8,32],[12,2,24,8]],
+    /* wielka arena bossa za Wisłą (leśna), połączona kładką */
+    arena:{floor:0,wall:4,band:[64,0,91,43],ai:[66,13,81,26],corr:[56,18,65,20],
+      flank:[[64,17,65,17],[64,21,65,21]],sign:[58,19],boss:[73,19]}},
+  chodziez:{n:'CHODZIEŻ',w:74,h:36,build:buildChodziez,spawn:[20*16,15.5*16],pks:[20,14],ic:'🏡',
     tdesc:'rodzinne strony Edka · targ · Dziki Las · MEGA DRES',
     cars:false,boars:false,leaves:true,smoke:false,boat:true,
-    foesMax:5,foeTypes:['zazdrosnik','hejter','pies','oburzona'],zones:[[36,2,46,12],[2,17,8,23]]},
-  morze:{n:'POLSKIE MORZE',w:56,h:30,build:buildMorze,spawn:[18*16,25.4*16],pks:[18,26],ic:'🌊',
+    foesMax:5,foeTypes:['zazdrosnik','hejter','pies','oburzona'],zones:[[36,2,46,12],[2,17,8,23]],
+    arena:{floor:0,wall:4,band:[48,0,73,35],ai:[54,12,69,25],corr:[47,17,53,19],
+      flank:[[48,16,53,16],[48,20,53,20]],sign:[49,18],boss:[61,18]}},
+  morze:{n:'POLSKIE MORZE',w:82,h:30,build:buildMorze,spawn:[18*16,25.4*16],pks:[18,26],ic:'🌊',
     tdesc:'plaża · molo · bursztyny · Zatopione Molo · Kraken',
     cars:false,boars:false,leaves:false,smoke:false,boat:true,
-    foesMax:5,foeTypes:['dres','hejter','zlyrobot','pies'],zones:[[4,12,24,16],[32,11,54,16]]},
-  krakow:{n:'KRAKÓW',w:60,h:40,build:buildKrakow,spawn:[51*16,29.5*16],pks:[51,28],ic:'🐉',
+    foesMax:5,foeTypes:['dres','hejter','zlyrobot','pies'],zones:[[4,12,24,16],[32,11,54,16]],
+    /* arena Krakena: piaszczysta wyspa otoczona morzem (fosą), pomost jako brama */
+    arena:{floor:8,wall:3,band:[56,0,81,29],ai:[62,10,77,23],corr:[55,15,61,17],
+      flank:[],sign:[57,16],boss:[69,16]}},
+  krakow:{n:'KRAKÓW',w:86,h:40,build:buildKrakow,spawn:[51*16,29.5*16],pks:[51,28],ic:'🐉',
     tdesc:'Rynek · Sukiennice · Wawel · Smocza Jama · SMOK',
     cars:false,boars:false,leaves:true,smoke:false,boat:false,
-    foesMax:5,foeTypes:['hejter','zazdrosnik','oburzona','pies'],zones:[[2,2,12,20],[46,2,57,18]]},
-  tatry:{n:'TATRY — ZAKOPANE',w:56,h:36,build:buildTatry,spawn:[39*16,28.5*16],pks:[39,26],ic:'🏔',
+    foesMax:5,foeTypes:['hejter','zazdrosnik','oburzona','pies'],zones:[[2,2,12,20],[46,2,57,18]],
+    /* arena Smoka: skalna jama za miastem */
+    arena:{floor:0,wall:16,band:[60,0,85,39],ai:[66,13,81,26],corr:[59,18,65,20],
+      flank:[[60,17,65,17],[60,21,65,21]],sign:[61,19],boss:[73,19]}},
+  tatry:{n:'TATRY — ZAKOPANE',w:82,h:36,build:buildTatry,spawn:[39*16,28.5*16],pks:[39,26],ic:'🏔',
     tdesc:'Krupówki · Giewont · oscypki · Lodowa Grota · YETI',
     cars:false,boars:false,leaves:true,smoke:false,boat:false,
-    foesMax:5,foeTypes:['dres','zazdrosnik','pies','zlyrobot'],zones:[[4,28,20,33],[30,10,52,14]]},
+    foesMax:5,foeTypes:['dres','zazdrosnik','pies','zlyrobot'],zones:[[4,28,20,33],[30,10,52,14]],
+    /* arena Yeti: śnieżny kocioł otoczony skałami */
+    arena:{floor:17,wall:16,band:[56,0,81,35],ai:[62,13,77,26],corr:[55,18,61,20],
+      flank:[[56,17,61,17],[56,21,61,21]],sign:[57,19],boss:[69,19]}},
 };
 let REG='wawa';
 const SOLID=v=>v===3||v===4||v===5||v===6||(v>=10&&v<=16);
@@ -642,19 +656,30 @@ let selfieT=45,dropT=14,leafT=0,smokeT=0,worldFlash=0,boatY=8*16,boatV=12;
 /* walka */
 let foes=[],hitFX=[],foeT=6,bossShots=[];
 let hurtT=0,atkT=0,atkAnim=0,atkDir=0,spcT=0,dashT=0,dashDir=0;
-const BOSS_LEASH=190; /* promień areny bossa (px) — dalej = boss wraca na środek i walka od nowa */
+const BOSS_LEASH=320; /* promień areny bossa (px) — dalej = boss wraca na środek i walka od nowa (arena jest duża i murowana) */
 const DV=[[0,1],[-1,0],[1,0],[0,-1]]; // wektory kierunków (dół/lewo/prawo/góra)
 /* ekipa: reszta drużyny idzie za graczem (max 2 z tyłu) */
 const FOLW=[{x:0,y:0,dir:0,frame:0},{x:0,y:0,dir:0,frame:0}];
 function resetFollowers(){for(const fo of FOLW){fo.x=P.x;fo.y=P.y+14;}}
 let dychIdleT=20;
 
+/* wielka, oddzielona arena bossa w dołożonej przestrzeni mapy:
+   czysty pas podłoża → gruby mur naturalny (las/skała/woda) → wnętrze → korytarz-brama */
+function buildBossArena(cfg){
+  const A=cfg.arena;if(!A)return;
+  rect(A.band[0],A.band[1],A.band[2],A.band[3],A.floor);          // wyczyść dołożony pas do podłoża
+  rect(A.ai[0]-3,A.ai[1]-3,A.ai[2]+3,A.ai[3]+3,A.wall);           // gruby mur (3 kafle)
+  rect(A.ai[0],A.ai[1],A.ai[2],A.ai[3],A.floor);                 // otwarte wnętrze areny
+  for(const f of (A.flank||[]))rect(f[0],f[1],f[2],f[3],A.wall); // ściany wzdłuż korytarza
+  rect(A.corr[0],A.corr[1],A.corr[2],A.corr[3],1);               // korytarz/kładka — przebija mur = brama
+}
 /* ---------------- REGIONY: przełączanie ---------------- */
 function setRegion(id){
   const cfg=REGIONS[id];if(!cfg)return;
   REG=id;MW=cfg.w;MH=cfg.h;
   M=new Uint8Array(MW*MH);
   cfg.build();
+  buildBossArena(cfg);
   /* duża, otwarta arena wokół spawnu bossa: karczujemy przeszkody w promieniu 5 kafli,
      wstawiając najczęstszy deptalny kafel z okolicy (trawa/piasek/śnieg wg regionu) */
   for(const b of Object.values(BOSSES)){
@@ -1467,27 +1492,27 @@ function exitDomain(){
    BOSSOWIE REGIONALNI
    ===================================================================== */
 const BOSSES={
-  krol:{r:'wawa',x:8,y:6,t:'krol',n:'KRÓL DZIKÓW',batk:'charge',
+  krol:{r:'wawa',x:73,y:19,t:'krol',n:'KRÓL DZIKÓW',batk:'charge',
     film:'WALCZĘ Z KRÓLEM DZIKÓW! (prawie mnie stratował)',
     intro:[['Edek','Te dziki mają swojego króla?! Miasto to nie chlew, byku!','c_problemy'],
            ['KRÓL DZIKÓW','CHRUM CHRUM!!! TO MÓJ PARK, BLASZAKU!'],
            ['Edek','Uciekajcie stąd, dziki! Zbierajcie się, no już!','c_uciekajcie']]},
-  seba:{r:'chodziez',x:41,y:20,t:'mdres',n:'MEGA DRES SEBASTIAN OSTATECZNY',batk:'kettle',
+  seba:{r:'chodziez',x:61,y:18,t:'mdres',n:'MEGA DRES SEBASTIAN OSTATECZNY',batk:'kettle',
     film:'MEGA DRES CHCIAŁ MI ZABRAĆ ROLEXA (poszło z kopyta)',
     intro:[['Sebastian Ostateczny','Patrzcie, robot-celebryta. Oddawaj rolexa i kanał, blaszko!'],
            ['Edek','Jestem Warchockim Edwardem, byku. Rolex zostaje na lewej.','c_rolexlewa'],
            ['Sebastian Ostateczny','TO TERAZ ZOBACZYSZ KETTLE Z CHODZIEŻY!']]},
-  kraken:{r:'morze',x:32,y:12,t:'kraken',n:'KRAKEN BAŁTYCKI',batk:'bryzg',
+  kraken:{r:'morze',x:69,y:16,t:'kraken',n:'KRAKEN BAŁTYCKI',batk:'bryzg',
     film:'KRAKEN W BAŁTYKU?! (nagrałem wszystko)',
     intro:[['Rybak Bogdan','Panie Edward! COŚ wyszło z morza i kradnie bursztyny!'],
            ['KRAKEN BAŁTYCKI','BLUB BLUB... WYŚWIETLENIA... ODDAĆ... MOJE...'],
            ['Edek','Zobaczcie, co mi los przyniesie. Macki kontra rolex!','v_los']]},
-  smok:{r:'krakow',x:19,y:31,t:'smok',n:'SMOK WAWELSKI',batk:'ogien',
+  smok:{r:'krakow',x:73,y:19,t:'smok',n:'SMOK WAWELSKI',batk:'ogien',
     film:'OBUDZIŁEM SMOKA WAWELSKIEGO (Kraków ewakuowany?!)',
     intro:[['Przekupka','Panie Edwardzie! Smok się obudził i żąda... wyświetleń!'],
            ['SMOK WAWELSKI','TYSIĄC LAT SPAŁEM. A TERAZ JAKIŚ BLASZAK MA WIĘCEJ FANÓW ODE MNIE?!'],
            ['Edek','Człowieku, ja mam rolexa z diamentami. A ty? Ogień z paszczy. Wyrównajmy rachunki.','c_rolextiktok']]},
-  yeti:{r:'tatry',x:14,y:7,t:'yeti',n:'YETI Z GIEWONTU',batk:'snieg',
+  yeti:{r:'tatry',x:69,y:19,t:'yeti',n:'YETI Z GIEWONTU',batk:'snieg',
     film:'YETI ISTNIEJE!!! (nagranie z Giewontu, nie klikbajt)',
     intro:[['Baca','Edek, cosik po graniach chodzi i porywa oscypki! Jak nic — YETI!'],
            ['YETI','GRRR! MOJE GÓRY! MOJA CISZA! ZABIERAJ TE KAMERY!'],
@@ -3494,6 +3519,22 @@ function drawWorld(){
         cx.restore();
         cx.font='6px "Press Start 2P"';cx.textAlign='center';cx.fillStyle='rgba(224,72,72,.95)';
         cx.fillText('BOSS: '+b.n,sx,sy-16);cx.textAlign='left';
+      }
+    }
+    /* drogowskaz do oddzielonej areny bossa (przy wejściu do korytarza) */
+    const AR=REGIONS[REG].arena;
+    if(AR&&AR.sign){
+      const bid=Object.keys(BOSSES).find(id=>BOSSES[id].r===REG);
+      if(bid&&!bossOnMap(bid)&&!(bossCdT[bid]>0)){
+        const sx=AR.sign[0]*16+8-camX,sy=AR.sign[1]*16+8-camY;
+        if(sx>-60&&sx<W+60&&sy>-40&&sy<H+40){
+          const p=1+Math.sin(anim*4)*.1;
+          cx.save();cx.translate(sx,sy-6);cx.scale(p,p);
+          cx.font='7px "Press Start 2P"';cx.textAlign='center';
+          cx.fillStyle='#000';cx.fillText('⚔ ARENA →',1,1);
+          cx.fillStyle='#f5c542';cx.fillText('⚔ ARENA →',0,0);
+          cx.restore();cx.textAlign='left';
+        }
       }
     }
   }else{
