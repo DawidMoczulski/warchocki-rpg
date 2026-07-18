@@ -780,20 +780,29 @@ function reachMask(sx,sy){
       if(SOLID(at(nx,ny)))continue;const kk=ny*MW+nx;if(seen[kk])continue;seen[kk]=1;q.push(kk);}}
   return seen;
 }
+/* wytnij drogę od (x0,y0) do (x1,y1); szerokość w kafli; nie rusza dróg/budynków miasta (1,2,5,6) */
+function carvePath(x0,y0,x1,y1,w,tile){
+  tile=tile||23;const hw=(w-1)>>1;let x=x0,y=y0,g=0;
+  const stamp=(cx2,cy2)=>{for(let dy=-hw;dy<=hw;dy++)for(let dx=-hw;dx<=hw;dx++){
+    const tx=cx2+dx,ty=cy2+dy;if(tx<1||ty<1||tx>=MW-1||ty>=MH-1)continue;
+    const v=at(tx,ty);if(v===1||v===2||v===5||v===6)continue;if(v!==tile)set(tx,ty,tile);}};
+  while((x!==x1||y!==y1)&&g++<2000){stamp(x,y);
+    if(Math.abs(x1-x)>=Math.abs(y1-y))x+=Math.sign(x1-x);else y+=Math.sign(y1-y);}
+  stamp(x1,y1);
+}
 function ensureConnectivity(cfg){
   const stx=Math.floor(cfg.spawn[0]/16),sty=Math.floor(cfg.spawn[1]/16);
-  const carve=(tx,ty)=>{let x=tx,y=ty,g=0;
-    while((x!==stx||y!==sty)&&g++<600){
-      if(SOLID(at(x,y)))set(x,y,23);
-      if(Math.abs(stx-x)>=Math.abs(sty-y))x+=Math.sign(stx-x);else y+=Math.sign(sty-y);}};
+  /* ZAWSZE prowadź szeroką (3), widoczną leśną drogę od miasta do wejścia areny —
+     żeby gracz miał czytelny i wygodny szlak do bossa (nie tylko cienki tunel) */
+  if(cfg.arena){const c=cfg.arena.corr,mx=c[0],my=Math.round((c[1]+c[3])/2);
+    carvePath(stx,sty,mx,my,3,23);}
+  /* siatka bezpieczeństwa: dodatkowo dokop do niedostępnych drzwi/domen (3 szerokości) */
   const targets=[];
   for(const d of DOORS)if(d.r===REG)targets.push([d.x,d.y]);
   for(const dm of Object.values(DOMAINS))if(dm.r===REG)targets.push([dm.x,dm.y]);
-  if(cfg.arena)targets.push(cfg.arena.sign);
-  let seen=reachMask(stx,sty),fixed=false;
+  let seen=reachMask(stx,sty);
   for(const t of targets){const nw=nearestWalkableTile(t[0]|0,t[1]|0);
-    if(nw&&!seen[nw[1]*MW+nw[0]]){carve(nw[0],nw[1]);fixed=true;}}
-  if(fixed)reachMask(stx,sty);
+    if(nw&&!seen[nw[1]*MW+nw[0]])carvePath(nw[0],nw[1],stx,sty,3,23);}
 }
 /* wielka, oddzielona arena bossa w dołożonej przestrzeni mapy:
    czysty pas podłoża → gruby mur naturalny (las/skała/woda) → wnętrze → korytarz-brama */
@@ -4166,6 +4175,21 @@ function drawWorld(){
           cx.font='7px "Press Start 2P"';cx.textAlign='center';
           cx.fillStyle='#000';cx.fillText('⚔ ARENA →',1,1);
           cx.fillStyle='#f5c542';cx.fillText('⚔ ARENA →',0,0);
+          cx.restore();cx.textAlign='left';
+        }
+      }
+      /* strzałka na krawędzi ekranu prowadząca do areny (gdy poza widokiem) */
+      if(bid&&!bossOnMap(bid)&&!(bossCdT[bid]>0)&&AR.boss){
+        const bxp=AR.boss[0]*16+8-camX,byp=AR.boss[1]*16+8-camY;
+        if(bxp<10||bxp>W-10||byp<10||byp>H-10){
+          const ang=Math.atan2(byp-H/2,bxp-W/2),mg=34;
+          const ex=Math.max(mg,Math.min(W-mg,W/2+Math.cos(ang)*500)),ey=Math.max(mg,Math.min(H-mg,H/2+Math.sin(ang)*500));
+          cx.save();cx.translate(ex,ey);
+          cx.fillStyle='rgba(20,10,20,.5)';cx.beginPath();cx.arc(0,0,13,0,7);cx.fill();
+          cx.save();cx.rotate(ang);cx.fillStyle='#e04848';
+          cx.beginPath();cx.moveTo(9,0);cx.lineTo(-4,-6);cx.lineTo(-4,6);cx.closePath();cx.fill();cx.restore();
+          cx.font='6px "Press Start 2P"';cx.textAlign='center';
+          cx.fillStyle='#000';cx.fillText('⚔ ARENA',1,20);cx.fillStyle='#f5c542';cx.fillText('⚔ ARENA',0,19);
           cx.restore();cx.textAlign='left';
         }
       }
