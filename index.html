@@ -27,6 +27,7 @@
     <button class="hudbtn" id="btnPhone" title="Kanał Edka">📱</button>
     <button class="hudbtn" id="btnFit">🧥</button>
     <button class="hudbtn" id="btnQuest">📜</button>
+    <button class="hudbtn" id="btnAudio" title="Głośność: głos / muzyka">🎚️</button>
     <button class="hudbtn" id="btnFS">⛶</button>
     <button class="hudbtn" id="btnMute">🔊</button>
   </div>
@@ -138,6 +139,24 @@
       <button class="xbtn" data-close="travel">✕</button>
     </div>
     <div class="panelBody"><div id="travelList"></div></div>
+  </div>
+
+  <div id="audio" class="panel px hidden">
+    <div class="panelHead">
+      <h2>🎚️ PANEL DŹWIĘKU</h2>
+      <button class="xbtn" data-close="audio">✕</button>
+    </div>
+    <div class="panelBody" style="flex-direction:column;gap:20px">
+      <div class="volrow">
+        <label>🎤 Głos Edka i Dycha <span id="volVoiceVal">100%</span></label>
+        <input id="volVoice" type="range" min="0" max="100" step="1" value="100">
+      </div>
+      <div class="volrow">
+        <label>🎵 Muzyka <span id="volMusicVal">100%</span></label>
+        <input id="volMusic" type="range" min="0" max="100" step="1" value="100">
+      </div>
+      <button id="audioMute" class="ghostbtn px">🔊 WYCISZ WSZYSTKO</button>
+    </div>
   </div>
 
   <div id="mgEnd" class="ov hidden">

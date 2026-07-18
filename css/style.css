@@ -216,4 +216,19 @@ h1.px{margin:0;font-size:clamp(20px,4.6vw,36px);color:var(--gold);
   pointer-events:none;opacity:0;transition:opacity .25s;text-align:center;line-height:1.8;max-width:80%;
   box-shadow:0 10px 30px -8px rgba(0,0,0,.7),0 0 20px -6px rgba(245,197,66,.4)}
 #toast.show{opacity:1}
+/* panel dźwięku — suwaki głosu i muzyki */
+#audio .panelBody{padding:22px 26px;align-items:stretch}
+.volrow{display:flex;flex-direction:column;gap:12px;background:linear-gradient(170deg,var(--panel2),#221c3e);
+  border:2px solid var(--edge);border-radius:12px;padding:16px 18px}
+.volrow label{font-size:12px;color:var(--pearl);display:flex;justify-content:space-between;align-items:center}
+.volrow label span{color:var(--gold);font-size:13px}
+.volrow input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:14px;border-radius:8px;
+  background:linear-gradient(90deg,var(--gold) 0%,var(--gold) var(--fill,100%),#2a2344 var(--fill,100%),#2a2344 100%);
+  border:2px solid var(--edge);cursor:pointer;outline:none}
+.volrow input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:26px;height:26px;
+  border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff7d6,var(--gold));border:2px solid #1a1530;
+  box-shadow:0 3px 8px -2px rgba(0,0,0,.6);cursor:pointer}
+.volrow input[type=range]::-moz-range-thumb{width:24px;height:24px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#fff7d6,var(--gold));border:2px solid #1a1530;cursor:pointer}
+#audioMute{align-self:center;margin-top:4px}
 footer{margin-top:16px;font-size:13px;color:var(--mut);text-align:center;max-width:70ch;line-height:1.7}

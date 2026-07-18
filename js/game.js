@@ -64,6 +64,19 @@ let AC=null,master=null,musicGain=null,voiceGain=null,chipGain=null,battleGain=n
 let songSrc=null,songT0=0;
 const BUFS={};
 let muted=store.get('wrpg_mute')==='1';
+/* osobne poziomy: głos bohaterów vs muzyka (0..1), zapamiętywane w localStorage */
+let voiceVol=(v=>isNaN(v)?1:v)(parseFloat(store.get('wrpg_vol_voice')));
+let musicVol=(v=>isNaN(v)?1:v)(parseFloat(store.get('wrpg_vol_music')));
+let ducking=false;
+/* przelicz i zastosuj bazowe wzmocnienia (uwzględnia stan „duck" przy gadaniu Edka) */
+function applyVolumes(){
+  if(!AC)return;
+  const t=AC.currentTime;
+  voiceGain.gain.setTargetAtTime(voiceVol,t,.03);
+  musicGain.gain.setTargetAtTime(.9*musicVol,t,.03);
+  chipGain.gain.setTargetAtTime((ducking?.18:1)*musicVol,t,.03);
+  if(battleGain)battleGain.gain.setTargetAtTime((ducking?BATTLE_VOL*.3:BATTLE_VOL)*musicVol,t,.03);
+}
 function loadClip(k){
   return fetch(AUDIO_BASE+k+'.mp3').then(r=>{
     if(!r.ok)throw new Error(k+': HTTP '+r.status);
@@ -75,10 +88,10 @@ function initAudio(){
   try{
     AC=new (window.AudioContext||window.webkitAudioContext)();
     master=AC.createGain();master.gain.value=muted?0:1;master.connect(AC.destination);
-    musicGain=AC.createGain();musicGain.gain.value=.9;musicGain.connect(master);
-    battleGain=AC.createGain();battleGain.gain.value=BATTLE_VOL;battleGain.connect(master);
-    chipGain=AC.createGain();chipGain.gain.value=1;chipGain.connect(master);
-    voiceGain=AC.createGain();voiceGain.gain.value=1;voiceGain.connect(master);
+    musicGain=AC.createGain();musicGain.gain.value=.9*musicVol;musicGain.connect(master);
+    battleGain=AC.createGain();battleGain.gain.value=BATTLE_VOL*musicVol;battleGain.connect(master);
+    chipGain=AC.createGain();chipGain.gain.value=musicVol;chipGain.connect(master);
+    voiceGain=AC.createGain();voiceGain.gain.value=voiceVol;voiceGain.connect(master);
     const jobs=AUDIO_KEYS.map(k=>loadClip(k).then(buf=>{BUFS[k]=buf;}).catch(()=>{}));
     return Promise.all(jobs);
   }catch(e){return Promise.resolve();}
@@ -86,14 +99,15 @@ function initAudio(){
 /* --- menedżer głosu: jeden klip naraz + przyciszanie muzyki + kolejka --- */
 let curVoice=null,voiceQ=[];
 function duck(on){
+  ducking=on;
   if(!AC)return;
   const t=AC.currentTime;
   chipGain.gain.cancelScheduledValues(t);
-  chipGain.gain.setTargetAtTime(on?.18:1,t,.08);
+  chipGain.gain.setTargetAtTime((on?.18:1)*musicVol,t,.08);
   /* muzyka bitewna jest agresywna — przy klipach Edka schodzi jeszcze niżej */
   if(battleGain){
     battleGain.gain.cancelScheduledValues(t);
-    battleGain.gain.setTargetAtTime(on?BATTLE_VOL*.3:BATTLE_VOL,t,.08);
+    battleGain.gain.setTargetAtTime((on?BATTLE_VOL*.3:BATTLE_VOL)*musicVol,t,.08);
   }
 }
 function fadeOut(s){ // miękkie wyciszenie klipu (0,22 s) zamiast ucięcia
@@ -219,9 +233,31 @@ $('btnMute').addEventListener('click',()=>{
   muted=!muted;store.set('wrpg_mute',muted?'1':'0');
   if(master)master.gain.value=muted?0:1;
   $('btnMute').textContent=muted?'🔇':'🔊';
+  const am=$('audioMute');if(am)am.textContent=muted?'🔇 WŁĄCZ DŹWIĘK':'🔊 WYCISZ WSZYSTKO';
   if(!muted)startMenuMusic();
 });
 if(muted)$('btnMute').textContent='🔇';
+
+/* ---------------- PANEL DŹWIĘKU: osobno głos i muzyka ---------------- */
+function setSliderFill(el){el.style.setProperty('--fill',el.value+'%');}
+function openAudio(){
+  SFX.open();
+  const vv=Math.round(voiceVol*100),mv=Math.round(musicVol*100);
+  $('volVoice').value=vv;$('volVoiceVal').textContent=vv+'%';setSliderFill($('volVoice'));
+  $('volMusic').value=mv;$('volMusicVal').textContent=mv+'%';setSliderFill($('volMusic'));
+  $('audioMute').textContent=muted?'🔇 WŁĄCZ DŹWIĘK':'🔊 WYCISZ WSZYSTKO';
+  $('audio').classList.remove('hidden');
+}
+$('btnAudio').addEventListener('click',()=>{initAudio();openAudio();});
+$('volVoice').addEventListener('input',e=>{
+  voiceVol=(+e.target.value)/100;store.set('wrpg_vol_voice',voiceVol);
+  $('volVoiceVal').textContent=e.target.value+'%';setSliderFill(e.target);applyVolumes();
+});
+$('volMusic').addEventListener('input',e=>{
+  musicVol=(+e.target.value)/100;store.set('wrpg_vol_music',musicVol);
+  $('volMusicVal').textContent=e.target.value+'%';setSliderFill(e.target);applyVolumes();
+});
+$('audioMute').addEventListener('click',()=>$('btnMute').click());
 
 /* --- smaczek 67 --- */
 let last67=-1e9;
@@ -522,23 +558,23 @@ const REGIONS={
   wawa:{n:'WARSZAWA',w:64,h:44,build:buildWawa,spawn:[456,368],pks:[24,24],ic:'🏙',
     tdesc:'stolica · 10 questów · Piwnica Hejterów · Król Dzików',
     cars:true,boars:true,leaves:true,smoke:true,boat:true,
-    foesMax:5,foeTypes:['hejter','dres'],zones:[[38,36,55,42],[2,22,8,32],[12,2,24,8]]},
+    foesMax:6,foeTypes:['hejter','dres','pies','oburzona','zlyrobot'],zones:[[38,36,55,42],[2,22,8,32],[12,2,24,8]]},
   chodziez:{n:'CHODZIEŻ',w:48,h:36,build:buildChodziez,spawn:[20*16,15.5*16],pks:[20,14],ic:'🏡',
     tdesc:'rodzinne strony Edka · targ · Dziki Las · MEGA DRES',
     cars:false,boars:false,leaves:true,smoke:false,boat:true,
-    foesMax:4,foeTypes:['zazdrosnik','hejter'],zones:[[36,2,46,12],[2,17,8,23]]},
+    foesMax:5,foeTypes:['zazdrosnik','hejter','pies','oburzona'],zones:[[36,2,46,12],[2,17,8,23]]},
   morze:{n:'POLSKIE MORZE',w:56,h:30,build:buildMorze,spawn:[18*16,25.4*16],pks:[18,26],ic:'🌊',
     tdesc:'plaża · molo · bursztyny · Zatopione Molo · Kraken',
     cars:false,boars:false,leaves:false,smoke:false,boat:true,
-    foesMax:5,foeTypes:['dres','hejter'],zones:[[4,12,24,16],[32,11,54,16]]},
+    foesMax:5,foeTypes:['dres','hejter','zlyrobot','pies'],zones:[[4,12,24,16],[32,11,54,16]]},
   krakow:{n:'KRAKÓW',w:60,h:40,build:buildKrakow,spawn:[51*16,29.5*16],pks:[51,28],ic:'🐉',
     tdesc:'Rynek · Sukiennice · Wawel · Smocza Jama · SMOK',
     cars:false,boars:false,leaves:true,smoke:false,boat:false,
-    foesMax:5,foeTypes:['hejter','zazdrosnik'],zones:[[2,2,12,20],[46,2,57,18]]},
+    foesMax:5,foeTypes:['hejter','zazdrosnik','oburzona','pies'],zones:[[2,2,12,20],[46,2,57,18]]},
   tatry:{n:'TATRY — ZAKOPANE',w:56,h:36,build:buildTatry,spawn:[39*16,28.5*16],pks:[39,26],ic:'🏔',
     tdesc:'Krupówki · Giewont · oscypki · Lodowa Grota · YETI',
     cars:false,boars:false,leaves:true,smoke:false,boat:false,
-    foesMax:4,foeTypes:['dres','zazdrosnik'],zones:[[4,28,20,33],[30,10,52,14]]},
+    foesMax:5,foeTypes:['dres','zazdrosnik','pies','zlyrobot'],zones:[[4,28,20,33],[30,10,52,14]]},
 };
 let REG='wawa';
 const SOLID=v=>v===3||v===4||v===5||v===6||(v>=10&&v<=16);
@@ -667,6 +703,10 @@ const FOE_TYPES={
   hejter:{hp:45,atk:10,spd:52,c:'#3a3a5a',hood:'#2a2a44',skin:'#d8b890',dia:3,pts:900},
   dres:{hp:80,atk:14,spd:66,c:'#1a1a24',hood:'#31518f',skin:'#e8c9a0',dia:5,pts:1400},
   zazdrosnik:{hp:60,atk:12,spd:58,c:'#4a5a3a',hood:'#6a4a2a',skin:'#e8c9a0',dia:4,pts:1100},
+  /* nowi przeciwnicy */
+  pies:{hp:34,atk:9,spd:84,c:'#6e4a28',hood:'#4a2f18',skin:'#6e4a28',dia:2,pts:700},          // szczekający kundel — szybki, słaby
+  oburzona:{hp:70,atk:11,spd:50,c:'#8a4a6a',hood:'#c86fa8',skin:'#e8c9a0',dia:4,pts:1200},     // pani oburzona nowoczesnymi robotami
+  zlyrobot:{hp:120,atk:13,spd:44,c:'#23232f',hood:'#c02020',skin:'#3a3a4a',dia:8,pts:1900,shoots:true}, // zły robot — strzela czerwonymi pociskami
   gigadres:{hp:220,atk:18,spd:58,c:'#0e0e16',hood:'#c8384a',skin:'#e8c9a0',dia:10,pts:3000},
   straznik:{hp:400,atk:20,spd:48,c:'#2a2440',hood:'#8a6fc8',skin:'#c9c4dd',dia:20,pts:8000},
   /* bossowie */
@@ -961,6 +1001,22 @@ function updateFoes(dt){
             atk:Math.round((f.gatk||14))});}
         addHit(f.x,f.y-30,'SALWA!','#8a6fc8');
         beep(300,.2,'sawtooth',.08,120);
+      }
+    }
+    /* ZŁY ROBOT: co jakiś czas strzela czerwonym pociskiem w gracza (z krótkim „ładunkiem") */
+    if(td.shoots&&!f.boss){
+      if(f.shootT===undefined)f.shootT=1.6+Math.random()*2.2;
+      f.shootT-=dt;
+      f.chargeT=(f.shootT<.5&&d<240)?f.shootT:0;   // świecenie wizjera tuż przed strzałem
+      if(f.shootT<=0){
+        f.shootT=2.6+Math.random()*1.8;
+        if(d<240){
+          const a=Math.atan2(P.y-f.y,P.x-f.x);
+          bossShots.push({x:f.x,y:f.y-6,dx:Math.cos(a)*150,dy:Math.sin(a)*150,life:2.2,t:'laser',
+            atk:Math.round(td.atk*.9)});
+          addHit(f.x,f.y-28,'PIF!','#e03028');
+          beep(520,.12,'square',.06,180);
+        }
       }
     }
     /* BOSS: fazy + ataki specjalne + ARENA (leash — ucieczka gracza = walka od nowa) */
@@ -1884,7 +1940,7 @@ function refreshHUD(){
   $('questHint').textContent=act?('▶ '+QUESTS[act].n):(S.legend?'👑 LEGENDA INTERNETU':
     discN?('questy: '+doneN+'/'+discN+' odkrytych — szukaj „!”'):'szukaj ludzi z „!” nad głową');
 }
-function closePanels(){['fit','quests','phone','travel','chars','gacha','hero','bag','shop'].forEach(id=>$(id).classList.add('hidden'));}
+function closePanels(){['fit','quests','phone','travel','chars','gacha','hero','bag','shop','audio'].forEach(id=>$(id).classList.add('hidden'));}
 document.querySelectorAll('.xbtn').forEach(b=>b.addEventListener('click',()=>{SFX.close();$(b.dataset.close).classList.add('hidden');}));
 $('btnFit').addEventListener('click',()=>openFit(false));
 $('btnQuest').addEventListener('click',openQuests);
@@ -2254,6 +2310,14 @@ function talkTo(n){
       break;
   }
 }
+/* nagraj content w miejscu: zawsze zasięgi + filmik, przy PIERWSZYM razie premia 💎 */
+function recordSpot(key,title,firstDia){
+  addViews(3000+Math.random()*4000,true);
+  postFilm(title,9000+Math.random()*8000);
+  if(!S.mile[key]){S.mile[key]=1;S.dia+=firstDia;save();refreshHUD();SFX.dia();worldFlash=.4;
+    burstConfetti();toast('🎬 Nowe miejsce na kanale: '+title+'<br>+'+firstDia+'💎');}
+  else toast('🎬 Kręcę content: '+title);
+}
 function enterDoor(d){
   switch(d.act){
     case 'bazar':openFit(true);break;
@@ -2263,10 +2327,12 @@ function enterDoor(d){
     case 'kopernik':talkTo(NPCS.find(n=>n.id==='ochrona_cnk'));break;
     case 'metro':talkTo(NPCS.find(n=>n.id==='maszynista'));break;
     case 'pkin':say([{who:'Edek',t:'Pałac Kultury. Kiedyś zrobię z niego największy ring świateł na moje urodziny.'},
-      {who:'Edek',t:'A wy to co? Też lubicie czasem spontan?',v:'v_spontan'}]);break;
+      {who:'Edek',t:'A wy to co? Też lubicie czasem spontan? No to kręcimy filmik!',v:'v_spontan'}],
+      ()=>recordSpot('pkin','KRĘCĘ POD PAŁACEM KULTURY (spontan!)',14));break;
     case 'pks':openTravel();break;
     case 'dom':say([{who:'Edek',t:'Mój dom w Chodzieży. Tu się wszystko zaczęło, człowieku.'},
-      {who:'Edek',t:'Życie jest za krótkie, żeby wszystko planować co do minuty.',v:'v_zycie'}]);break;
+      {who:'Edek',t:'Życie jest za krótkie, żeby wszystko planować co do minuty. Pozdro dla starych fanów!',v:'v_zycie'}],
+      ()=>recordSpot('dom','WRACAM DO DOMU W CHODZIEŻY (tu się zaczęło!)',12));break;
     case 'dino2':say([{who:'Edek',t:'Panie, ja tu jestem od napojów, nie od procentów!',v:'v_napoje'},
       {who:'Edek',t:'Paleta z moimi napojami jest rewelacyjnie wyeksponowana!',v:'v_paleta'}],
       ()=>{if(!S.mile['dino_'+REG]){S.mile['dino_'+REG]=1;S.dia+=5;save();refreshHUD();SFX.dia();
@@ -2280,13 +2346,20 @@ function enterDoor(d){
     case 'oscypki':openShop('oscypki');break;
     case 'obwarzanki':openShop('obwarzanki');break;
     case 'sukiennice':say([{who:'Edek',t:'Sukiennice! Tu się handluje od 700 lat. Stary bazar, ale zasięgi ma do dziś.'},
-      {who:'Edek',t:'No co ja na to poradzę, że jestem taki rozchwytywany.',v:'c_rozchwytywany'}]);break;
+      {who:'Edek',t:'No co ja na to poradzę, że jestem taki rozchwytywany. Robimy filmik dla fanów!',v:'c_rozchwytywany'}],
+      ()=>recordSpot('sukiennice','KRĘCĘ W SUKIENNICACH (700 lat handlu, teraz JA)',13));break;
     case 'wawel':say([{who:'Edek',t:'Wawel, człowieku. Zamek królów. Kiedyś zrobię tu z ekipą teledysk.'},
       {who:'Edek',t:'Zobaczcie, co mi los przyniesie.',v:'v_los'}],
       ()=>{if(!S.mile.wawel){S.mile.wawel=1;save();postFilm('ZWIEDZAM WAWEL (król tu mieszkał, teraz JA wbijam)',20000);}});break;
-    case 'mariacki':say([{who:'Edek',t:'Kościół Mariacki. Hejnał gra co godzinę — to dopiero regularny content, człowieku.'}]);break;
+    case 'mariacki':say([{who:'Edek',t:'Kościół Mariacki. Hejnał gra co godzinę — to dopiero regularny content, człowieku.'},
+      {who:'Edek',t:'Nagram jak trębacz gra, fani to uwielbiają!'}],
+      ()=>recordSpot('mariacki','HEJNAŁ MARIACKI NA ŻYWO (regularny content!)',13));break;
     case 'karczma':say([{who:'Karczmarz',t:'Kwaśnica, oscypek z grilla, herbata z prundem! Dla robota... olej przekładniowy?'},
-      {who:'Edek',t:'Panie, ja tu jestem od napojów, nie od procentów!',v:'v_napoje'}]);break;
+      {who:'Edek',t:'No dawaj dawaj człowieku, doleję oleju i lecimy dalej!',v:'c_etam'}],
+      ()=>{healParty(1);BUFF={atk:.1,def:.1,spd:.05,t:40,n:'Olej z karczmy'};
+        SFX.heal();worldFlash=.35;
+        toast('🛢 Olej przekładniowy z karczmy:<br>PEŁNE HP ekipy + BUFF na 40 s!');
+        recordSpot('karczma','JEM W GÓRALSKIEJ KARCZMIE (robot na oleju!)',12);});break;
     case 'giewont':say([{who:'Edek',t:'Giewont. Śpiący rycerz. Ja bym tak nie umiał — ciągle coś się dzieje na kanale.'},
       {who:'Edek',t:'A wy to co? Też lubicie czasem spontan?',v:'v_spontan'}],
       ()=>{if(!S.mile.giewont){S.mile.giewont=1;save();postFilm('WSZEDŁEM NA GIEWONT!!! (robot vs góra)',26000);worldFlash=.6;}});break;
@@ -2409,16 +2482,19 @@ function rr(c,x,y,w,h,r,col){ // zaokrąglony prostokąt
   c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);
   c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.fill();
 }
+/* charakterystyczne kolory twarzy Edka: NIEBIESKA ramka + poziomy pasek (nie okrągłe oczy!) */
+const EDEK_BLUE='#3a90ff',EDEK_BLUE_HI='#a9d6ff';
 function drawEdekHead(c,x,y,s,eq){ // portret, s = szerokość
   const u=s/12;
-  rr(c,x,y,12*u,11*u,3*u,'#ece9f4');                       // głowa zaokrąglona
-  rr(c,x+1.2*u,y+1.6*u,9.6*u,7.6*u,2.4*u,'#101020');       // duży ciemny ekran-twarz
-  // poświata oczu
-  c.fillStyle='rgba(111,216,232,.25)';
-  c.fillRect(x+2.6*u,y+2.9*u,3*u,3*u);c.fillRect(x+6.6*u,y+2.9*u,3*u,3*u);
-  rr(c,x+3.2*u,y+3.5*u,1.9*u,1.9*u,.9*u,'#6fd8e8');        // oczy okrągłe
-  rr(c,x+7*u,y+3.5*u,1.9*u,1.9*u,.9*u,'#6fd8e8');
-  c.fillStyle='#fff';c.fillRect(x+3.6*u,y+3.9*u,.6*u,.6*u);c.fillRect(x+7.4*u,y+3.9*u,.6*u,.6*u);
+  rr(c,x,y,12*u,11*u,3*u,'#ece9f4');                       // biała głowa zaokrąglona
+  // NIEBIESKA RAMKA wokół twarzy (ring: niebieski spód + ciemny ekran na wierzchu)
+  rr(c,x+1.0*u,y+1.4*u,10.0*u,8.0*u,2.4*u,EDEK_BLUE);      // ramka (tło)
+  rr(c,x+1.7*u,y+2.1*u,8.6*u,6.6*u,1.8*u,'#0e1420');       // ciemny ekran-twarz
+  // POZIOMY NIEBIESKI PASEK na wysokości oczu (skaner) — brak okrągłych oczu
+  const barY=y+4.3*u;
+  c.fillStyle='rgba(58,144,255,.30)';c.fillRect(x+1.7*u,barY-1.1*u,8.6*u,3.2*u); // poświata
+  rr(c,x+2.3*u,barY,7.4*u,1.5*u,.7*u,EDEK_BLUE);           // pasek
+  rr(c,x+2.3*u,barY+.25*u,7.4*u,.55*u,.3*u,EDEK_BLUE_HI);  // jaśniejszy rdzeń
   drawMustache(c,x+2*u,y+6.6*u,u,eq.mustache);
   drawHat(c,x,y,u,eq.hat);
   drawGlasses(c,x,y,u,eq.glasses);
@@ -2565,18 +2641,25 @@ function drawEdekBody(c,x,y,dir,f,sc,eq){
     rr(c,2,-.5,12,10.5,3,'#ece9f4');rr(c,4,1.5,8,5.5,2,'#c9c4dd');
     drawHatBack(c,eq.hat);
   }else if(dir===0){
-    rr(c,2,-.5,12,10.5,3,'#ece9f4');
-    rr(c,3,1,10,7.4,2.4,'#101020');
-    c.fillStyle='rgba(111,216,232,.22)';c.fillRect(4.2,2.4,3,3);c.fillRect(8.6,2.4,3,3);
-    rr(c,4.8,3,1.9,1.9,.9,'#6fd8e8');rr(c,9.2,3,1.9,1.9,.9,'#6fd8e8');
-    c.fillStyle='#fff';c.fillRect(5.2,3.4,.6,.6);c.fillRect(9.6,3.4,.6,.6);
+    rr(c,2,-.5,12,10.5,3,'#ece9f4');                 // biała głowa
+    rr(c,2.6,.6,10.8,8.2,2.6,EDEK_BLUE);             // NIEBIESKA RAMKA (tło)
+    rr(c,3.3,1.3,9.4,6.8,2,'#0e1420');               // ciemny ekran (ring = ramka)
+    // POZIOMY NIEBIESKI PASEK na wysokości oczu (skaner), zamiast okrągłych oczu
+    c.fillStyle='rgba(58,144,255,.30)';c.fillRect(3,3.5,10,2.6);
+    rr(c,3.8,4.1,8.4,1.5,.7,EDEK_BLUE);
+    rr(c,3.8,4.35,8.4,.55,.3,EDEK_BLUE_HI);
     drawMustache(c,4,6.4,1,eq.mustache);
     drawHat(c,2,0,1,eq.hat);drawGlasses(c,2,0,1,eq.glasses);
   }else{
     const fl=dir===1;
     rr(c,2,-.5,12,10.5,3,'#ece9f4');
-    rr(c,fl?2.4:5.6,1,8,7.2,2.4,'#101020');
-    rr(c,fl?3.6:10.4,3,1.9,1.9,.9,'#6fd8e8');
+    const sx0=fl?2.2:5.4;
+    rr(c,sx0,.8,8.4,7.6,2.2,EDEK_BLUE);              // NIEBIESKA RAMKA (profil)
+    rr(c,sx0+.7,1.5,7,6.2,1.7,'#0e1420');            // ciemny ekran
+    // poziomy niebieski pasek na wysokości oczu
+    c.fillStyle='rgba(58,144,255,.30)';c.fillRect(sx0+.3,3.5,7.8,2.4);
+    rr(c,sx0+1,4,6.4,1.4,.6,EDEK_BLUE);
+    rr(c,sx0+1,4.2,6.4,.5,.25,EDEK_BLUE_HI);
     const mw=eq.mustache==='was_gigant'?6:4;
     R(c,fl?2.4:16-2.4-mw,6.4,mw,1.4,mCol(eq.mustache));
     drawHat(c,2,0,1,eq.hat);
@@ -2912,6 +2995,9 @@ function drawFoe(f,sx,sy){
   const bob=f.stun>0?0:Math.sin(anim*7+f.x)*0.6;
   if(f.flash>0){cx.globalAlpha=.6;}
   cx.fillStyle='rgba(0,0,0,.3)';cx.beginPath();cx.ellipse(sx+8,sy+24,6,2,0,0,7);cx.fill();
+  if(f.t==='pies'){drawFoeDog(f,sx,sy);if(f.flash>0)cx.globalAlpha=1;drawFoeExtras(f,sx,sy);return;}
+  if(f.t==='oburzona'){drawFoeLady(f,sx,sy,bob);if(f.flash>0)cx.globalAlpha=1;drawFoeExtras(f,sx,sy);return;}
+  if(f.t==='zlyrobot'){drawFoeRobot(f,sx,sy,bob);if(f.flash>0)cx.globalAlpha=1;drawFoeExtras(f,sx,sy);return;}
   R(cx,sx+4,sy+18,3,6,'#1a1a24');R(cx,sx+9,sy+18,3,6,'#1a1a24');
   rr(cx,sx+3,sy+9+bob,10,10,2,td.c);
   if(f.t==='dres'){R(cx,sx+3.6,sy+9.6+bob,1.2,8,'#ece9f4');R(cx,sx+11.2,sy+9.6+bob,1.2,8,'#ece9f4');}
@@ -2924,6 +3010,10 @@ function drawFoe(f,sx,sy){
   R(cx,sx+5.5,sy+4+bob,2,1.5,'#c02020');R(cx,sx+8.5,sy+4+bob,2,1.5,'#c02020');
   R(cx,sx+12,sy+11+bob,3,5,'#1a1a24');R(cx,sx+12.5,sy+11.5+bob,2,3.5,'#6fd8e8');
   if(f.flash>0)cx.globalAlpha=1;
+  drawFoeExtras(f,sx,sy);
+}
+/* wspólne dekoracje przeciwnika: gwiazdki ogłuszenia, pasek HP, aura żywiołu, krąg strażnika */
+function drawFoeExtras(f,sx,sy){
   if(f.stun>0){ // gwiazdki nad głową
     for(let i=0;i<3;i++){const a=anim*4+i*2.1;
       R(cx,sx+8+Math.cos(a)*8-1,sy-6+Math.sin(a)*2,2,2,'#f5c542');}
@@ -2937,6 +3027,66 @@ function drawFoe(f,sx,sy){
     cx.fillStyle='rgba(255,255,255,.7)';cx.fillRect(sx+7.4,sy-8.6,1.2,1.2);}
   if(f.guard){cx.strokeStyle='#8a6fc8';cx.lineWidth=1.5;cx.globalAlpha=.6;
     cx.beginPath();cx.arc(sx+8,sy+10,15+Math.sin(anim*4)*2,0,7);cx.stroke();cx.globalAlpha=1;}
+}
+/* --- PIES (szczekający kundel) --- */
+function drawFoeDog(f,sx,sy){
+  const b=f.stun>0?0:Math.sin(anim*11+f.x)*(reduceMotion?0:.7);
+  const body='#6e4a28',dark='#4a2f18';
+  // nogi (drobią)
+  R(cx,sx+3,sy+18,2,5,dark);R(cx,sx+6,sy+19,2,4,dark);
+  R(cx,sx+10,sy+18,2,5,dark);R(cx,sx+13,sy+19,2,4,dark);
+  // ogon (macha)
+  cx.save();cx.translate(sx+3,sy+13+b);cx.rotate(Math.sin(anim*14)*.5);R(cx,-2.5,-1,3,2,body);cx.restore();
+  // tułów
+  rr(cx,sx+3,sy+12+b,10,7,3,body);
+  // głowa
+  rr(cx,sx+9.5,sy+8.5+b,6.5,6.5,2,body);
+  R(cx,sx+15,sy+11+b,2,3,dark);         // pysk
+  R(cx,sx+16.5,sy+11.5+b,1.4,1,'#1a1a24'); // nos
+  // uszy
+  R(cx,sx+9.8,sy+7+b,2,3,dark);R(cx,sx+13,sy+7+b,2,3,dark);
+  // złe oko + kły
+  R(cx,sx+12.6,sy+10.3+b,1.6,1.6,'#c02020');
+  R(cx,sx+15,sy+13.6+b,1.4,1,'#fff');R(cx,sx+16.4,sy+13.6+b,1.2,.9,'#fff');
+}
+/* --- OBURZONA PANI (przeciwniczka robotów) --- */
+function drawFoeLady(f,sx,sy,bob){
+  const dress='#8a4a6a',hair='#d8d4e8',skin='#e8c9a0';
+  R(cx,sx+4.5,sy+18,3,6,'#5a3346');R(cx,sx+8.5,sy+18,3,6,'#5a3346'); // buty/nogi
+  // sukienka (trapez)
+  cx.fillStyle=dress;cx.beginPath();
+  cx.moveTo(sx+5,sy+9+bob);cx.lineTo(sx+11,sy+9+bob);cx.lineTo(sx+13,sy+19);cx.lineTo(sx+3,sy+19);cx.closePath();cx.fill();
+  // głowa
+  rr(cx,sx+4.5,sy+1+bob,7,7.5,2.2,skin);
+  // włosy (upięte)
+  rr(cx,sx+3.8,sy-.6+bob,8.4,4,2,hair);R(cx,sx+3.2,sy+1.5+bob,1.6,4.5,hair);R(cx,sx+11.2,sy+1.5+bob,1.6,4.5,hair);
+  // wściekłe brwi + oczy
+  R(cx,sx+5.2,sy+3.3+bob,2.4,.8,'#3a2a2a');R(cx,sx+8.4,sy+3.3+bob,2.4,.8,'#3a2a2a');
+  R(cx,sx+5.6,sy+4.2+bob,1.8,1.4,'#3a2a2a');R(cx,sx+8.6,sy+4.2+bob,1.8,1.4,'#3a2a2a');
+  // otwarte usta (krzyczy „skandal!")
+  R(cx,sx+6.6,sy+6.2+bob,2.6,1.6,'#8a2438');
+  // wzniesiona pięść z torebką
+  const pump=Math.sin(anim*8)*(reduceMotion?0:1.4);
+  R(cx,sx+11.4,sy+3+pump,3,3,skin);rr(cx,sx+11.6,sy+.6+pump,2.8,2.6,.8,'#3a2a2a');
+}
+/* --- ZŁY ROBOT (strzela czerwonymi pociskami; CZERWONY wizjer w kontrze do niebieskiego Edka) --- */
+function drawFoeRobot(f,sx,sy,bob){
+  const dark='#23232f',mid='#3a3a4c',red='#e03028';
+  R(cx,sx+4,sy+18,3,6,dark);R(cx,sx+9,sy+18,3,6,dark);
+  // korpus
+  rr(cx,sx+3,sy+9+bob,10,10,2,mid);rr(cx,sx+4.5,sy+11+bob,7,4,1,dark);
+  R(cx,sx+7.4,sy+12.4+bob,1.4,1.4,red);   // rdzeń
+  // działko
+  R(cx,sx+12.4,sy+11+bob,3,2.4,'#555');R(cx,sx+15,sy+11.5+bob,1.6,1.6,f.chargeT>0?'#ff5a4a':red);
+  // głowa
+  rr(cx,sx+3.5,sy+1+bob,9,7.6,2,dark);
+  // CZERWONY poziomy wizjer (świeci jaśniej tuż przed strzałem)
+  const glow=f.chargeT>0?1:.55;
+  cx.fillStyle='rgba(224,48,40,'+(.3*glow)+')';cx.fillRect(sx+3,sy+3.6+bob,10,2.8);
+  rr(cx,sx+4.4,sy+4.1+bob,7.4,1.6,.7,red);
+  rr(cx,sx+4.4,sy+4.35+bob,7.4,.55,.25,f.chargeT>0?'#ffd0c8':'#ff9a90');
+  // antena
+  R(cx,sx+8,sy-1.6+bob,1,2.6,'#888');R(cx,sx+7.4,sy-2.8+bob,2.2,2,f.chargeT>0?'#ff5a4a':red);
 }
 function drawNPC(c,n,sx,sy){
   if(n.robo){ // Dych jako NPC (zanim dołączy do ekipy)
@@ -3397,6 +3547,11 @@ function drawWorld(){
     }else if(b.t==='snieg'){
       cx.fillStyle='#ece9f4';cx.beginPath();cx.arc(sx,sy,4.5,0,7);cx.fill();
       cx.fillStyle='#bfe8f4';cx.beginPath();cx.arc(sx+1,sy+1,2,0,7);cx.fill();
+    }else if(b.t==='laser'){       // czerwony pocisk złego robota
+      const ang=Math.atan2(b.dy,b.dx),el=1+Math.sin(anim*20)*.2;
+      cx.fillStyle='#e03028';cx.beginPath();cx.ellipse(sx,sy,6*el,2.8*el,ang,0,7);cx.fill();
+      cx.fillStyle='#ff9a90';cx.beginPath();cx.ellipse(sx,sy,3*el,1.4*el,ang,0,7);cx.fill();
+      cx.fillStyle='#fff7f2';cx.beginPath();cx.arc(sx-b.dx*.02,sy-b.dy*.02,1.1,0,7);cx.fill();
     }else{
       cx.fillStyle='rgba(111,216,232,.85)';
       cx.beginPath();cx.arc(sx,sy,5+Math.sin(anim*14)*1.2,0,7);cx.fill();
@@ -4088,15 +4243,19 @@ function meczTap(){
   MC.bar=Math.min(104,MC.bar+8);MC.taps++;SFX.tap();check67(MC.taps);
 }
 function updateMecz(dt){
+  if(scene!=='mgMecz')return;   // strażnik: po wygranej/przegranej nie licz dalej (żadnego podwójnego mgWin)
   MC.time-=dt;
-  MC.bar-=(16+MC.round*7)*dt;
-  if(MC.bar<0)MC.bar=0;
+  /* pełny pasek sprawdzamy PRZED ubytkiem — dzięki temu wypełnienie „na styk" z końcem czasu
+     zawsze kończy się WYGRANĄ, a nie fałszywą przegraną (bug: „wygrałem, a każe grać od nowa") */
   if(MC.bar>=100){
     SFX.ok();MC.round++;
     if(MC.round>3){mgWin('mecz','📣 Trybuny oszalały!<br>„PO-LSKA! PO-LSKA!” słychać w Szwecji!');return;}
     MC.bar=20;MC.time=8;
     toast('📣 RUNDA '+MC.round+'/3 — głośniej!');
+    return;
   }
+  MC.bar-=(16+MC.round*7)*dt;
+  if(MC.bar<0)MC.bar=0;
   if(MC.time<=0)mgLose('Doping ucichł... Trybuny zasnęły przy rundzie '+MC.round+'/3.','mecz');
 }
 function drawMeczMG(){
@@ -4151,12 +4310,16 @@ function mgWin(quest,txt){
   $('mgRetry').classList.add('hidden');
   $('mgEnd').classList.remove('hidden');
   vsay('v_elegancko');
+  /* quest zaliczamy OD RAZU po wygranej — dawniej czekało na przycisk „NA MAPĘ",
+     przez co przy powtórnym wejściu (rewanż) potrafiło znów prosić o zagranie */
+  mgQuest=null;
   if(replay){
-    mgQuest=null;
     S.dia+=15;save();refreshHUD();SFX.dia();
     addViews(4000+Math.random()*5000,true);
     if(Math.random()<.35)setTimeout(()=>postFilm('POWTÓRKA: '+QUESTS[quest].n.toUpperCase(),9000),1500);
-  }else mgQuest=quest;
+  }else{
+    completeQuest(quest);
+  }
 }
 function mgLose(txt,quest){
   scene='world';stopSong();
@@ -4170,6 +4333,8 @@ function mgLose(txt,quest){
 }
 $('mgBack').addEventListener('click',()=>{
   $('mgEnd').classList.add('hidden');
+  /* zabezpieczenie zgodności: quest zaliczany jest już w mgWin,
+     ale gdyby coś zostało odłożone — dokańczamy tutaj */
   if(mgQuest){completeQuest(mgQuest);mgQuest=null;}
 });
 $('mgRetry').addEventListener('click',()=>{
