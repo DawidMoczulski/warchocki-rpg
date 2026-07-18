@@ -27,6 +27,7 @@
     <button class="hudbtn" id="btnPhone" title="Kanał Edka">📱</button>
     <button class="hudbtn" id="btnFit">🧥</button>
     <button class="hudbtn" id="btnQuest">📜</button>
+    <button class="hudbtn" id="btnMenu" title="Menu (Esc)">☰</button>
     <button class="hudbtn" id="btnMap" title="Mapa (M)">🗺️</button>
     <button class="hudbtn" id="btnCook" title="Gotowanie">🍳</button>
     <button class="hudbtn" id="btnAudio" title="Głośność: głos / muzyka">🎚️</button>
@@ -141,6 +142,23 @@
       <button class="xbtn" data-close="travel">✕</button>
     </div>
     <div class="panelBody"><div id="travelList"></div></div>
+  </div>
+
+  <div id="menu" class="panel menu px hidden">
+    <div class="panelHead">
+      <h2>☰ MENU GRY</h2>
+      <button class="xbtn" data-close="menu">✕</button>
+    </div>
+    <div class="panelBody" style="flex-direction:column">
+      <div id="menuTiles" class="tileGrid"></div>
+      <div id="keybindWrap" class="hidden">
+        <button id="keyBack" class="ghostbtn px" style="font-size:10px;margin-bottom:10px">← wróć do menu</button>
+        <h3 style="font-size:11px;color:var(--gold);margin:0 0 4px">⌨️ STEROWANIE</h3>
+        <p style="font-size:9px;color:var(--mut);margin:0 0 10px">Kliknij akcję i naciśnij nowy klawisz (Esc = anuluj)</p>
+        <div id="keybindList"></div>
+        <button id="keysReset" class="ghostbtn px" style="font-size:10px;margin-top:10px">↺ Przywróć domyślne</button>
+      </div>
+    </div>
   </div>
 
   <div id="cook" class="panel px hidden">

@@ -237,4 +237,26 @@ h1.px{margin:0;font-size:clamp(20px,4.6vw,36px);color:var(--gold);
 #cookBody{flex:1;overflow-y:auto;padding:2px 4px;display:flex;flex-direction:column;gap:8px}
 #cookBody .shopRow .inf{font-size:9px;line-height:1.7}
 #cookBody .shopRow .inf b{font-size:11px}
+/* MENU GRY — lewy wysuwany panel z dużymi kaflami */
+.panel.menu{inset:0 auto 0 0;width:min(66%,580px);border-radius:0 18px 18px 0;animation:slideIn .18s ease-out}
+@keyframes slideIn{from{transform:translateX(-102%)}to{transform:translateX(0)}}
+@media (prefers-reduced-motion:reduce){.panel.menu{animation:none}}
+.tileGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(98px,1fr));gap:12px;
+  overflow-y:auto;padding:6px;align-content:start;flex:1}
+.mtile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  aspect-ratio:1;background:linear-gradient(160deg,var(--panel2),#241d42);border:2px solid var(--edge);
+  border-radius:14px;cursor:pointer;color:var(--pearl);transition:transform .1s,border-color .12s,box-shadow .12s}
+.mtile:hover{border-color:var(--gold);transform:translateY(-3px);box-shadow:0 10px 24px -10px rgba(245,197,66,.4)}
+.mtile .mic{font-size:34px;line-height:1}
+.mtile .mlab{font-size:10px;text-align:center}
+#keybindWrap{display:flex;flex-direction:column;overflow:hidden;flex:1;text-align:left}
+#keybindList{overflow-y:auto;flex:1}
+.kbrow{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  background:linear-gradient(170deg,var(--panel2),#221c3e);border:2px solid var(--edge);
+  border-radius:10px;padding:9px 12px;margin-bottom:8px}
+.kbn{font-size:11px;color:var(--pearl)}
+.kbkey{font-family:'Press Start 2P',monospace;font-size:11px;min-width:104px;padding:9px 12px;
+  background:var(--panel);color:var(--gold);border:2px solid var(--gold-dim);border-radius:8px;cursor:pointer;flex:none}
+.kbkey:hover{border-color:var(--gold)}
+.kbkey.wait{color:var(--red);border-color:var(--red);animation:blink 1s steps(2) infinite}
 footer{margin-top:16px;font-size:13px;color:var(--mut);text-align:center;max-width:70ch;line-height:1.7}

@@ -16,6 +16,20 @@ const store={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},
              set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
 const pickA=a=>a[(Math.random()*a.length)|0];
 
+/* ---------------- STEROWANIE: edytowalne przypisania klawiszy ---------------- */
+const DEFAULT_KEYS={action:'KeyE',attack:'Space',special:'KeyZ',swap:'KeyC',eat:'KeyQ',
+  map:'KeyM',pause:'KeyP',fullscreen:'KeyF',up:'KeyW',down:'KeyS',left:'KeyA',right:'KeyD'};
+const KEY_LABELS={action:'✋ Akcja / [E]',attack:'👊 Cios',special:'⚡ Super',swap:'🔄 Zmiana postaci',
+  eat:'🍴 Jedzenie',map:'🗺️ Mapa',pause:'⏸ Pauza',fullscreen:'⛶ Pełny ekran',
+  up:'⬆️ Góra',down:'⬇️ Dół',left:'⬅️ Lewo',right:'➡️ Prawo'};
+let KEYMAP=(()=>{try{return Object.assign({},DEFAULT_KEYS,JSON.parse(store.get('wrpg_keys')||'{}'));}
+  catch(e){return Object.assign({},DEFAULT_KEYS);}})();
+function saveKeys(){store.set('wrpg_keys',JSON.stringify(KEYMAP));}
+const keyName=code=>({Space:'SPACJA',Enter:'ENTER',Escape:'ESC',ArrowUp:'↑',ArrowDown:'↓',
+  ArrowLeft:'←',ArrowRight:'→',ShiftLeft:'SHIFT',ShiftRight:'SHIFT',ControlLeft:'CTRL',
+  ControlRight:'CTRL',Tab:'TAB',Backquote:'`'}[code]||(code||'').replace('Key','').replace('Digit',''));
+let rebindAction=null;   // trwa przypisywanie klawisza do tej akcji
+
 /* ---------------- ZAPIS ---------------- */
 const DEFAULT_SAVE={dia:25,owned:['was_klasyk','rolex_d'],equip:{mustache:'was_klasyk',watch:'rolex_d'},
   quests:{},col:{},k:{},trip:0,legend:false,px:456,py:368,
@@ -241,8 +255,20 @@ if(muted)$('btnMute').textContent='🔇';
 
 /* ---------------- PANEL DŹWIĘKU: osobno głos i muzyka ---------------- */
 function setSliderFill(el){el.style.setProperty('--fill',el.value+'%');}
+/* krótki dźwięk przez daną magistralę — słyszalny podgląd głośności */
+function beepThrough(bus,f,d,ty,v){
+  if(!AC||!bus||muted)return;
+  const T=AC.currentTime,o=AC.createOscillator(),g=AC.createGain();
+  o.type=ty||'triangle';o.frequency.value=f;
+  g.gain.setValueAtTime(v||.16,T);g.gain.exponentialRampToValueAtTime(.001,T+d);
+  o.connect(g);g.connect(bus);o.start(T);o.stop(T+d+.02);
+}
+function previewMusic(){[523,659,784].forEach((f,i)=>setTimeout(()=>beepThrough(musicGain,f,.16,'triangle'),i*95));}
+function previewVoice(){ if(AC&&BUFS['v_czesc']&&!muted)vsay('v_czesc');
+  else[660,520].forEach((f,i)=>setTimeout(()=>beepThrough(voiceGain,f,.18,'sawtooth',.12),i*120)); }
+function resumeAC(){ if(AC&&AC.state==='suspended')AC.resume(); }
 function openAudio(){
-  SFX.open();
+  SFX.open();initAudio().then(resumeAC);
   const vv=Math.round(voiceVol*100),mv=Math.round(musicVol*100);
   $('volVoice').value=vv;$('volVoiceVal').textContent=vv+'%';setSliderFill($('volVoice'));
   $('volMusic').value=mv;$('volMusicVal').textContent=mv+'%';setSliderFill($('volMusic'));
@@ -252,12 +278,14 @@ function openAudio(){
 $('btnAudio').addEventListener('click',()=>{initAudio();openAudio();});
 $('volVoice').addEventListener('input',e=>{
   voiceVol=(+e.target.value)/100;store.set('wrpg_vol_voice',voiceVol);
-  $('volVoiceVal').textContent=e.target.value+'%';setSliderFill(e.target);applyVolumes();
+  $('volVoiceVal').textContent=e.target.value+'%';setSliderFill(e.target);resumeAC();applyVolumes();
 });
+$('volVoice').addEventListener('change',()=>{resumeAC();previewVoice();}); // podgląd po puszczeniu suwaka
 $('volMusic').addEventListener('input',e=>{
   musicVol=(+e.target.value)/100;store.set('wrpg_vol_music',musicVol);
-  $('volMusicVal').textContent=e.target.value+'%';setSliderFill(e.target);applyVolumes();
+  $('volMusicVal').textContent=e.target.value+'%';setSliderFill(e.target);resumeAC();applyVolumes();
 });
+$('volMusic').addEventListener('change',()=>{resumeAC();previewMusic();});
 $('audioMute').addEventListener('click',()=>$('btnMute').click());
 
 /* --- smaczek 67 --- */
@@ -1848,6 +1876,60 @@ function cook(r){
   renderCook();refreshHUD();
 }
 
+/* ---------------- MENU GRY (Esc): kafle + edycja sterowania ---------------- */
+const MENU_TILES=[
+  {ic:'🎴',n:'Postacie',fn:openChars},
+  {ic:'🎁',n:'Paczki',fn:openGacha},
+  {ic:'🎒',n:'Plecak',fn:openBag},
+  {ic:'🧥',n:'Szafa',fn:()=>openFit(false)},
+  {ic:'📜',n:'Questy',fn:openQuests},
+  {ic:'📱',n:'Kanał',fn:openPhone},
+  {ic:'🗺️',n:'Mapa',fn:()=>toggleMap()},
+  {ic:'🍳',n:'Gotowanie',fn:openCook},
+  {ic:'🎚️',n:'Dźwięk',fn:openAudio},
+  {ic:'⛶',n:'Pełny ekran',fn:toggleFS,keep:true},
+  {ic:'⏸️',n:'Pauza',fn:()=>togglePause()},
+  {ic:'⌨️',n:'Sterowanie',fn:showKeybind,keep:true},
+];
+const MENU_IDS=['menu','fit','quests','phone','travel','chars','gacha','hero','bag','shop','audio','cook'];
+function anyPanelOpen(){return MENU_IDS.some(id=>!$(id).classList.contains('hidden'));}
+function closeMenu(){$('menu').classList.add('hidden');rebindAction=null;}
+function openMenu(){
+  SFX.open();closePanels();
+  $('keybindWrap').classList.add('hidden');$('menuTiles').classList.remove('hidden');
+  renderMenu();$('menu').classList.remove('hidden');
+}
+function renderMenu(){
+  const g=$('menuTiles');g.innerHTML='';
+  for(const t of MENU_TILES){
+    const b=document.createElement('button');b.className='mtile px';
+    b.innerHTML='<span class="mic">'+t.ic+'</span><span class="mlab">'+t.n+'</span>';
+    b.addEventListener('click',()=>{initAudio();SFX.ok();if(t.keep){t.fn();}else{closeMenu();t.fn();}});
+    g.appendChild(b);
+  }
+}
+function showKeybind(){$('menuTiles').classList.add('hidden');$('keybindWrap').classList.remove('hidden');renderKeybind();}
+function renderKeybind(){
+  const el=$('keybindList');el.innerHTML='';
+  for(const a of Object.keys(DEFAULT_KEYS)){
+    const row=document.createElement('div');row.className='kbrow';
+    row.innerHTML='<span class="kbn">'+KEY_LABELS[a]+'</span>';
+    const btn=document.createElement('button');btn.className='kbkey px'+(rebindAction===a?' wait':'');
+    btn.textContent=rebindAction===a?'…naciśnij…':keyName(KEYMAP[a]);
+    btn.addEventListener('click',()=>{rebindAction=(rebindAction===a?null:a);renderKeybind();});
+    row.appendChild(btn);el.appendChild(row);
+  }
+}
+function captureRebind(code){
+  if(code==='Escape'){rebindAction=null;renderKeybind();return;}
+  const a=rebindAction,old=KEYMAP[a];rebindAction=null;
+  for(const k of Object.keys(KEYMAP))if(KEYMAP[k]===code&&k!==a)KEYMAP[k]=old; // zamiana klawiszy (unikalność)
+  KEYMAP[a]=code;saveKeys();SFX.equip();renderKeybind();
+}
+$('btnMenu').addEventListener('click',()=>{initAudio();if($('menu').classList.contains('hidden'))openMenu();else closeMenu();});
+$('keyBack').addEventListener('click',()=>{rebindAction=null;$('keybindWrap').classList.add('hidden');$('menuTiles').classList.remove('hidden');});
+$('keysReset').addEventListener('click',()=>{KEYMAP=Object.assign({},DEFAULT_KEYS);saveKeys();rebindAction=null;renderKeybind();SFX.ok();});
+
 /* ---------------- PANEL BOHATERA: statystyki + ekwipunek ---------------- */
 let curHero=null;
 function renderHero(){
@@ -2039,31 +2121,37 @@ function drawPauseOverlay(){
 const keys={};
 let joy=null;
 addEventListener('keydown',e=>{
-  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();
+  /* przechwytywanie klawisza przy edycji sterowania (menu → STEROWANIE) */
+  if(rebindAction){e.preventDefault();captureRebind(e.code);return;}
+  const K=KEYMAP;
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space',K.up,K.down,K.left,K.right,K.attack].includes(e.code))e.preventDefault();
   keys[e.code]=true;
-  if(e.code==='KeyP'&&scene!=='title'){togglePause();return;}
-  if(paused)return; // w pauzie działa tylko P
-  /* MAPA (klawisz M): otwiera/zamyka pełnoekranową mapę; przy otwartej blokuj resztę */
-  if(e.code==='KeyM'&&(scene==='world'||scene==='dialog'||mapOpen)){toggleMap();return;}
+  if(e.code===K.pause&&scene!=='title'){togglePause();return;}
+  if(paused)return; // w pauzie działa tylko pauza
+  /* MAPA: otwiera/zamyka pełnoekranową mapę; przy otwartej blokuj resztę */
+  if(e.code===K.map&&(scene==='world'||scene==='dialog'||mapOpen)){toggleMap();return;}
   if(mapOpen){if(e.code==='Escape')toggleMap();return;}
-  if(e.code==='KeyF')toggleFS();
-  if(e.code==='Escape'){if(stage.classList.contains('fakefs'))setFake(false);closePanels();}
-  if(e.code==='KeyE'||e.code==='Enter')doAction();
-  /* SPACJA = tylko CIOS w świecie (wejście/wyjście z domeny itp. wyłącznie E) */
-  if(e.code==='Space'){
-    if(scene==='world')tryAttack();else doAction();
+  /* ESC: zamknij otwarty panel/menu, a jak nic nie otwarte — otwórz MENU */
+  if(e.code==='Escape'){
+    if(stage.classList.contains('fakefs')){setFake(false);return;}
+    if(anyPanelOpen())closePanels();else openMenu();
+    return;
   }
-  if(e.code==='KeyX'&&scene==='world')tryAttack();
-  if(e.code==='KeyZ'&&scene==='world')trySpecial();
-  if(e.code==='KeyC'&&scene==='world')switchChar();
-  if(e.code==='KeyQ'&&scene==='world')quickEat();
+  if(e.code===K.fullscreen)toggleFS();
+  if(e.code===K.action||e.code==='Enter')doAction();
+  /* klawisz CIOSU = tylko CIOS w świecie (wejście/wyjście z domeny itp. wyłącznie akcja) */
+  if(e.code===K.attack){if(scene==='world')tryAttack();else doAction();}
+  if(e.code==='KeyX'&&scene==='world')tryAttack();   // stały alias ciosu
+  if(e.code===K.special&&scene==='world')trySpecial();
+  if(e.code===K.swap&&scene==='world')switchChar();
+  if(e.code===K.eat&&scene==='world')quickEat();
   if(scene==='world'&&(e.code==='Digit1'||e.code==='Digit2'||e.code==='Digit3')){
     const i=+e.code.slice(-1)-1;
     if(S.party[i])switchTo(S.party[i]);
   }
   if(scene==='mgRhythm')rhythmKey(e.code);
   if(scene==='mgSimon')simonKey(e.code);
-  if(scene==='mgMecz'&&(e.code==='Space'||e.code==='KeyE'))meczTap();
+  if(scene==='mgMecz'&&(e.code===K.attack||e.code===K.action||e.code==='Space'))meczTap();
 });
 addEventListener('keyup',e=>keys[e.code]=false);
 stage.addEventListener('pointerdown',e=>{
@@ -2086,8 +2174,8 @@ $('atkBtn').addEventListener('pointerdown',e=>{e.stopPropagation();if(paused)ret
 $('spcBtn').addEventListener('pointerdown',e=>{e.stopPropagation();if(paused)return;initAudio();trySpecial();});
 function moveVec(){
   let dx=0,dy=0;
-  if(keys.ArrowLeft||keys.KeyA)dx-=1;if(keys.ArrowRight||keys.KeyD)dx+=1;
-  if(keys.ArrowUp||keys.KeyW)dy-=1;if(keys.ArrowDown||keys.KeyS)dy+=1;
+  if(keys.ArrowLeft||keys[KEYMAP.left])dx-=1;if(keys.ArrowRight||keys[KEYMAP.right])dx+=1;
+  if(keys.ArrowUp||keys[KEYMAP.up])dy-=1;if(keys.ArrowDown||keys[KEYMAP.down])dy+=1;
   if(joy){const m=Math.hypot(joy.dx,joy.dy);if(m>8){dx=joy.dx/m;dy=joy.dy/m;}}
   const m=Math.hypot(dx,dy);if(m>1){dx/=m;dy/=m}
   return[dx,dy];
@@ -2110,7 +2198,7 @@ function refreshHUD(){
   $('questHint').textContent=act?('▶ '+QUESTS[act].n):(S.legend?'👑 LEGENDA INTERNETU':
     discN?('questy: '+doneN+'/'+discN+' odkrytych — szukaj „!”'):'szukaj ludzi z „!” nad głową');
 }
-function closePanels(){['fit','quests','phone','travel','chars','gacha','hero','bag','shop','audio','cook'].forEach(id=>$(id).classList.add('hidden'));}
+function closePanels(){['menu','fit','quests','phone','travel','chars','gacha','hero','bag','shop','audio','cook'].forEach(id=>$(id).classList.add('hidden'));rebindAction=null;}
 document.querySelectorAll('.xbtn').forEach(b=>b.addEventListener('click',()=>{SFX.close();$(b.dataset.close).classList.add('hidden');}));
 $('btnFit').addEventListener('click',()=>openFit(false));
 $('btnQuest').addEventListener('click',openQuests);
@@ -2247,10 +2335,9 @@ function talkTo(n){
         L('Edek','Uciekajcie stąd, dziki! Zbierajcie się, no już!','c_uciekajcie'),
       ],()=>{setQ('dziki',1);startBoar();});
       else if(qs('dziki')===1)say([L(n.n,'Dziki dalej ryją! Pogoń je!')],()=>startBoar());
-      else say([L(n.n,'Grządki uratowane! Jesteś skarbem, Edeczku... O NIE, znowu ryją!'),
-        L('Edek','Trzeba uważać, bo jeszcze mnie w maliny wpuszczą.','c_maliny'),
-        L(n.n,'Pogoń je jeszcze raz, dam 15 diamencików!'),
-      ],()=>startBoar());
+      else say([L(n.n,'Grządki uratowane raz na zawsze! Jesteś skarbem, Edeczku!'),
+        L('Edek','Trzeba było uważać, żeby mnie w maliny nie wpuścili. No i elegancko.','c_maliny'),
+      ]);
       break;
     case 'fan':
       if(qs('freestyle')===0)say([
@@ -2259,9 +2346,9 @@ function talkTo(n){
         L('Edek','No dawaj, dawaj człowieku! Puszczaj bit!'),
       ],()=>{setQ('freestyle',1);startRhythm('byku');});
       else if(qs('freestyle')===1)say([L(n.n,'Bit czeka! Wbijaj w rytm!')],()=>startRhythm('byku'));
-      else say([L(n.n,'Ten pokaz przeszedł do historii TikToka! Bisujemy? (+15💎)'),
-        L('Edek','No dawaj, dawaj człowieku! Puszczaj bit!'),
-      ],()=>startRhythm('byku'));
+      else say([L(n.n,'Ten pokaz przeszedł do historii TikToka! Legenda, Edek!'),
+        L('Edek','No i elegancko. Rozchwytywany jestem, co ja poradzę.','c_rozchwytywany'),
+      ]);
       break;
     case 'ochroniarz':
       if(qs('sejm')===0)say([
@@ -2271,9 +2358,9 @@ function talkTo(n){
         L('Edek','Ja tu jestem otwarty na wszystko. Jak trzeba to zaśpiewam, jak trzeba zatańczę, a jak trzeba to i dziki przegonię.','c_zaspiewam'),
       ],()=>{setQ('sejm',1);startSimon('sejm');});
       else if(qs('sejm')===1)say([L(n.n,'Mównica czeka, panie Edwardzie.')],()=>startSimon('sejm'));
-      else say([L(n.n,'Najlepsze przemówienie kadencji! Posłowie proszą o bis. (+15💎)'),
+      else say([L(n.n,'Najlepsze przemówienie kadencji! Do dziś je cytują.'),
         L('Edek','Edek jest wolny jak ptak. Policja profesjonalnie, bez żadnych ceregieli.','c_wolnyptak'),
-      ],()=>startSimon('sejm'));
+      ]);
       break;
     case 'pani_dino':
       if(qs('dino')===0)say([
@@ -2282,10 +2369,9 @@ function talkTo(n){
         L('Edek','Łapię wszystko! No dawaj, dawaj!'),
       ],()=>{setQ('dino',1);startDino();});
       else if(qs('dino')===1)say([L(n.n,'Napoje dalej fruwają! Ratuj!')],()=>startDino());
-      else say([L(n.n,'Półki pełne! Ale przyszła nowa dostawa... Pomożesz jeszcze raz? (+15💎)'),
+      else say([L(n.n,'Półki pełne, klienci zadowoleni! Uratowałeś dostawę, Edek!'),
         L('Edek','Paleta z moimi napojami jest rewelacyjnie wyeksponowana!','v_paleta'),
-        L('Edek','No dawaj, dawaj! Łapię wszystko!'),
-      ],()=>startDino());
+      ]);
       break;
     case 'spawacz':
       if(S.trip===1)say([
@@ -2422,9 +2508,9 @@ function talkTo(n){
         L('Edek','Edek to człowiek do dogadania, byle z szacunkiem. A teraz zaczynamy taniec!'),
       ],()=>{setQ('kopernik',1);startSimon('dance');});
       else if(qs('kopernik')===1)say([L(n.n,'Parkiet czeka. Pokaż kulturę!')],()=>startSimon('dance'));
-      else say([L(n.n,'Edward, wpadaj kiedy chcesz! ...A może potańczymy jeszcze raz? (+15💎)'),
-        L('Edek','No i elegancko. A teraz zaczynamy taniec!','c_elegancko2'),
-      ],()=>startSimon('dance'));
+      else say([L(n.n,'Edward, wpadaj kiedy chcesz! Skandal zażegnany, kultura wygrała.'),
+        L('Edek','No i elegancko. Edek to człowiek do dogadania.','c_elegancko2'),
+      ]);
       break;
     case 'maszynista':
       if(qs('metro')===0)say([
@@ -2433,9 +2519,9 @@ function talkTo(n){
         L(n.n,'To pokaż, że czujesz rytm podziemia. Tunel po tunelu!'),
       ],()=>{setQ('metro',1);startRhythm('metro');});
       else if(qs('metro')===1)say([L(n.n,'Wagon czeka. Tunel po tunelu!')],()=>startRhythm('metro'));
-      else say([L(n.n,'Cała linia o Tobie mówi! Ostatni wagon znowu podstawiony. Jedziesz? (+15💎)'),
+      else say([L(n.n,'Cała linia o Tobie mówi! Ten wagon to już legenda metra.'),
         L('Edek','No co ja na to poradzę, że jestem taki rozchwytywany.','c_rozchwytywany'),
-      ],()=>startRhythm('metro'));
+      ]);
       break;
     case 'kibic':
       if(qs('mecz')===0)say([
@@ -2444,9 +2530,9 @@ function talkTo(n){
         L('Edek','Strzelimy im dwie bramki, a oni nam jedną. No i elegancko, wygramy dwa do jednego!','c_dwabramki'),
       ],()=>{setQ('mecz',1);startMecz();});
       else if(qs('mecz')===1)say([L(n.n,'Trybuny czekają! Dawaj doping!')],()=>startMecz());
-      else say([L(n.n,'Taki doping to nawet Lewandowski by usłyszał! Gramy rewanż — rozkręcisz trybuny? (+15💎)'),
-        L('Edek','Nic się nie stało, Polacy! My Polacy to się nigdy nie poddajemy. Głowa do góry!','c_niepoddajemy'),
-      ],()=>startMecz());
+      else say([L(n.n,'Taki doping to nawet Lewandowski usłyszał! Wygraliśmy dwa do jednego, jak mówiłeś!'),
+        L('Edek','My Polacy to się nigdy nie poddajemy. No i elegancko!','c_niepoddajemy'),
+      ]);
       break;
     case 'zabson':
       if(qs('zabson')===0)say([
