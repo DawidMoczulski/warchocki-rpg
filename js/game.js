@@ -21,7 +21,7 @@ const DEFAULT_SAVE={dia:25,owned:['was_klasyk','rolex_d'],equip:{mustache:'was_k
   quests:{},col:{},k:{},trip:0,legend:false,px:456,py:368,
   region:'wawa',ch:'edek',dych:0,subs:120,views:0,films:[],mile:{},visited:{wawa:1},
   chars:{edek:{lvl:1,st:0}},party:['edek'],mats:{sr:0,ch:0,di:0},pity:0,domLvl:{},bossLvl:{},
-  gear:{},gearOwn:{kij:1},food:{picie:2}};
+  gear:{},gearOwn:{kij:1},food:{picie:2},ingr:{}};
 let S=null;
 function loadSave(){
   try{
@@ -46,6 +46,7 @@ function loadSave(){
     // migracja v6 -> v7 (ekwipunek + jedzenie)
     if(!p.gearOwn){S.gear={};S.gearOwn={kij:1};S.food={picie:2};}
     if(!S.food)S.food={};if(!S.gear)S.gear={};if(!S.gearOwn)S.gearOwn={};
+    if(!S.ingr)S.ingr={};   // surowce do gotowania (v10.2)
     if(!S.party.includes(S.ch))S.ch=S.party[0];
   }catch(e){S=null}
 }
@@ -651,6 +652,8 @@ let scene='title';
 let last=0,camX=0,camY=0,anim=0;
 const P={x:456,y:368,dir:0,frame:0,moving:false,speed:85,slow:false};
 let boars=[],idleT=16,confetti=[],prompt=null;
+let mapOpen=false;          // pełnoekranowa mapa (klawisz M)
+let forage=[];              // dzikie surowce do zbierania na mapie
 let cars=[],peds=[],pigeons=[],drops=[],leaves=[],smoke=[],selfie=null;
 let selfieT=45,dropT=14,leafT=0,smokeT=0,worldFlash=0,boatY=8*16,boatV=12;
 /* walka */
@@ -699,6 +702,7 @@ function setRegion(id){
     }
   }
   resetAmbient();
+  spawnForage();
   foes=[];hitFX=[];foeT=1.5;PROJ=[];bossShots=[];dmgNums=[];
   for(let i=0;i<cfg.foesMax;i++)spawnFoe();
   if(S){S.region=id;
@@ -1254,7 +1258,44 @@ const FOOD={
   schabowy:{n:'Schabowy jak u Mamy',ic:'🍖',heal:.7,buff:{atk:.2,t:30},desc:'+20% ATK. Drop z reakcji SCHABOWY!'},
   obwarzanek:{n:'Obwarzanek Krakowski',ic:'🥨',heal:.3,desc:'Prosto spod Sukiennic.'},
   dorszsmaz:{n:'Dorsz ze Smażalni',ic:'🐟',heal:.55,desc:'Bogdan poleca. Świeży jak bryza.'},
+  /* dania z gotowania (z dziko zebranych surowców) */
+  grzybowa:{n:'Zupa grzybowa',ic:'🍲',heal:.6,desc:'Z runa leśnego. Rozgrzewa procesor.'},
+  herbata:{n:'Herbata ziołowa',ic:'🍵',heal:.35,buff:{def:10,t:30},desc:'+10 DEF. Z dzikich ziół.'},
+  rybgrill:{n:'Ryba z grilla',ic:'🍥',heal:.55,buff:{atk:.12,t:30},desc:'+12% ATK. Świeżo złowiona.'},
+  frytki:{n:'Frytki domowe',ic:'🍟',heal:.4,buff:{spd:.15,t:20},desc:'+15% szybkości. Z dzikich ziemniaków.'},
+  placek:{n:'Placek jabłkowy',ic:'🥧',heal:.7,desc:'Z dzikich jabłek. Babcia by pochwaliła.'},
+  miodzik:{n:'Miód na zdrowie',ic:'🍯',heal:.5,buff:{def:8,t:25},desc:'+8 DEF. Prosto z barci.'},
 };
+/* --- SUROWCE (dziko rosnące) --- */
+const INGREDIENTS={
+  ziolo:{n:'Dzikie zioła',ic:'🌿',col:'#57ab52'},
+  grzyb:{n:'Grzyby leśne',ic:'🍄',col:'#c0503a'},
+  jagoda:{n:'Leśne jagody',ic:'🫐',col:'#5a6ad0'},
+  jablko:{n:'Dzikie jabłka',ic:'🍎',col:'#d84040'},
+  miod:{n:'Dziki miód',ic:'🍯',col:'#f5a032'},
+  ryba_sur:{n:'Świeża ryba',ic:'🐟',col:'#6fa8d0'},
+  ziemniak:{n:'Ziemniaki',ic:'🥔',col:'#c8a060'},
+  czosnek:{n:'Czosnek niedźwiedzi',ic:'🧄',col:'#e2e3d4'},
+};
+const FORAGE_POOL={
+  wawa:['ziolo','grzyb','jagoda','jablko','czosnek'],
+  chodziez:['ziolo','grzyb','jagoda','jablko','ryba_sur','ziemniak'],
+  morze:['ryba_sur','ziolo','czosnek','ziemniak'],
+  krakow:['ziolo','jagoda','jablko','grzyb','ziemniak'],
+  tatry:['ziolo','grzyb','jagoda','miod','czosnek'],
+};
+/* --- PRZEPISY: surowce -> danie (FOOD) --- */
+const RECIPES=[
+  {out:'herbata',need:{ziolo:3}},
+  {out:'grzybowa',need:{grzyb:2,ziolo:1}},
+  {out:'kompot',need:{jagoda:3}},
+  {out:'placek',need:{jablko:3}},
+  {out:'frytki',need:{ziemniak:2}},
+  {out:'miodzik',need:{miod:1,ziolo:1}},
+  {out:'rybgrill',need:{ryba_sur:1,czosnek:1}},
+  {out:'schabowy',need:{ziemniak:2,czosnek:1,ziolo:1}},
+  {out:'rosol',need:{ryba_sur:1,ziolo:2,czosnek:1}},
+];
 /* --- SKLEPY (drzwi -> asortyment) --- */
 const SHOPS={
   dino:{n:'🛒 DINO — PÓŁKA EDKA',items:[['food','picie',8],['food','zapiekanka',7],['food','paczek',5],['food','oranzada',4],['food','ogorek',6],['food','kebab',12]]},
@@ -1774,6 +1815,39 @@ function renderBag(){
 }
 function openBag(){SFX.open();renderBag();$('bag').classList.remove('hidden');}
 
+/* ---------------- GOTOWANIE: surowce -> dania ---------------- */
+function openCook(){SFX.open();renderCook();$('cook').classList.remove('hidden');}
+const haveIngr=k=>S.ingr[k]||0;
+const canCook=r=>Object.entries(r.need).every(([k,v])=>haveIngr(k)>=v);
+function renderCook(){
+  const keys=Object.keys(INGREDIENTS).filter(k=>haveIngr(k)>0);
+  $('ingrBar').innerHTML='<b style="font-size:10px;color:var(--gold)">🌿 TWOJE SUROWCE:</b> '+
+    (keys.length?keys.map(k=>INGREDIENTS[k].ic+' '+INGREDIENTS[k].n.split(' ')[0]+' ×'+haveIngr(k)).join('   ')
+     :'<span style="color:var(--mut)">brak — zbieraj [E] rośliny, grzyby i ryby na mapie 🌿🍄🐟</span>');
+  const cb=$('cookBody');cb.innerHTML='';
+  for(const r of RECIPES){
+    const f=FOOD[r.out],ok=canCook(r);
+    const need=Object.entries(r.need).map(([k,v])=>{const have=haveIngr(k);
+      return '<span style="color:'+(have>=v?'#7bc950':'#e04848')+'">'+INGREDIENTS[k].ic+INGREDIENTS[k].n.split(' ')[0]+' '+have+'/'+v+'</span>';}).join('   ');
+    const row=document.createElement('div');row.className='shopRow';
+    row.innerHTML='<span class="ic">'+f.ic+'</span><span class="inf"><b>'+f.n+'</b><br>'+
+      '<i>leczy '+Math.round(f.heal*100)+'% HP'+(f.buff?' · buff '+f.buff.t+'s':'')+'</i><br>'+need+'</span>';
+    const btn=document.createElement('button');btn.className='bigbtn px';btn.style.fontSize='10px';btn.style.flex='none';
+    btn.textContent='🍳 GOTUJ';btn.disabled=!ok;
+    btn.addEventListener('click',()=>cook(r));
+    row.appendChild(btn);cb.appendChild(row);
+  }
+}
+function cook(r){
+  if(!canCook(r)){SFX.no();toast('Za mało surowców na to danie!');return;}
+  for(const[k,v]of Object.entries(r.need)){S.ingr[k]-=v;if(S.ingr[k]<=0)delete S.ingr[k];}
+  S.food[r.out]=(S.food[r.out]||0)+1;save();
+  const f=FOOD[r.out];SFX.buy();burstConfetti();
+  toast('🍳 Ugotowano: '+f.ic+' '+f.n+'!<br><span style="color:#8f88b0">Zjedz w plecaku 🎒 (Q)</span>');
+  if(!curVoice&&S.ch==='edek'&&Math.random()<.5)vsay('v_elegancko');
+  renderCook();refreshHUD();
+}
+
 /* ---------------- PANEL BOHATERA: statystyki + ekwipunek ---------------- */
 let curHero=null;
 function renderHero(){
@@ -1872,6 +1946,72 @@ function resetAmbient(){
     if(p)pigeons.push({x:p[0],y:p[1],st:0,vx:0,vy:0,t:0});}
   drops=[];leaves=[];smoke=[];selfie=null;selfieT=45;dropT=10;
 }
+/* ---------------- DZIKIE SUROWCE (foraging) ---------------- */
+function spawnForage(){
+  forage=[];
+  const pool=FORAGE_POOL[REG]||['ziolo','grzyb','jagoda'];
+  const n=11+((Math.random()*5)|0);
+  for(let i=0;i<n;i++){
+    let type=pickA(pool),spot=null;
+    for(let a=0;a<40;a++){
+      const tx=2+(Math.random()*(MW-4))|0,ty=2+(Math.random()*(MH-4))|0;
+      const v=at(tx,ty);
+      if(v!==0&&v!==8&&v!==17)continue;                 // tylko trawa/piasek/śnieg
+      const byWater=at(tx+1,ty)===3||at(tx-1,ty)===3||at(tx,ty+1)===3||at(tx,ty-1)===3;
+      if(type==='ryba_sur'&&!byWater)continue;          // ryba tylko przy wodzie
+      if(type!=='ryba_sur'&&byWater&&Math.random()<.5)continue;
+      if(Math.hypot(tx*16-P.x,ty*16-P.y)<44)continue;   // nie na graczu
+      spot=[tx*16+8,ty*16+8];break;
+    }
+    if(spot)forage.push({x:spot[0],y:spot[1],type,ready:true,t:0});
+  }
+}
+function updateForage(dt){
+  for(const g of forage)if(!g.ready){g.t-=dt;if(g.t<=0)g.ready=true;}
+}
+function gatherForage(node){
+  if(!node||!node.ready)return;
+  node.ready=false;node.t=22+Math.random()*22;          // odrasta po ~22-44 s
+  const amt=1+(Math.random()<.35?1:0);
+  S.ingr[node.type]=(S.ingr[node.type]||0)+amt;save();
+  const ing=INGREDIENTS[node.type];
+  addHit(node.x,node.y-6,'+'+amt+ing.ic,ing.col);SFX.dia();
+  toast(ing.ic+' Zebrano: '+ing.n+' ×'+amt+'<br><span style="color:#8f88b0">Ugotuj coś: 🍳</span>');
+  if(Math.random()<.3&&!curVoice&&S.ch==='edek')vsay(pickA(['c_maliny','c_truskawka','c_kawa']));
+}
+/* sprite surowca (dodaje detali mapie) */
+function drawForageNode(g,sx,sy){
+  const ing=INGREDIENTS[g.type],glow=g.ready;
+  cx.fillStyle='rgba(0,0,0,.22)';cx.beginPath();cx.ellipse(sx+8,sy+13,5,2,0,0,7);cx.fill();
+  if(!glow){ // zebrane — mały odrost
+    R(cx,sx+7,sy+9,2,3,'#3d7346');R(cx,sx+6,sy+9,4,1.5,'#4a8a4a');return;
+  }
+  if(glow&&Math.floor(anim*3)%2===0){cx.fillStyle='rgba(255,255,255,.15)';
+    cx.beginPath();cx.arc(sx+8,sy+7,7,0,7);cx.fill();}
+  const b=Math.sin(anim*3+sx)*(reduceMotion?0:.6);
+  if(g.type==='ziolo'||g.type==='czosnek'){
+    for(let i=0;i<4;i++){const a=(i-1.5)*.4;R(cx,sx+8+a*6,sy+4+b,1.4,8,'#3d8a44');}
+    R(cx,sx+5,sy+3+b,2,2,ing.col);R(cx,sx+9,sy+2+b,2,2,ing.col);R(cx,sx+7,sy+1+b,2,2,ing.col);
+  }else if(g.type==='grzyb'){
+    R(cx,sx+6,sy+7,2,4,'#e8dcc0');R(cx,sx+9,sy+8,1.6,3,'#e8dcc0');
+    cx.fillStyle=ing.col;cx.beginPath();cx.arc(sx+7,sy+6,3.2,Math.PI,0);cx.fill();
+    cx.beginPath();cx.arc(sx+9.8,sy+7.5,2.2,Math.PI,0);cx.fill();
+    R(cx,sx+6,sy+4.6,1,1,'#fff');R(cx,sx+8,sy+5,1,1,'#fff');
+  }else if(g.type==='ryba_sur'){
+    cx.fillStyle=ing.col;cx.beginPath();cx.ellipse(sx+8,sy+8+b,5,2.6,0,0,7);cx.fill();
+    cx.beginPath();cx.moveTo(sx+13,sy+8+b);cx.lineTo(sx+16,sy+6+b);cx.lineTo(sx+16,sy+10+b);cx.fill();
+    R(cx,sx+4,sy+7+b,1.2,1.2,'#fff');
+  }else if(g.type==='miod'){
+    R(cx,sx+5,sy+4+b,6,7,'#c88a3a');R(cx,sx+5,sy+6+b,6,1,'#a8701e');R(cx,sx+5,sy+8.5+b,6,1,'#a8701e');
+    R(cx,sx+7,sy+2+b,2,2,'#f5c542');
+  }else{ // jagoda / jablko (krzak z owocami)
+    cx.fillStyle='#26542e';cx.beginPath();cx.arc(sx+8,sy+7+b,5.5,0,7);cx.fill();
+    cx.fillStyle='#2e6236';cx.beginPath();cx.arc(sx+5,sy+5+b,3,0,7);cx.fill();
+    for(let i=0;i<4;i++){const ax=sx+4+i*2.6,ay=sy+7+((i*5)%3)+b;
+      cx.fillStyle=ing.col;cx.beginPath();cx.arc(ax,ay,g.type==='jablko'?2.2:1.5,0,7);cx.fill();
+      cx.fillStyle='rgba(255,255,255,.5)';cx.fillRect(ax-.6,ay-.8,.8,.8);}
+  }
+}
 resetAmbient();
 
 /* ---------------- PAUZA (klawisz P) ---------------- */
@@ -1903,11 +2043,15 @@ addEventListener('keydown',e=>{
   keys[e.code]=true;
   if(e.code==='KeyP'&&scene!=='title'){togglePause();return;}
   if(paused)return; // w pauzie działa tylko P
+  /* MAPA (klawisz M): otwiera/zamyka pełnoekranową mapę; przy otwartej blokuj resztę */
+  if(e.code==='KeyM'&&(scene==='world'||scene==='dialog'||mapOpen)){toggleMap();return;}
+  if(mapOpen){if(e.code==='Escape')toggleMap();return;}
   if(e.code==='KeyF')toggleFS();
   if(e.code==='Escape'){if(stage.classList.contains('fakefs'))setFake(false);closePanels();}
   if(e.code==='KeyE'||e.code==='Enter')doAction();
+  /* SPACJA = tylko CIOS w świecie (wejście/wyjście z domeny itp. wyłącznie E) */
   if(e.code==='Space'){
-    if(scene==='world'&&!prompt)tryAttack();else doAction();
+    if(scene==='world')tryAttack();else doAction();
   }
   if(e.code==='KeyX'&&scene==='world')tryAttack();
   if(e.code==='KeyZ'&&scene==='world')trySpecial();
@@ -1924,6 +2068,7 @@ addEventListener('keydown',e=>{
 addEventListener('keyup',e=>keys[e.code]=false);
 stage.addEventListener('pointerdown',e=>{
   if(e.target.closest('button')||e.target.closest('.panel')||e.target.closest('#dlg')||e.target.closest('.ov:not(.hidden)'))return;
+  if(mapOpen){toggleMap();return;}  // tap na otwartej mapie = zamknij
   if(paused){togglePause();return;} // tap = wznów (mobile)
   initAudio();
   const r=cv.getBoundingClientRect();
@@ -1965,7 +2110,7 @@ function refreshHUD(){
   $('questHint').textContent=act?('▶ '+QUESTS[act].n):(S.legend?'👑 LEGENDA INTERNETU':
     discN?('questy: '+doneN+'/'+discN+' odkrytych — szukaj „!”'):'szukaj ludzi z „!” nad głową');
 }
-function closePanels(){['fit','quests','phone','travel','chars','gacha','hero','bag','shop','audio'].forEach(id=>$(id).classList.add('hidden'));}
+function closePanels(){['fit','quests','phone','travel','chars','gacha','hero','bag','shop','audio','cook'].forEach(id=>$(id).classList.add('hidden'));}
 document.querySelectorAll('.xbtn').forEach(b=>b.addEventListener('click',()=>{SFX.close();$(b.dataset.close).classList.add('hidden');}));
 $('btnFit').addEventListener('click',()=>openFit(false));
 $('btnQuest').addEventListener('click',openQuests);
@@ -1974,6 +2119,8 @@ $('btnChar').addEventListener('click',()=>{initAudio();switchChar();});
 $('btnChars').addEventListener('click',()=>{initAudio();openChars();});
 $('btnGacha').addEventListener('click',()=>{initAudio();openGacha();});
 $('btnBag').addEventListener('click',()=>{initAudio();openBag();});
+$('btnMap').addEventListener('click',()=>{if(scene==='world'||scene==='dialog'||mapOpen)toggleMap();});
+$('btnCook').addEventListener('click',()=>{initAudio();openCook();});
 
 /* ---------------- TELEFON: kanał Edka ---------------- */
 function openPhone(){
@@ -2033,6 +2180,7 @@ function doAction(){
   else if(prompt.door)enterDoor(prompt.door);
   else if(prompt.colQ)pickCol(prompt.colQ,prompt.colI);
   else if(prompt.selfie)doSelfie();
+  else if(prompt.forage)gatherForage(prompt.forage);
   else if(prompt.domain)enterDomain(prompt.domain);
   else if(prompt.bossId)startBoss(prompt.bossId);
   else if(prompt.chest)domOpenChest();
@@ -2056,6 +2204,10 @@ function findPrompt(){
   if(!prompt&&REG==='arena'){
     if(DOM.chest&&!DOM.chest.open&&Math.hypot(P.x-DOM.chest.x,P.y-DOM.chest.y)<24)prompt={chest:1,label:'🎁 Skrzynia!'};
     else if(Math.hypot(P.x-REGIONS.arena.spawn[0],P.y-REGIONS.arena.spawn[1])<22)prompt={exit:1,label:'Wyjście z domeny'};
+  }
+  if(!prompt&&REG!=='arena')for(const g of forage){
+    if(g.ready&&Math.hypot(P.x-g.x,P.y-g.y)<24){
+      prompt={forage:g,label:INGREDIENTS[g.type].ic+' Zbierz: '+INGREDIENTS[g.type].n};break;}
   }
   if(!prompt)for(const[q,cfg]of Object.entries(COLLECT)){
     if(qs(q)!==1||cfg.r!==REG)continue;
@@ -3333,6 +3485,7 @@ function updateWorld(dt){
   }
   updateCity(dt);
   updateRadio(dt);
+  updateForage(dt);
   idleT-=dt;
   if(idleT<=0){
     if(scene==='world'&&REG!=='arena'&&!curVoice){
@@ -3350,6 +3503,44 @@ function updateWorld(dt){
   camX+=(tx-camX)*Math.min(1,dt*8);camY+=(ty-camY)*Math.min(1,dt*8);
 }
 
+/* ---------------- MAPA PEŁNOEKRANOWA (klawisz M) ---------------- */
+function toggleMap(){mapOpen=!mapOpen;mapOpen?SFX.open():SFX.close();}
+const MAPCOL={0:'#2f6b3a',1:'#b39a68',2:'#454552',3:'#2f6db0',4:'#173a20',5:'#9a8ab0',6:'#8a5a2e',
+  7:'#3a7a46',8:'#dcc888',9:'#8a6a42',16:'#7a7a8c',17:'#e8eef8'};
+const mapColor=v=>MAPCOL[v]||(v>=10&&v<=15?'#6a6a80':'#2f6b3a');
+function drawMapOverlay(){
+  cx.fillStyle='rgba(9,7,18,.93)';cx.fillRect(0,0,W,H);
+  const s=Math.max(1,Math.min((W-20)/MW,(H-56)/MH));
+  const mw=MW*s,mh=MH*s,ox=(W-mw)/2,oy=34+(H-40-mh)/2;
+  // tło ramki
+  cx.fillStyle='#0c0a1a';cx.fillRect(ox-4,oy-4,mw+8,mh+8);
+  // kafle
+  for(let y=0;y<MH;y++)for(let x=0;x<MW;x++){
+    cx.fillStyle=mapColor(M[y*MW+x]);
+    cx.fillRect(ox+x*s,oy+y*s,Math.ceil(s),Math.ceil(s));
+  }
+  cx.strokeStyle='#f5c542';cx.lineWidth=1.5;cx.strokeRect(ox-4,oy-4,mw+8,mh+8);
+  // znaczniki: domeny (🌀) i bossowie (⚔) oraz wejście do areny
+  const mark=(tx,ty,col,txt)=>{const px=ox+tx*s,py=oy+ty*s;
+    cx.fillStyle=col;cx.beginPath();cx.arc(px,py,2.6,0,7);cx.fill();
+    if(txt){cx.font='6px "Press Start 2P"';cx.fillStyle=col;cx.textAlign='center';cx.fillText(txt,px,py-4);cx.textAlign='left';}};
+  for(const[id,dm]of Object.entries(DOMAINS))if(dm.r===REG)mark(dm.x,dm.y,'#b98cf0','🌀');
+  for(const[id,b]of Object.entries(BOSSES))if(b.r===REG&&!bossOnMap(id))mark(b.x,b.y,'#e04848','⚔');
+  for(const d of DOORS)if(d.r===REG)mark(d.x,d.y,'rgba(245,197,66,.7)','');
+  // NIEBIESKI znacznik gracza (pulsujący, poprawnie skalowany)
+  const px=ox+(P.x/16)*s,py=oy+(P.y/16)*s,pr=4+Math.sin(anim*5)*1.2;
+  cx.strokeStyle='rgba(80,170,255,.55)';cx.lineWidth=2;
+  cx.beginPath();cx.arc(px,py,pr+3,0,7);cx.stroke();
+  cx.fillStyle='#2f7fe0';cx.beginPath();cx.arc(px,py,pr,0,7);cx.fill();
+  cx.fillStyle='#bfe0ff';cx.beginPath();cx.arc(px,py,1.6,0,7);cx.fill();
+  // nagłówek + legenda
+  cx.font='11px "Press Start 2P"';cx.textAlign='center';
+  cx.fillStyle='#000';cx.fillText('🗺 '+REGIONS[REG].n,W/2+1,21);
+  cx.fillStyle='#f5c542';cx.fillText('🗺 '+REGIONS[REG].n,W/2,20);
+  cx.font='6px "Press Start 2P"';cx.fillStyle='#8f88b0';
+  cx.fillText('🔵 Ty   ⚔ boss   🌀 domena      [M] / dotknij — zamknij',W/2,H-8);
+  cx.textAlign='left';
+}
 /* ---------------- ŚWIAT: draw ---------------- */
 const TCOL={0:'#2e5a34',1:'#a08a5a',2:'#3a3a48',7:'#2e5a34',8:'#d8c084',9:'#8a6a42',16:'#7a7a8c',17:'#e8eef8'};
 function drawWorld(){
@@ -3362,6 +3553,12 @@ function drawWorld(){
       if((tx*7+ty*13)%9===0)R(cx,sx+6,sy+7,2,2,'#376b3e');
       if((tx*13+ty*7)%11===0){R(cx,sx+3,sy+10,1,3,'#3d7346');R(cx,sx+5,sy+11,1,2,'#3d7346');}
       if((tx*5+ty*17)%23===0)R(cx,sx+10,sy+4,2,2,'#e8e4f0');
+      /* bogatsze detale (statyczne wg pozycji kafla) */
+      if((tx*11+ty*3)%17===0){R(cx,sx+11,sy+9,1,4,'#3d7346');R(cx,sx+12,sy+8,1,5,'#48814f');R(cx,sx+13,sy+10,1,3,'#3d7346');}
+      if((tx*19+ty*7)%29===0){R(cx,sx+4,sy+5,3,2,'#7c7c8a');R(cx,sx+4,sy+5,3,1,'#93939e');}   // kamyk
+      if((tx*7+ty*23)%37===0){const fc=['#f5c542','#e88ac8','#ece9f4'][(tx+ty)%3];
+        R(cx,sx+9,sy+11,2,2,fc);R(cx,sx+12,sy+12,2,2,fc);R(cx,sx+9.6,sy+11.6,.8,.8,'#fff');}    // kwiatki
+      if((tx*29+ty*13)%43===0){R(cx,sx+7,sy+3,1.6,1.6,'#2e6236');R(cx,sx+8.4,sy+2.4,1.6,1.6,'#2e6236');R(cx,sx+7.7,sy+4,1.6,1.6,'#2e6236');} // koniczyna
     }
     if(v===1){
       if((tx+ty)%3===0)R(cx,sx+4,sy+6,3,2,'#8a7548');
@@ -3556,6 +3753,7 @@ function drawWorld(){
   for(const c of cars)ents.push({y:c.y+(c.h?11:24),d:()=>drawCarE(c,c.x-camX,c.y-camY)});
   for(const p of peds)ents.push({y:p.y,d:()=>drawPed(p,p.x-4-camX,p.y-18-camY)});
   for(const g of pigeons)ents.push({y:g.y,d:()=>drawPigeon(g,g.x-3-camX,g.y-4-camY)});
+  for(const g of forage)ents.push({y:g.y,d:()=>drawForageNode(g,g.x-8-camX,g.y-12-camY)});
   if(selfie)ents.push({y:selfie.y,d:()=>drawSelfieGirl(selfie.x-6-camX,selfie.y-20-camY)});
   ents.sort((a,b)=>a.y-b.y).forEach(e=>e.d());
   // pociski postaci: dorsz Bogdana / serduszko Julki
@@ -4498,6 +4696,9 @@ function loop(ts){
     drawPauseOverlay();
     requestAnimationFrame(loop);
     return;
+  }
+  if(mapOpen&&(scene==='world'||scene==='dialog')){
+    drawWorld();drawMapOverlay();requestAnimationFrame(loop);return; // mapa zamraża świat
   }
   switch(scene){
     case 'title':drawTitleScene();break;

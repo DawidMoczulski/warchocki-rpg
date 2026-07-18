@@ -27,6 +27,8 @@
     <button class="hudbtn" id="btnPhone" title="Kanał Edka">📱</button>
     <button class="hudbtn" id="btnFit">🧥</button>
     <button class="hudbtn" id="btnQuest">📜</button>
+    <button class="hudbtn" id="btnMap" title="Mapa (M)">🗺️</button>
+    <button class="hudbtn" id="btnCook" title="Gotowanie">🍳</button>
     <button class="hudbtn" id="btnAudio" title="Głośność: głos / muzyka">🎚️</button>
     <button class="hudbtn" id="btnFS">⛶</button>
     <button class="hudbtn" id="btnMute">🔊</button>
@@ -43,7 +45,7 @@
       <button id="btnNew" class="bigbtn px">▶ NOWA GRA</button>
       <button id="btnCont" class="ghostbtn px hidden">↻ KONTYNUUJ</button>
     </div>
-    <p class="hint px">ruch: WASD / dotyk · akcja: E · CIOS: spacja/X/👊 · super: Z/⚡<br>postać: 1-2-3 / C · jedzenie: Q · pauza: P<br><br>🎧 graj z dźwiękiem — Edek gada swoim głosem!</p>
+    <p class="hint px">ruch: WASD / dotyk · akcja: E · CIOS: spacja/X/👊 · super: Z/⚡<br>postać: 1-2-3 / C · jedzenie: Q · MAPA: M · zbieranie/gotowanie 🌿🍳 · pauza: P<br><br>🎧 graj z dźwiękiem — Edek gada swoim głosem!</p>
   </div>
 
   <div id="dlg" class="px hidden">
@@ -139,6 +141,17 @@
       <button class="xbtn" data-close="travel">✕</button>
     </div>
     <div class="panelBody"><div id="travelList"></div></div>
+  </div>
+
+  <div id="cook" class="panel px hidden">
+    <div class="panelHead">
+      <h2>🍳 GOTOWANIE</h2>
+      <button class="xbtn" data-close="cook">✕</button>
+    </div>
+    <div class="panelBody" style="flex-direction:column">
+      <div id="ingrBar"></div>
+      <div id="cookBody"></div>
+    </div>
   </div>
 
   <div id="audio" class="panel px hidden">
