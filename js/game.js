@@ -587,34 +587,34 @@ const REGIONS={
   wawa:{n:'WARSZAWA',w:92,h:44,build:buildWawa,spawn:[456,368],pks:[24,24],ic:'🏙',
     tdesc:'stolica · 10 questów · Piwnica Hejterów · Król Dzików',
     cars:true,boars:true,leaves:true,smoke:true,boat:true,
-    foesMax:6,foeTypes:['hejter','dres','pies','oburzona','zlyrobot'],zones:[[38,36,55,42],[2,22,8,32],[12,2,24,8]],
+    foesMax:6,foeTypes:['hejter','dres','pies','oburzona','zlyrobot','dron','golab','rywal','zlomiarz'],zones:[[38,36,55,42],[2,22,8,32],[12,2,24,8]],
     /* wielka arena bossa za Wisłą (leśna), połączona kładką */
     arena:{floor:0,wall:4,band:[64,0,91,43],ai:[66,13,81,26],corr:[56,18,65,20],
       flank:[[64,17,65,17],[64,21,65,21]],sign:[58,19],boss:[73,19]}},
   chodziez:{n:'CHODZIEŻ',w:74,h:36,build:buildChodziez,spawn:[20*16,15.5*16],pks:[20,14],ic:'🏡',
     tdesc:'rodzinne strony Edka · targ · Dziki Las · MEGA DRES',
     cars:false,boars:false,leaves:true,smoke:false,boat:true,
-    foesMax:5,foeTypes:['zazdrosnik','hejter','pies','oburzona'],zones:[[36,2,46,12],[2,17,8,23]],
+    foesMax:5,foeTypes:['zazdrosnik','hejter','pies','oburzona','wilk','zmija','zlomiarz'],zones:[[36,2,46,12],[2,17,8,23]],
     arena:{floor:0,wall:4,band:[48,0,73,35],ai:[54,12,69,25],corr:[47,17,53,19],
       flank:[[48,16,53,16],[48,20,53,20]],sign:[49,18],boss:[61,18]}},
   morze:{n:'POLSKIE MORZE',w:82,h:30,build:buildMorze,spawn:[18*16,25.4*16],pks:[18,26],ic:'🌊',
     tdesc:'plaża · molo · bursztyny · Zatopione Molo · Kraken',
     cars:false,boars:false,leaves:false,smoke:false,boat:true,
-    foesMax:5,foeTypes:['dres','hejter','zlyrobot','pies'],zones:[[4,12,24,16],[32,11,54,16]],
+    foesMax:5,foeTypes:['dres','hejter','zlyrobot','pies','mewa','krab'],zones:[[4,12,24,16],[32,11,54,16]],
     /* arena Krakena: piaszczysta wyspa otoczona morzem (fosą), pomost jako brama */
     arena:{floor:8,wall:3,band:[56,0,81,29],ai:[62,10,77,23],corr:[55,15,61,17],
       flank:[],sign:[57,16],boss:[69,16]}},
   krakow:{n:'KRAKÓW',w:86,h:40,build:buildKrakow,spawn:[51*16,29.5*16],pks:[51,28],ic:'🐉',
     tdesc:'Rynek · Sukiennice · Wawel · Smocza Jama · SMOK',
     cars:false,boars:false,leaves:true,smoke:false,boat:false,
-    foesMax:5,foeTypes:['hejter','zazdrosnik','oburzona','pies'],zones:[[2,2,12,20],[46,2,57,18]],
+    foesMax:5,foeTypes:['hejter','zazdrosnik','oburzona','pies','dron','wilk','zmija','rywal'],zones:[[2,2,12,20],[46,2,57,18]],
     /* arena Smoka: skalna jama za miastem */
     arena:{floor:0,wall:16,band:[60,0,85,39],ai:[66,13,81,26],corr:[59,18,65,20],
       flank:[[60,17,65,17],[60,21,65,21]],sign:[61,19],boss:[73,19]}},
   tatry:{n:'TATRY — ZAKOPANE',w:82,h:36,build:buildTatry,spawn:[39*16,28.5*16],pks:[39,26],ic:'🏔',
     tdesc:'Krupówki · Giewont · oscypki · Lodowa Grota · YETI',
     cars:false,boars:false,leaves:true,smoke:false,boat:false,
-    foesMax:5,foeTypes:['dres','zazdrosnik','pies','zlyrobot'],zones:[[4,28,20,33],[30,10,52,14]],
+    foesMax:5,foeTypes:['dres','zazdrosnik','pies','zlyrobot','kozica','balwan','zmija'],zones:[[4,28,20,33],[30,10,52,14]],
     /* arena Yeti: śnieżny kocioł otoczony skałami */
     arena:{floor:17,wall:16,band:[56,0,81,35],ai:[62,13,77,26],corr:[55,18,61,20],
       flank:[[56,17,61,17],[56,21,61,21]],sign:[57,19],boss:[69,19]}},
@@ -682,6 +682,7 @@ const P={x:456,y:368,dir:0,frame:0,moving:false,speed:85,slow:false};
 let boars=[],idleT=16,confetti=[],prompt=null;
 let mapOpen=false;          // pełnoekranowa mapa (klawisz M)
 let forage=[];              // dzikie surowce do zbierania na mapie
+let poison={t:0,dmg:0,tick:0};  // zatrucie gracza (żmija) — DoT, nie zabija
 let cars=[],peds=[],pigeons=[],drops=[],leaves=[],smoke=[],selfie=null;
 let selfieT=45,dropT=14,leafT=0,smokeT=0,worldFlash=0,boatY=8*16,boatV=12;
 /* walka */
@@ -763,7 +764,18 @@ const FOE_TYPES={
   /* nowi przeciwnicy */
   pies:{hp:34,atk:9,spd:84,c:'#6e4a28',hood:'#4a2f18',skin:'#6e4a28',dia:2,pts:700},          // szczekający kundel — szybki, słaby
   oburzona:{hp:70,atk:11,spd:50,c:'#8a4a6a',hood:'#c86fa8',skin:'#e8c9a0',dia:4,pts:1200},     // pani oburzona nowoczesnymi robotami
-  zlyrobot:{hp:120,atk:13,spd:44,c:'#23232f',hood:'#c02020',skin:'#3a3a4a',dia:8,pts:1900,shoots:true}, // zły robot — strzela czerwonymi pociskami
+  zlyrobot:{hp:120,atk:13,spd:44,c:'#23232f',hood:'#c02020',skin:'#3a3a4a',dia:8,pts:1900,shoots:true,shotType:'laser'}, // zły robot — strzela czerwonymi pociskami
+  /* --- 10 NOWYCH przeciwników (v10.4) --- */
+  dron:{hp:70,atk:12,spd:72,c:'#2a2a34',dia:6,pts:1600,flying:true,shoots:true,shotType:'flash'},   // dron paparazzi — lata, oślepia fleszem
+  mewa:{hp:42,atk:10,spd:96,c:'#eef2f8',dia:3,pts:900,flying:true},                                   // mewa — szybki nalot nad morzem
+  krab:{hp:150,atk:14,spd:34,c:'#d0512e',dia:7,pts:2000,kbres:true},                                  // krab — wolny, opancerzony
+  kozica:{hp:95,atk:15,spd:60,c:'#8a6a44',dia:6,pts:1700,charge:true},                                 // kozica — szarżuje z gór
+  balwan:{hp:160,atk:13,spd:30,c:'#eef4fb',dia:8,pts:2200,kbres:true,shoots:true,shotType:'snieg'},   // zły bałwan — rzuca śnieżkami
+  zmija:{hp:55,atk:11,spd:66,c:'#4a7a3a',dia:5,pts:1400,poison:true},                                  // żmija — jadowita (DoT)
+  wilk:{hp:88,atk:16,spd:90,c:'#6a6a78',dia:6,pts:1700},                                               // wilk — szybki drapieżnik
+  golab:{hp:50,atk:11,spd:82,c:'#8a8a9a',dia:4,pts:1100,flying:true},                                  // gołąb-mutant — agresywny nalot
+  rywal:{hp:135,atk:15,spd:52,c:'#f5c542',dia:9,pts:2200,shoots:true,shotType:'laser'},                // robot-rywal influencer
+  zlomiarz:{hp:175,atk:16,spd:40,c:'#5a4a34',dia:9,pts:2400,kbres:true},                               // złomiarz — chce oddać Edka na złom
   gigadres:{hp:220,atk:18,spd:58,c:'#0e0e16',hood:'#c8384a',skin:'#e8c9a0',dia:10,pts:3000},
   straznik:{hp:400,atk:20,spd:48,c:'#2a2440',hood:'#8a6fc8',skin:'#c9c4dd',dia:20,pts:8000},
   /* bossowie */
@@ -832,7 +844,8 @@ function dealDmg(f,chId,mult,opts){
   f.hp-=dmg;f.flash=.15;
   addDmgNum(f.x,f.y-18,dmg,eCol,crit);
   if(crit)SFX.crit();
-  const kbF=(opts.kb!==undefined?opts.kb:1)*180;
+  const kbMul=(FOE_TYPES[f.t]&&FOE_TYPES[f.t].kbres)?.25:1;   // opancerzeni (krab/bałwan/złomiarz) prawie nie lecą
+  const kbF=(opts.kb!==undefined?opts.kb:1)*180*kbMul;
   const ox=opts.ox!==undefined?opts.ox:P.x,oy=opts.oy!==undefined?opts.oy:P.y;
   const d=Math.max(1,Math.hypot(f.x-ox,f.y-oy));
   if(kbF>0){f.kb=.22;f.kbx=(f.x-ox)/d*kbF;f.kby=(f.y-oy)/d*kbF;}
@@ -967,6 +980,11 @@ function hurtPlayer(srcF){
   PHP[S.ch]=Math.max(0,(PHP[S.ch]||0)-dmg);
   hurtT=1.2;SFX.no();
   addDmgNum(P.x,P.y-26,'-'+dmg,'#e04848',false);
+  /* żmija zatruwa — DoT na kilka sekund */
+  if(srcF&&FOE_TYPES[srcF.t]&&FOE_TYPES[srcF.t].poison){
+    poison.t=4;poison.dmg=Math.max(2,Math.round(baseAtk*.22));poison.tick=.7;
+    addHit(P.x,P.y-34,'ZATRUCIE!','#7bc950');
+  }
   const sx2=srcF?srcF.x:P.x-6,sy2=srcF?srcF.y:P.y;
   const d=Math.max(1,Math.hypot(P.x-sx2,P.y-sy2));
   const kx=P.x+(P.x-sx2)/d*14,ky=P.y+(P.y-sy2)/d*14;
@@ -1060,20 +1078,28 @@ function updateFoes(dt){
         beep(300,.2,'sawtooth',.08,120);
       }
     }
-    /* ZŁY ROBOT: co jakiś czas strzela czerwonym pociskiem w gracza (z krótkim „ładunkiem") */
+    /* STRZELAJĄCY (zły robot / dron / bałwan / rywal): pocisk w gracza z krótkim „ładunkiem" */
     if(td.shoots&&!f.boss){
       if(f.shootT===undefined)f.shootT=1.6+Math.random()*2.2;
       f.shootT-=dt;
-      f.chargeT=(f.shootT<.5&&d<240)?f.shootT:0;   // świecenie wizjera tuż przed strzałem
+      f.chargeT=(f.shootT<.5&&d<240)?f.shootT:0;   // świeci tuż przed strzałem
       if(f.shootT<=0){
         f.shootT=2.6+Math.random()*1.8;
         if(d<240){
-          const a=Math.atan2(P.y-f.y,P.x-f.x);
-          bossShots.push({x:f.x,y:f.y-6,dx:Math.cos(a)*150,dy:Math.sin(a)*150,life:2.2,t:'laser',
-            atk:Math.round(td.atk*.9)});
-          addHit(f.x,f.y-28,'PIF!','#e03028');
-          beep(520,.12,'square',.06,180);
+          const a=Math.atan2(P.y-f.y,P.x-f.x),st=td.shotType||'laser',sp=st==='snieg'?128:150;
+          bossShots.push({x:f.x,y:f.y-6,dx:Math.cos(a)*sp,dy:Math.sin(a)*sp,life:2.2,t:st,atk:Math.round(td.atk*.9)});
+          addHit(f.x,f.y-28,st==='snieg'?'HAŁ!':st==='flash'?'PSTRYK!':'PIF!',st==='snieg'?'#bfe8f4':st==='flash'?'#fff':'#e03028');
+          beep(st==='snieg'?300:520,.12,st==='flash'?'triangle':'square',.06,st==='snieg'?120:180);
         }
+      }
+    }
+    /* SZARŻUJĄCY (kozica): rzuca się na gracza co jakiś czas */
+    if(td.charge&&!f.boss){
+      f.at=(f.at||1.4+Math.random())-dt;
+      if(f.at<=0&&d<180&&d>18){
+        f.at=2.6+Math.random()*1.4;
+        f.kb=.45;f.kbx=(P.x-f.x)/Math.max(1,d)*300;f.kby=(P.y-f.y)/Math.max(1,d)*300;
+        addHit(f.x,f.y-24,'SZARŻA!','#f5a032');SFX.boar();
       }
     }
     /* BOSS: fazy + ataki specjalne + ARENA (leash — ucieczka gracza = walka od nowa) */
@@ -1113,8 +1139,12 @@ function updateFoes(dt){
       }
     }
     const nx=f.x+f.dx*slowK*dt,ny=f.y+f.dy*slowK*dt;
-    if(!SOLID(at(Math.floor(nx/16),Math.floor(f.y/16))))f.x=nx;else f.dx*=-1;
-    if(!SOLID(at(Math.floor(f.x/16),Math.floor(ny/16))))f.y=ny;else f.dy*=-1;
+    if(td.flying){ // latające ignorują przeszkody (lecą nad wodą/murami)
+      f.x=Math.max(8,Math.min(MW*16-8,nx));f.y=Math.max(8,Math.min(MH*16-8,ny));
+    }else{
+      if(!SOLID(at(Math.floor(nx/16),Math.floor(f.y/16))))f.x=nx;else f.dx*=-1;
+      if(!SOLID(at(Math.floor(f.x/16),Math.floor(ny/16))))f.y=ny;else f.dy*=-1;
+    }
     if(d<(f.boss?22:13))hurtPlayer(f);
     /* SZARŻA: jeden czysty cios na wroga + odrzut, żeby Dych nie utknął w przeciwniku */
     if(dashT>0&&Math.hypot(P.x-f.x,P.y-f.y)<(f.boss?28:20)&&!(f.dHit>anim)){
@@ -3258,9 +3288,8 @@ function drawFoe(f,sx,sy){
   const bob=f.stun>0?0:Math.sin(anim*7+f.x)*0.6;
   if(f.flash>0){cx.globalAlpha=.6;}
   cx.fillStyle='rgba(0,0,0,.3)';cx.beginPath();cx.ellipse(sx+8,sy+24,6,2,0,0,7);cx.fill();
-  if(f.t==='pies'){drawFoeDog(f,sx,sy);if(f.flash>0)cx.globalAlpha=1;drawFoeExtras(f,sx,sy);return;}
-  if(f.t==='oburzona'){drawFoeLady(f,sx,sy,bob);if(f.flash>0)cx.globalAlpha=1;drawFoeExtras(f,sx,sy);return;}
-  if(f.t==='zlyrobot'){drawFoeRobot(f,sx,sy,bob);if(f.flash>0)cx.globalAlpha=1;drawFoeExtras(f,sx,sy);return;}
+  const fd=FOE_DRAW[f.t];
+  if(fd){fd(f,sx,sy,bob);if(f.flash>0)cx.globalAlpha=1;drawFoeExtras(f,sx,sy);return;}
   R(cx,sx+4,sy+18,3,6,'#1a1a24');R(cx,sx+9,sy+18,3,6,'#1a1a24');
   rr(cx,sx+3,sy+9+bob,10,10,2,td.c);
   if(f.t==='dres'){R(cx,sx+3.6,sy+9.6+bob,1.2,8,'#ece9f4');R(cx,sx+11.2,sy+9.6+bob,1.2,8,'#ece9f4');}
@@ -3351,6 +3380,120 @@ function drawFoeRobot(f,sx,sy,bob){
   // antena
   R(cx,sx+8,sy-1.6+bob,1,2.6,'#888');R(cx,sx+7.4,sy-2.8+bob,2.2,2,f.chargeT>0?'#ff5a4a':red);
 }
+/* ---- 10 NOWYCH przeciwników: sprite'y ---- */
+function drawFoeDron(f,sx,sy){
+  const fly=-6+Math.sin(anim*3+sx)*(reduceMotion?0:1.5),dark='#2a2a34',mid='#44445a',spin=Math.floor(anim*30)%2;
+  for(const dx of[-1,1]){R(cx,sx+8+dx*6-1,sy+3+fly,2,1.6,mid);
+    cx.strokeStyle='#8f9bb0';cx.lineWidth=1;cx.beginPath();
+    cx.moveTo(sx+8+dx*7-(spin?4:0),sy+3.5+fly);cx.lineTo(sx+8+dx*7+(spin?4:0),sy+3.5+fly);cx.stroke();}
+  rr(cx,sx+4,sy+3+fly,8,5,2,dark);
+  cx.fillStyle=f.chargeT>0?'#ff5a4a':'#e03028';cx.beginPath();cx.arc(sx+8,sy+7.5+fly,2.4,0,7);cx.fill();
+  cx.fillStyle='#fff';cx.beginPath();cx.arc(sx+7.3,sy+6.8+fly,.8,0,7);cx.fill();
+  if(Math.floor(anim*4)%2)R(cx,sx+5,sy+3.6+fly,1.4,1.4,'#7bc950');
+}
+function drawFoeMewa(f,sx,sy){
+  const fly=-5+Math.sin(anim*4+sx)*(reduceMotion?0:2),wf=Math.sin(anim*16)*(reduceMotion?0:3),w='#eef2f8';
+  cx.fillStyle=w;
+  cx.beginPath();cx.moveTo(sx+8,sy+7+fly);cx.lineTo(sx+1,sy+5+fly-wf);cx.lineTo(sx+4,sy+8+fly);cx.fill();
+  cx.beginPath();cx.moveTo(sx+8,sy+7+fly);cx.lineTo(sx+15,sy+5+fly-wf);cx.lineTo(sx+12,sy+8+fly);cx.fill();
+  rr(cx,sx+6,sy+5+fly,5,5,2,w);rr(cx,sx+8,sy+3+fly,4,4,1.6,w);
+  R(cx,sx+11.5,sy+4.5+fly,2.6,1.4,'#f5a032');
+  R(cx,sx+10,sy+4+fly,1.3,1.3,'#1a1a24');R(cx,sx+11,sy+4.4+fly,1,.6,'#c02020');
+}
+function drawFoeKrab(f,sx,sy){
+  const b=Math.sin(anim*6+sx)*(reduceMotion?0:.5),body='#d0512e',dark='#a83a1e';
+  for(let i=0;i<3;i++){R(cx,sx+3-i*.5,sy+14+i*1.5,2,1.4,dark);R(cx,sx+11+i*.5,sy+14+i*1.5,2,1.4,dark);}
+  R(cx,sx+1,sy+9+b,3,3,dark);R(cx,sx+.5,sy+8+b,2,2,body);
+  R(cx,sx+12,sy+9+b,3,3,dark);R(cx,sx+13.5,sy+8+b,2,2,body);
+  rr(cx,sx+3,sy+9+b,10,6,3,body);R(cx,sx+4,sy+10+b,8,1.4,'#e87a52');
+  R(cx,sx+5,sy+6+b,1,3,dark);R(cx,sx+10,sy+6+b,1,3,dark);
+  R(cx,sx+4.4,sy+5+b,2,2,'#fff');R(cx,sx+9.6,sy+5+b,2,2,'#fff');
+  R(cx,sx+5,sy+5.6+b,1,1,'#1a1a24');R(cx,sx+10.2,sy+5.6+b,1,1,'#1a1a24');
+}
+function drawFoeKozica(f,sx,sy){
+  const b=f.kb>0?0:Math.sin(anim*8+sx)*(reduceMotion?0:.6),body='#8a6a44',dark='#5a4426',mad=f.at&&f.at<.6;
+  R(cx,sx+4,sy+17,2.4,6,dark);R(cx,sx+10,sy+17,2.4,6,dark);
+  rr(cx,sx+3,sy+9+b,10,9,3,body);rr(cx,sx+9,sy+5+b,6,6,2,body);
+  R(cx,sx+14,sy+8+b,2,2,dark);
+  cx.strokeStyle='#2a2018';cx.lineWidth=1.6;
+  cx.beginPath();cx.moveTo(sx+10,sy+5+b);cx.quadraticCurveTo(sx+9,sy+1+b,sx+11,sy+0+b);cx.stroke();
+  cx.beginPath();cx.moveTo(sx+13,sy+5+b);cx.quadraticCurveTo(sx+13,sy+1+b,sx+15,sy+.5+b);cx.stroke();
+  R(cx,sx+12,sy+7+b,1.4,1.4,mad?'#e03028':'#1a1a24');
+  R(cx,sx+6,sy+16+b,3,3,'#efe9dc');
+}
+function drawFoeBalwan(f,sx,sy){
+  const b=Math.sin(anim*3+sx)*(reduceMotion?0:.4),sn='#eef4fb';
+  cx.fillStyle=sn;cx.beginPath();cx.arc(sx+8,sy+16+b,6,0,7);cx.fill();
+  cx.beginPath();cx.arc(sx+8,sy+8+b,4.6,0,7);cx.fill();
+  cx.strokeStyle='#6e4a28';cx.lineWidth=1.4;
+  cx.beginPath();cx.moveTo(sx+3,sy+13+b);cx.lineTo(sx-1,sy+9+b);cx.stroke();
+  cx.beginPath();cx.moveTo(sx+13,sy+13+b);cx.lineTo(sx+17,sy+9+b+(f.chargeT>0?-2:0));cx.stroke();
+  R(cx,sx+6,sy+6.6+b,1.4,1.6,'#1a1a24');R(cx,sx+9,sy+6.6+b,1.4,1.6,'#1a1a24');
+  R(cx,sx+5.4,sy+6+b,2,.8,'#1a1a24');R(cx,sx+8.6,sy+6+b,2,.8,'#1a1a24');
+  cx.fillStyle='#f5a032';cx.beginPath();cx.moveTo(sx+8,sy+8.4+b);cx.lineTo(sx+12,sy+9+b);cx.lineTo(sx+8,sy+9.6+b);cx.fill();
+  R(cx,sx+3,sy+11+b,10,1.6,'#c8384a');
+  R(cx,sx+5,sy+13.6+b,1,1,'#2a2a34');R(cx,sx+8,sy+15+b,1,1,'#2a2a34');
+}
+function drawFoeZmija(f,sx,sy){
+  const wig=Math.sin(anim*8+sx)*(reduceMotion?0:1.5),g='#4a7a3a';
+  cx.strokeStyle=g;cx.lineWidth=3.4;cx.lineCap='round';
+  cx.beginPath();cx.moveTo(sx+2,sy+18);
+  cx.quadraticCurveTo(sx+6+wig,sy+15,sx+7,sy+12);
+  cx.quadraticCurveTo(sx+8-wig,sy+9,sx+12,sy+8);cx.stroke();
+  cx.strokeStyle='#356028';cx.lineWidth=1;cx.stroke();
+  rr(cx,sx+11,sy+6,4,3.4,1.4,g);
+  R(cx,sx+13,sy+7,1.2,1.2,'#f5c542');
+  if(Math.floor(anim*5)%2){cx.strokeStyle='#e03028';cx.lineWidth=.8;
+    cx.beginPath();cx.moveTo(sx+15,sy+7.6);cx.lineTo(sx+17,sy+7);cx.stroke();
+    cx.beginPath();cx.moveTo(sx+15,sy+7.6);cx.lineTo(sx+17,sy+8.4);cx.stroke();}
+}
+function drawFoeWilk(f,sx,sy){
+  const b=Math.sin(anim*10+sx)*(reduceMotion?0:.6),body='#6a6a78',d='#45454f';
+  R(cx,sx+3,sy+17,2,6,d);R(cx,sx+6,sy+18,2,5,d);R(cx,sx+10,sy+17,2,6,d);R(cx,sx+13,sy+18,2,5,d);
+  cx.fillStyle=body;cx.beginPath();cx.moveTo(sx+3,sy+11+b);cx.lineTo(sx-2,sy+8+b);cx.lineTo(sx+1,sy+14+b);cx.fill();
+  rr(cx,sx+3,sy+11+b,10,7,3,body);rr(cx,sx+9,sy+7+b,6,6,2,body);
+  R(cx,sx+14,sy+10+b,2,2.4,d);
+  R(cx,sx+9,sy+5+b,2,3,d);R(cx,sx+12,sy+5+b,2,3,d);
+  R(cx,sx+12,sy+9+b,1.5,1.5,'#f5c542');
+  R(cx,sx+14,sy+12+b,1.2,.9,'#fff');R(cx,sx+15.4,sy+12+b,1,.8,'#fff');
+  R(cx,sx+5,sy+12+b,4,2,'#55555f');
+}
+function drawFoeGolab(f,sx,sy){
+  const fly=-4+Math.sin(anim*4+sx)*(reduceMotion?0:1.5),wf=Math.sin(anim*18)*(reduceMotion?0:3),g='#8a8a9a';
+  cx.fillStyle=g;
+  cx.beginPath();cx.moveTo(sx+8,sy+8+fly);cx.lineTo(sx+1,sy+6+fly-wf);cx.lineTo(sx+5,sy+10+fly);cx.fill();
+  cx.beginPath();cx.moveTo(sx+8,sy+8+fly);cx.lineTo(sx+15,sy+6+fly-wf);cx.lineTo(sx+11,sy+10+fly);cx.fill();
+  rr(cx,sx+5,sy+6+fly,6,7,2.4,g);rr(cx,sx+8,sy+3+fly,4,4,1.6,g);
+  R(cx,sx+6,sy+9+fly,4,2,'#6fd8e8');
+  R(cx,sx+11.5,sy+4.6+fly,2,1.2,'#e08a2a');
+  R(cx,sx+10,sy+4+fly,1.4,1.4,'#e03028');
+}
+function drawFoeRywal(f,sx,sy){
+  const g='#f5c542',dark='#1a1a24',mid='#c9c4dd';
+  R(cx,sx+4,sy+18,3,5,mid);R(cx,sx+9,sy+18,3,5,mid);
+  cx.strokeStyle=f.chargeT>0?'#fff7d6':'rgba(255,247,214,.6)';cx.lineWidth=1.4;
+  cx.beginPath();cx.arc(sx+8,sy+4,7,0,7);cx.stroke();
+  rr(cx,sx+3,sy+9,10,9,2,g);rr(cx,sx+4.5,sy+11,7,4,1,'#a8842e');
+  R(cx,sx+7,sy+13,2,1.2,'#e03028');
+  R(cx,sx+12.5,sy+12,3,4,dark);R(cx,sx+13,sy+12.5,2,3,'#6fd8e8');
+  rr(cx,sx+4,sy+1,8,7,2.4,'#ece9f4');rr(cx,sx+5,sy+2,6,4.4,1.6,dark);
+  R(cx,sx+5.6,sy+3.4,4.8,1.4,'#e03028');R(cx,sx+6,sy+3.6,4.8,.5,'#ff9a90');
+}
+function drawFoeZlomiarz(f,sx,sy){
+  const b=Math.sin(anim*5+sx)*(reduceMotion?0:.4),ov='#4a6a8a',skin='#e8c9a0';
+  R(cx,sx+4,sy+18,3,6,'#3a3020');R(cx,sx+9,sy+18,3,6,'#3a3020');
+  rr(cx,sx+3,sy+9+b,10,10,2,ov);R(cx,sx+6,sy+10+b,4,6,'#5a7a9a');R(cx,sx+7,sy+10+b,.8,6,'#3a5a7a');
+  rr(cx,sx+4.5,sy+2+b,7,7,2,skin);
+  R(cx,sx+4,sy+1+b,9,2.4,'#6e4a28');R(cx,sx+11,sy+1.6+b,3,1.4,'#5a3a1e');
+  R(cx,sx+6,sy+5+b,1.4,1.4,'#1a1a24');R(cx,sx+9,sy+5+b,1.4,1.4,'#1a1a24');
+  R(cx,sx+6,sy+7.4+b,4,.8,'#8a5a3a');
+  R(cx,sx+12,sy+9+b,2,5,'#888');
+  R(cx,sx+13.5,sy+12+b,4,2.4,f.kb>0?'#e03028':'#c02020');
+  R(cx,sx+13.5,sy+12+b,1.4,2.4,'#ece9f4');R(cx,sx+16,sy+12+b,1.4,2.4,'#ece9f4');
+}
+const FOE_DRAW={pies:drawFoeDog,oburzona:drawFoeLady,zlyrobot:drawFoeRobot,
+  dron:drawFoeDron,mewa:drawFoeMewa,krab:drawFoeKrab,kozica:drawFoeKozica,balwan:drawFoeBalwan,
+  zmija:drawFoeZmija,wilk:drawFoeWilk,golab:drawFoeGolab,rywal:drawFoeRywal,zlomiarz:drawFoeZlomiarz};
 function drawNPC(c,n,sx,sy){
   if(n.robo){ // Dych jako NPC (zanim dołączy do ekipy)
     drawDychBody(c,sx,sy,0,Math.floor(anim*2)%2);
@@ -3555,6 +3698,12 @@ function updateWorld(dt){
   P.x=Math.max(20,Math.min(MW*16-20,P.x));P.y=Math.max(20,Math.min(MH*16-20,P.y));
   /* na mapie widać TYLKO aktywną postać — reszta drużyny czeka „w kieszeni" (wymóg Dawida) */
   if(BUFF.t>0){BUFF.t-=dt;if(BUFF.t<=0)BUFF={atk:0,def:0,spd:0,t:0,n:''};}
+  /* zatrucie: obrażenia co 0,7 s, ale nie zabija (min 1 HP) */
+  if(poison.t>0){poison.t-=dt;poison.tick-=dt;
+    if(poison.tick<=0){poison.tick=.7;
+      PHP[S.ch]=Math.max(1,(PHP[S.ch]||1)-poison.dmg);
+      addDmgNum(P.x,P.y-18,'-'+poison.dmg,'#7bc950');
+    }}
   updateFoes(dt);
   domUpdate();
   for(const id in bossCdT)if(bossCdT[id]>0)bossCdT[id]-=dt;
@@ -3877,6 +4026,11 @@ function drawWorld(){
       cx.fillStyle='#e03028';cx.beginPath();cx.ellipse(sx,sy,6*el,2.8*el,ang,0,7);cx.fill();
       cx.fillStyle='#ff9a90';cx.beginPath();cx.ellipse(sx,sy,3*el,1.4*el,ang,0,7);cx.fill();
       cx.fillStyle='#fff7f2';cx.beginPath();cx.arc(sx-b.dx*.02,sy-b.dy*.02,1.1,0,7);cx.fill();
+    }else if(b.t==='flash'){        // flesz drona paparazzi
+      const k=1+Math.sin(anim*30)*.3;
+      cx.strokeStyle='rgba(255,90,90,.7)';cx.lineWidth=1;cx.beginPath();cx.arc(sx,sy,6.5*k,0,7);cx.stroke();
+      cx.fillStyle='rgba(255,255,255,.92)';cx.beginPath();cx.arc(sx,sy,4.6*k,0,7);cx.fill();
+      cx.fillStyle='#e03028';cx.beginPath();cx.arc(sx,sy,2.2,0,7);cx.fill();
     }else{
       cx.fillStyle='rgba(111,216,232,.85)';
       cx.beginPath();cx.arc(sx,sy,5+Math.sin(anim*14)*1.2,0,7);cx.fill();
