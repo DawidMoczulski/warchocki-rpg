@@ -456,7 +456,7 @@ const set=(x,y,v)=>{if(x>=0&&y>=0&&x<MW&&y<MH)M[y*MW+x]=v};
 function rect(x0,y0,x1,y1,v){for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)set(x,y,v)}
 function buildWawa(){
   rect(0,0,MW-1,MH-1,0);
-  rect(58,0,63,MH-1,3);rect(57,0,57,MH-1,1);      // Wisła + bulwar
+  rect(58,0,63,43,3);rect(57,0,57,43,1);          // Wisła + bulwar (oryginalny obszar)
   rect(0,20,56,21,2);rect(27,0,28,MH-1,2);        // drogi
   rect(10,10,10,19,1);rect(10,10,26,10,1);rect(29,10,36,10,1);
   rect(36,10,36,19,1);rect(48,8,48,19,1);rect(29,26,33,26,1);
@@ -489,8 +489,8 @@ function buildWawa(){
 }
 function buildChodziez(){
   rect(0,0,MW-1,MH-1,0);
-  rect(0,26,MW-1,35,3);rect(0,25,MW-1,25,1);       // Jezioro Miejskie + plaża
-  rect(0,14,MW-1,15,2);                            // szosa
+  rect(0,26,47,35,3);rect(0,25,47,25,1);           // Jezioro Miejskie + plaża (oryg. obszar)
+  rect(0,14,47,15,2);                              // szosa
   rect(23,4,24,13,1);rect(10,17,10,23,1);rect(10,17,37,17,1);rect(37,17,37,23,1);
   rect(16,4,16,13,1);rect(16,4,23,4,1);
   const trees=[[3,3],[6,5],[9,2],[13,6],[29,3],[33,5],[41,3],[44,6],[40,9],[44,11],[36,4],
@@ -535,7 +535,7 @@ function buildMorze(){
 /* ---------------- KRAKÓW ---------------- */
 function buildKrakow(){
   rect(0,0,MW-1,MH-1,0);
-  rect(0,34,MW-1,MH-1,3);rect(0,33,MW-1,33,1);      // Wisła + bulwar
+  rect(0,34,59,39,3);rect(0,33,59,33,1);            // Wisła + bulwar (oryg. obszar)
   rect(0,24,43,25,2);                                // droga
   rect(44,0,45,32,2);                                // droga pionowa
   rect(20,10,40,22,1);                               // Rynek Główny (bruk)
@@ -583,44 +583,53 @@ function buildTatry(){
   set(48,24,14);                                     // billboard
   for(let x=44;x<=52;x++)if(at(x,15)===0)set(x,15,13);
 }
+/* mapy 4× większe (2× na oś); miasto zostaje w rogu, reszta = dziki teren (wildFill).
+   Arena bossa w przeciwległym rogu, otoczona murem, połączona korytarzem. */
 const REGIONS={
-  wawa:{n:'WARSZAWA',w:92,h:44,build:buildWawa,spawn:[456,368],pks:[24,24],ic:'🏙',
+  wawa:{n:'WARSZAWA',w:128,h:88,build:buildWawa,spawn:[456,368],pks:[24,24],ic:'🏙',
     tdesc:'stolica · 10 questów · Piwnica Hejterów · Król Dzików',
     cars:true,boars:true,leaves:true,smoke:true,boat:true,
-    foesMax:6,foeTypes:['hejter','dres','pies','oburzona','zlyrobot','dron','golab','rywal','zlomiarz'],zones:[[38,36,55,42],[2,22,8,32],[12,2,24,8]],
-    /* wielka arena bossa za Wisłą (leśna), połączona kładką */
-    arena:{floor:0,wall:4,band:[64,0,91,43],ai:[66,13,81,26],corr:[56,18,65,20],
-      flank:[[64,17,65,17],[64,21,65,21]],sign:[58,19],boss:[73,19]}},
-  chodziez:{n:'CHODZIEŻ',w:74,h:36,build:buildChodziez,spawn:[20*16,15.5*16],pks:[20,14],ic:'🏡',
+    foesMax:8,foeTypes:['hejter','dres','pies','oburzona','zlyrobot','dron','golab','rywal','zlomiarz'],
+    zones:[[4,48,120,84],[70,6,122,60],[12,2,40,20]],
+    arena:{floor:0,wall:4,band:[98,60,127,87],ai:[104,66,119,79],corr:[96,71,104,73],
+      flank:[[98,70,103,70],[98,74,103,74]],sign:[95,72],boss:[112,73]}},
+  chodziez:{n:'CHODZIEŻ',w:96,h:72,build:buildChodziez,spawn:[20*16,15.5*16],pks:[20,14],ic:'🏡',
     tdesc:'rodzinne strony Edka · targ · Dziki Las · MEGA DRES',
     cars:false,boars:false,leaves:true,smoke:false,boat:true,
-    foesMax:5,foeTypes:['zazdrosnik','hejter','pies','oburzona','wilk','zmija','zlomiarz'],zones:[[36,2,46,12],[2,17,8,23]],
-    arena:{floor:0,wall:4,band:[48,0,73,35],ai:[54,12,69,25],corr:[47,17,53,19],
-      flank:[[48,16,53,16],[48,20,53,20]],sign:[49,18],boss:[61,18]}},
-  morze:{n:'POLSKIE MORZE',w:82,h:30,build:buildMorze,spawn:[18*16,25.4*16],pks:[18,26],ic:'🌊',
+    foesMax:7,foeTypes:['zazdrosnik','hejter','pies','oburzona','wilk','zmija','zlomiarz'],
+    zones:[[4,38,90,68],[50,2,90,30]],
+    arena:{floor:0,wall:4,band:[66,44,95,71],ai:[72,50,87,63],corr:[64,55,72,57],
+      flank:[[66,54,71,54],[66,58,71,58]],sign:[63,56],boss:[80,57]}},
+  morze:{n:'POLSKIE MORZE',w:112,h:64,build:buildMorze,spawn:[18*16,25.4*16],pks:[18,26],ic:'🌊',
     tdesc:'plaża · molo · bursztyny · Zatopione Molo · Kraken',
     cars:false,boars:false,leaves:false,smoke:false,boat:true,
-    foesMax:5,foeTypes:['dres','hejter','zlyrobot','pies','mewa','krab'],zones:[[4,12,24,16],[32,11,54,16]],
+    foesMax:7,foeTypes:['dres','hejter','zlyrobot','pies','mewa','krab'],
+    zones:[[4,28,108,58],[60,12,108,26]],
     /* arena Krakena: piaszczysta wyspa otoczona morzem (fosą), pomost jako brama */
-    arena:{floor:8,wall:3,band:[56,0,81,29],ai:[62,10,77,23],corr:[55,15,61,17],
-      flank:[],sign:[57,16],boss:[69,16]}},
-  krakow:{n:'KRAKÓW',w:86,h:40,build:buildKrakow,spawn:[51*16,29.5*16],pks:[51,28],ic:'🐉',
+    arena:{floor:8,wall:3,band:[82,36,111,63],ai:[88,42,103,55],corr:[80,47,88,49],
+      flank:[],sign:[79,48],boss:[96,49]}},
+  krakow:{n:'KRAKÓW',w:120,h:80,build:buildKrakow,spawn:[51*16,29.5*16],pks:[51,28],ic:'🐉',
     tdesc:'Rynek · Sukiennice · Wawel · Smocza Jama · SMOK',
     cars:false,boars:false,leaves:true,smoke:false,boat:false,
-    foesMax:5,foeTypes:['hejter','zazdrosnik','oburzona','pies','dron','wilk','zmija','rywal'],zones:[[2,2,12,20],[46,2,57,18]],
+    foesMax:7,foeTypes:['hejter','zazdrosnik','oburzona','pies','dron','wilk','zmija','rywal'],
+    zones:[[4,44,114,76],[64,4,114,40]],
     /* arena Smoka: skalna jama za miastem */
-    arena:{floor:0,wall:16,band:[60,0,85,39],ai:[66,13,81,26],corr:[59,18,65,20],
-      flank:[[60,17,65,17],[60,21,65,21]],sign:[61,19],boss:[73,19]}},
-  tatry:{n:'TATRY — ZAKOPANE',w:82,h:36,build:buildTatry,spawn:[39*16,28.5*16],pks:[39,26],ic:'🏔',
+    arena:{floor:0,wall:16,band:[90,52,119,79],ai:[96,58,111,71],corr:[88,63,96,65],
+      flank:[[90,62,95,62],[90,66,95,66]],sign:[87,64],boss:[104,65]}},
+  tatry:{n:'TATRY — ZAKOPANE',w:112,h:72,build:buildTatry,spawn:[39*16,28.5*16],pks:[39,26],ic:'🏔',
     tdesc:'Krupówki · Giewont · oscypki · Lodowa Grota · YETI',
     cars:false,boars:false,leaves:true,smoke:false,boat:false,
-    foesMax:5,foeTypes:['dres','zazdrosnik','pies','zlyrobot','kozica','balwan','zmija'],zones:[[4,28,20,33],[30,10,52,14]],
+    foesMax:7,foeTypes:['dres','zazdrosnik','pies','zlyrobot','kozica','balwan','zmija'],
+    zones:[[4,40,108,68],[60,12,108,40]],
     /* arena Yeti: śnieżny kocioł otoczony skałami */
-    arena:{floor:17,wall:16,band:[56,0,81,35],ai:[62,13,77,26],corr:[55,18,61,20],
-      flank:[[56,17,61,17],[56,21,61,21]],sign:[57,19],boss:[69,19]}},
+    arena:{floor:17,wall:16,band:[82,44,111,71],ai:[88,50,103,63],corr:[80,55,88,57],
+      flank:[[82,54,87,54],[82,58,87,58]],sign:[79,56],boss:[96,57]}},
 };
 let REG='wawa';
-const SOLID=v=>v===3||v===4||v===5||v===6||(v>=10&&v<=16);
+/* kafle blokujące ruch (tablica = szybkie sprawdzanie w AI/ruchu). Nowe assety 18–31. */
+const SOLIDF=new Uint8Array(64);
+[3,4,5,6,10,11,12,13,14,15,16,   18,19,20,22,24,26,27,29,30].forEach(v=>{SOLIDF[v]=1;});
+const SOLID=v=>SOLIDF[v]===1;
 
 const DOORS=[
   {r:'wawa',x:36,y:17,n:'PKiN',act:'pkin'},
@@ -695,6 +704,97 @@ const FOLW=[{x:0,y:0,dir:0,frame:0},{x:0,y:0,dir:0,frame:0}];
 function resetFollowers(){for(const fo of FOLW){fo.x=P.x;fo.y=P.y+14;}}
 let dychIdleT=20;
 
+/* ================= DZIKI ŚWIAT: proceduralna dekoracja powiększonych map =================
+   Wszystko pieczone do M przy budowie regionu → ZERO kosztu per-klatkę (kafle i tak
+   są cullowane do widocznego okna). */
+function chooseAsset(pick){ // id kafla-assetu wg regionu
+  if(REG==='morze')  return pick<.45?20:pick<.6?26:pick<.82?31:4;         // kamienie, drewno, paprocie, rzadkie drzewa
+  if(REG==='tatry')  return pick<.4?4:pick<.68?20:pick<.82?16:pick<.92?18:26; // świerki, głazy, skała, brzozy
+  if(REG==='krakow') return pick<.42?30:pick<.66?4:pick<.8?19:pick<.9?18:20;   // dęby, sosny, krzaki
+  return pick<.34?4:pick<.58?30:pick<.74?18:pick<.86?19:pick<.94?26:20;         // mieszany las
+}
+function protectedPts(cfg){
+  const p=[],add=(x,y)=>p.push([x|0,y|0]);
+  for(const d of DOORS)if(d.r===REG)add(d.x,d.y);
+  for(const n of NPCS)if(n.r===REG)add(n.x/16,n.y/16);
+  for(const dm of Object.values(DOMAINS))if(dm.r===REG)add(dm.x,dm.y);
+  for(const b of Object.values(BOSSES))if(b.r===REG)add(b.x,b.y);
+  for(const q in COLLECT)if(COLLECT[q].r===REG)for(const pt of COLLECT[q].pts)add(pt[0],pt[1]);
+  add(cfg.spawn[0]/16,cfg.spawn[1]/16);
+  if(cfg.arena)add(cfg.arena.sign[0],cfg.arena.sign[1]);
+  return p;
+}
+function insideArena(cfg,tx,ty){const A=cfg.arena;if(!A)return false;
+  return tx>=A.ai[0]-4&&tx<=A.ai[2]+4&&ty>=A.ai[1]-4&&ty<=A.ai[3]+4;}
+const hash3=(tx,ty,s)=>{let x=(((tx+7)*73856093)^((ty+13)*19349663)^(s*83492791))>>>0;return((x^(x>>>13))>>>0)/4294967296;};
+function wildFill(cfg){
+  const base=baseTile(),prot=protectedPts(cfg);
+  const near=(tx,ty,r)=>prot.some(q=>Math.abs(q[0]-tx)<=r&&Math.abs(q[1]-ty)<=r);
+  const adjSpecial=(tx,ty)=>{for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const v=at(tx+dx,ty+dy);
+    if(v===1||v===2||v===5||v===6||v===9)return true;}return false;};
+  const dens=REG==='morze'?.14:REG==='tatry'?.26:.30;
+  for(let ty=1;ty<MH-1;ty++)for(let tx=1;tx<MW-1;tx++){
+    if(at(tx,ty)!==base)continue;
+    if(insideArena(cfg,tx,ty)||near(tx,ty,3)||adjSpecial(tx,ty))continue;
+    const r=hash3(tx,ty,1);
+    if(r<dens)set(tx,ty,chooseAsset(hash3(tx,ty,2)));
+    else if(r<dens+.10){const q=hash3(tx,ty,3);set(tx,ty,q<.4?28:q<.7?31:21);}
+  }
+  wildPOI(cfg);
+}
+/* punkty widokowe (altanki, ogniska, stawy, łąki, głazowiska, drogowskazy) w dzikim terenie */
+function wildPOI(cfg){
+  const base=baseTile();
+  const clear=(tx,ty,r)=>{for(let y=ty-r;y<=ty+r;y++)for(let x=tx-r;x<=tx+r;x++)
+    if(x>1&&y>1&&x<MW-1&&y<MH-1&&at(x,y)!==1&&at(x,y)!==2&&at(x,y)!==5&&at(x,y)!==6&&at(x,y)!==9)set(x,y,base);};
+  const put=(fx,fy,r,tile)=>{const tx=(MW*fx)|0,ty=(MH*fy)|0;
+    if(at(tx,ty)===5||at(tx,ty)===6||insideArena(cfg,tx,ty))return null;
+    clear(tx,ty,r);set(tx,ty,tile);return[tx,ty];};
+  put(.55,.34,2,22);            // altanka
+  put(.72,.6,1,27);            // ognisko
+  put(.82,.28,2,20);           // głazowisko (+ kamienie wokół)
+  const gl=put(.8,.28,0,20);if(gl){set(gl[0]+2,gl[1]+1,20);set(gl[0]-2,gl[1]+1,21);set(gl[0]+1,gl[1]-2,20);}
+  const pond=put(.34,.7,3,24);  // staw + trzciny
+  if(pond)for(const[dx,dy]of[[-3,0],[3,0],[0,-3],[0,3],[-2,2],[2,-2]])set(pond[0]+dx,pond[1]+dy,25);
+  const mead=((MW*.6)|0);const mty=((MH*.8)|0);  // łąka kwietna 4×3
+  if(!insideArena(cfg,mead,mty))for(let y=mty;y<mty+3;y++)for(let x=mead;x<mead+4;x++)
+    if(at(x,y)===base||SOLID(at(x,y))===false)set(x,y,28);
+  put(.5,.5,1,29);             // drogowskaz w centrum dzikiego terenu
+  put(.28,.42,1,27);           // drugie ognisko
+  put(.66,.72,2,22);           // druga altanka
+}
+/* SIATKA BEZPIECZEŃSTWA: gwarancja, że wszystkie drzwi/domeny/wejście-areny są osiągalne
+   ze spawnu — jeśli nie, wykop ścieżkę (tunel tile 23). */
+function nearestWalkableTile(tx,ty){
+  if(!SOLID(at(tx,ty)))return[tx,ty];
+  for(let r=1;r<=4;r++)for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++)
+    if(!SOLID(at(tx+dx,ty+dy)))return[tx+dx,ty+dy];
+  return null;
+}
+function reachMask(sx,sy){
+  const seen=new Uint8Array(MW*MH);if(SOLID(at(sx,sy)))return seen;
+  const q=[sx+sy*MW];seen[sx+sy*MW]=1;
+  for(let i=0;i<q.length;i++){const k=q[i],x=k%MW,y=(k/MW)|0;
+    const nb=[[x+1,y],[x-1,y],[x,y+1],[x,y-1]];
+    for(const[nx,ny]of nb){if(nx<0||ny<0||nx>=MW||ny>=MH)continue;
+      if(SOLID(at(nx,ny)))continue;const kk=ny*MW+nx;if(seen[kk])continue;seen[kk]=1;q.push(kk);}}
+  return seen;
+}
+function ensureConnectivity(cfg){
+  const stx=Math.floor(cfg.spawn[0]/16),sty=Math.floor(cfg.spawn[1]/16);
+  const carve=(tx,ty)=>{let x=tx,y=ty,g=0;
+    while((x!==stx||y!==sty)&&g++<600){
+      if(SOLID(at(x,y)))set(x,y,23);
+      if(Math.abs(stx-x)>=Math.abs(sty-y))x+=Math.sign(stx-x);else y+=Math.sign(sty-y);}};
+  const targets=[];
+  for(const d of DOORS)if(d.r===REG)targets.push([d.x,d.y]);
+  for(const dm of Object.values(DOMAINS))if(dm.r===REG)targets.push([dm.x,dm.y]);
+  if(cfg.arena)targets.push(cfg.arena.sign);
+  let seen=reachMask(stx,sty),fixed=false;
+  for(const t of targets){const nw=nearestWalkableTile(t[0]|0,t[1]|0);
+    if(nw&&!seen[nw[1]*MW+nw[0]]){carve(nw[0],nw[1]);fixed=true;}}
+  if(fixed)reachMask(stx,sty);
+}
 /* wielka, oddzielona arena bossa w dołożonej przestrzeni mapy:
    czysty pas podłoża → gruby mur naturalny (las/skała/woda) → wnętrze → korytarz-brama */
 function buildBossArena(cfg){
@@ -712,6 +812,7 @@ function setRegion(id){
   M=new Uint8Array(MW*MH);
   cfg.build();
   buildBossArena(cfg);
+  wildFill(cfg);          // dziki teren: drzewa/skały/altanki/stawy/ścieżki (pieczone w M)
   /* duża, otwarta arena wokół spawnu bossa: karczujemy przeszkody w promieniu 5 kafli,
      wstawiając najczęstszy deptalny kafel z okolicy (trawa/piasek/śnieg wg regionu) */
   for(const b of Object.values(BOSSES)){
@@ -730,6 +831,7 @@ function setRegion(id){
       if(SOLID(M[ty*MW+tx]))M[ty*MW+tx]=fill;
     }
   }
+  ensureConnectivity(cfg);   // gwarancja dojścia do wszystkich drzwi/domen/areny
   resetAmbient();
   spawnForage();
   foes=[];hitFX=[];foeT=1.5;PROJ=[];bossShots=[];dmgNums=[];
@@ -1591,27 +1693,27 @@ function exitDomain(){
    BOSSOWIE REGIONALNI
    ===================================================================== */
 const BOSSES={
-  krol:{r:'wawa',x:73,y:19,t:'krol',n:'KRÓL DZIKÓW',batk:'charge',
+  krol:{r:'wawa',x:112,y:73,t:'krol',n:'KRÓL DZIKÓW',batk:'charge',
     film:'WALCZĘ Z KRÓLEM DZIKÓW! (prawie mnie stratował)',
     intro:[['Edek','Te dziki mają swojego króla?! Miasto to nie chlew, byku!','c_problemy'],
            ['KRÓL DZIKÓW','CHRUM CHRUM!!! TO MÓJ PARK, BLASZAKU!'],
            ['Edek','Uciekajcie stąd, dziki! Zbierajcie się, no już!','c_uciekajcie']]},
-  seba:{r:'chodziez',x:61,y:18,t:'mdres',n:'MEGA DRES SEBASTIAN OSTATECZNY',batk:'kettle',
+  seba:{r:'chodziez',x:80,y:57,t:'mdres',n:'MEGA DRES SEBASTIAN OSTATECZNY',batk:'kettle',
     film:'MEGA DRES CHCIAŁ MI ZABRAĆ ROLEXA (poszło z kopyta)',
     intro:[['Sebastian Ostateczny','Patrzcie, robot-celebryta. Oddawaj rolexa i kanał, blaszko!'],
            ['Edek','Jestem Warchockim Edwardem, byku. Rolex zostaje na lewej.','c_rolexlewa'],
            ['Sebastian Ostateczny','TO TERAZ ZOBACZYSZ KETTLE Z CHODZIEŻY!']]},
-  kraken:{r:'morze',x:69,y:16,t:'kraken',n:'KRAKEN BAŁTYCKI',batk:'bryzg',
+  kraken:{r:'morze',x:96,y:49,t:'kraken',n:'KRAKEN BAŁTYCKI',batk:'bryzg',
     film:'KRAKEN W BAŁTYKU?! (nagrałem wszystko)',
     intro:[['Rybak Bogdan','Panie Edward! COŚ wyszło z morza i kradnie bursztyny!'],
            ['KRAKEN BAŁTYCKI','BLUB BLUB... WYŚWIETLENIA... ODDAĆ... MOJE...'],
            ['Edek','Zobaczcie, co mi los przyniesie. Macki kontra rolex!','v_los']]},
-  smok:{r:'krakow',x:73,y:19,t:'smok',n:'SMOK WAWELSKI',batk:'ogien',
+  smok:{r:'krakow',x:104,y:65,t:'smok',n:'SMOK WAWELSKI',batk:'ogien',
     film:'OBUDZIŁEM SMOKA WAWELSKIEGO (Kraków ewakuowany?!)',
     intro:[['Przekupka','Panie Edwardzie! Smok się obudził i żąda... wyświetleń!'],
            ['SMOK WAWELSKI','TYSIĄC LAT SPAŁEM. A TERAZ JAKIŚ BLASZAK MA WIĘCEJ FANÓW ODE MNIE?!'],
            ['Edek','Człowieku, ja mam rolexa z diamentami. A ty? Ogień z paszczy. Wyrównajmy rachunki.','c_rolextiktok']]},
-  yeti:{r:'tatry',x:69,y:19,t:'yeti',n:'YETI Z GIEWONTU',batk:'snieg',
+  yeti:{r:'tatry',x:96,y:57,t:'yeti',n:'YETI Z GIEWONTU',batk:'snieg',
     film:'YETI ISTNIEJE!!! (nagranie z Giewontu, nie klikbajt)',
     intro:[['Baca','Edek, cosik po graniach chodzi i porywa oscypki! Jak nic — YETI!'],
            ['YETI','GRRR! MOJE GÓRY! MOJA CISZA! ZABIERAJ TE KAMERY!'],
@@ -3741,7 +3843,9 @@ function updateWorld(dt){
 /* ---------------- MAPA PEŁNOEKRANOWA (klawisz M) ---------------- */
 function toggleMap(){mapOpen=!mapOpen;mapOpen?SFX.open():SFX.close();}
 const MAPCOL={0:'#2f6b3a',1:'#b39a68',2:'#454552',3:'#2f6db0',4:'#173a20',5:'#9a8ab0',6:'#8a5a2e',
-  7:'#3a7a46',8:'#dcc888',9:'#8a6a42',16:'#7a7a8c',17:'#e8eef8'};
+  7:'#3a7a46',8:'#dcc888',9:'#8a6a42',16:'#7a7a8c',17:'#e8eef8',
+  18:'#3a7a44',30:'#1f4a24',19:'#2a5a2e',20:'#7a7a8c',21:'#4a7050',22:'#a02c44',23:'#8a6746',
+  24:'#2f6db0',25:'#4a7a3a',26:'#5a4028',27:'#e0662a',28:'#4a9a52',29:'#c8a86a',31:'#357a3e'};
 const mapColor=v=>MAPCOL[v]||(v>=10&&v<=15?'#6a6a80':'#2f6b3a');
 function drawMapOverlay(){
   cx.fillStyle='rgba(9,7,18,.93)';cx.fillRect(0,0,W,H);
@@ -3777,7 +3881,12 @@ function drawMapOverlay(){
   cx.textAlign='left';
 }
 /* ---------------- ŚWIAT: draw ---------------- */
-const TCOL={0:'#2e5a34',1:'#a08a5a',2:'#3a3a48',7:'#2e5a34',8:'#d8c084',9:'#8a6a42',16:'#7a7a8c',17:'#e8eef8'};
+const TCOL={0:'#2e5a34',1:'#a08a5a',2:'#3a3a48',7:'#2e5a34',8:'#d8c084',9:'#8a6a42',16:'#7a7a8c',17:'#e8eef8',
+  18:'#2e5a34',19:'#2e5a34',20:'#2e5a34',21:'#2e5a34',22:'#2e5a34',23:'#7a5636',24:'#2e5a34',25:'#2e5a34',
+  26:'#2e5a34',27:'#2e5a34',28:'#2e5a34',29:'#2e5a34',30:'#2e5a34',31:'#2e5a34'};
+/* podłoże pod asset (trawa/piasek/śnieg wg regionu) — spójne tło dekoracji */
+function baseTile(){return REG==='morze'?8:REG==='tatry'?17:0;}
+function baseCol(){return REG==='morze'?'#d8c084':REG==='tatry'?'#e8eef8':'#2e5a34';}
 function drawWorld(){
   const x0=Math.floor(camX/16),y0=Math.floor(camY/16);
   for(let ty=y0;ty<=y0+Math.ceil(H/16);ty++)for(let tx=x0;tx<=x0+Math.ceil(W/16)+1;tx++){
@@ -3897,6 +4006,98 @@ function drawWorld(){
       if((tx*5+ty*7)%9===0)R(cx,sx+4,sy+6,2,2,'#fff');
       if((tx*3+ty*11)%13===0)R(cx,sx+10,sy+11,2,2,'#cfdcec');
       if(at(tx,ty+1)===16)R(cx,sx,sy+14,16,2,'#cfdcec');}
+    /* ====== NOWE ASSETY 18–31 ====== */
+    if(v===18){ // BRZOZA
+      R(cx,sx,sy,16,16,baseCol());
+      cx.fillStyle='rgba(0,0,0,.2)';cx.beginPath();cx.ellipse(sx+8,sy+14,6,2.2,0,0,7);cx.fill();
+      R(cx,sx+7,sy+6,2.6,9,'#ece9f4');R(cx,sx+7,sy+8,2.6,1.2,'#2a2a30');R(cx,sx+7,sy+11,2.6,1,'#2a2a30');
+      cx.fillStyle='#5a9a4a';cx.beginPath();cx.arc(sx+8,sy+3,5.5,0,7);cx.fill();
+      cx.fillStyle='#6fb85a';cx.beginPath();cx.arc(sx+5.5,sy+1.5,3.2,0,7);cx.fill();
+      cx.fillStyle='#8fd070';cx.beginPath();cx.arc(sx+10,sy+2,2.4,0,7);cx.fill();}
+    else if(v===30){ // DĄB — duży, rozłożysty
+      R(cx,sx,sy,16,16,baseCol());
+      cx.fillStyle='rgba(0,0,0,.24)';cx.beginPath();cx.ellipse(sx+8,sy+14,7.5,2.6,0,0,7);cx.fill();
+      R(cx,sx+6,sy+8,4.5,7,'#5a4028');R(cx,sx+7,sy+9,1.4,5,'#6e5236');
+      cx.fillStyle='#245026';cx.beginPath();cx.arc(sx+8,sy+2,7.5,0,7);cx.fill();
+      cx.fillStyle='#2e6a34';cx.beginPath();cx.arc(sx+4,sy+1,4.2,0,7);cx.arc(sx+12,sy+1,4,0,7);cx.fill();
+      cx.fillStyle='#3a8040';cx.beginPath();cx.arc(sx+7,sy-1,3.4,0,7);cx.fill();
+      if((tx*7+ty)%3===0)R(cx,sx+10,sy+4,1.4,1.4,'#8a6a2e');}    // żołądź
+    else if(v===19){ // KRZAK z jagodami
+      R(cx,sx,sy,16,16,baseCol());
+      cx.fillStyle='#2a5a2e';cx.beginPath();cx.arc(sx+5,sy+10,4.4,0,7);cx.arc(sx+10,sy+10,4.6,0,7);cx.arc(sx+8,sy+7,4,0,7);cx.fill();
+      cx.fillStyle='#357a3a';cx.beginPath();cx.arc(sx+6,sy+8,2.4,0,7);cx.fill();
+      for(let i=0;i<3;i++)R(cx,sx+4+i*3,sy+9+((i*5)%3),1.6,1.6,'#5a6ad0');}
+    else if(v===20){ // GŁAZ
+      R(cx,sx,sy,16,16,baseCol());
+      cx.fillStyle='rgba(0,0,0,.22)';cx.beginPath();cx.ellipse(sx+8,sy+14,7,2.4,0,0,7);cx.fill();
+      cx.fillStyle='#8a8a98';cx.beginPath();cx.moveTo(sx+2,sy+14);cx.lineTo(sx+4,sy+5);cx.lineTo(sx+9,sy+3);cx.lineTo(sx+14,sy+7);cx.lineTo(sx+14,sy+14);cx.fill();
+      cx.fillStyle='#a2a2b0';cx.beginPath();cx.moveTo(sx+4,sy+5);cx.lineTo(sx+9,sy+3);cx.lineTo(sx+8,sy+8);cx.fill();
+      cx.fillStyle='#6a6a78';R(cx,sx+10,sy+9,3,4,'#6a6a78');
+      R(cx,sx+3,sy+11,3,1,'#42424e');}
+    else if(v===21){ // KAMYKI (deptalne)
+      R(cx,sx,sy,16,16,baseCol());
+      R(cx,sx+4,sy+6,3,2,'#8a8a98');R(cx,sx+4,sy+6,3,1,'#a2a2b0');
+      R(cx,sx+9,sy+10,2.4,1.6,'#7c7c8a');R(cx,sx+7,sy+4,1.6,1.4,'#9a9aa8');}
+    else if(v===22){ // ALTANKA (gazebo)
+      R(cx,sx,sy,16,16,baseCol());
+      cx.fillStyle='rgba(0,0,0,.2)';cx.beginPath();cx.ellipse(sx+8,sy+14,8,2.4,0,0,7);cx.fill();
+      R(cx,sx+2,sy+4,2,11,'#6e4a28');R(cx,sx+12,sy+4,2,11,'#6e4a28');      // słupki
+      R(cx,sx+2,sy+11,12,1.6,'#5a3a1e');                                    // barierka
+      cx.fillStyle='#8a2438';cx.beginPath();cx.moveTo(sx-1,sy+5);cx.lineTo(sx+8,sy-3);cx.lineTo(sx+17,sy+5);cx.fill(); // dach
+      cx.fillStyle='#a02c44';cx.beginPath();cx.moveTo(sx+1,sy+4.5);cx.lineTo(sx+8,sy-1.5);cx.lineTo(sx+15,sy+4.5);cx.lineTo(sx+8,sy+2);cx.fill();
+      R(cx,sx+7,sy-3.5,2,2,'#f5c542');}
+    else if(v===23){ // ŚCIEŻKA LEŚNA (deptalna)
+      R(cx,sx,sy,16,16,'#7a5636');
+      R(cx,sx,sy,16,16,'rgba(0,0,0,.05)');
+      if((tx*3+ty)%4===0)R(cx,sx+4,sy+6,2,2,'#8a6746');
+      if((tx+ty*3)%5===0)R(cx,sx+10,sy+10,2,1.6,'#6a4a2e');
+      if(at(tx,ty-1)!==23)R(cx,sx,sy,16,2,'#8a6746');
+      if(at(tx,ty+1)!==23)R(cx,sx,sy+14,16,2,'#5e4326');}
+    else if(v===24){ // STAW z lilią
+      R(cx,sx,sy,16,16,baseCol());
+      cx.fillStyle='#2f6db0';cx.beginPath();cx.ellipse(sx+8,sy+9,7,5.5,0,0,7);cx.fill();
+      cx.fillStyle='#4a8ad0';cx.beginPath();cx.ellipse(sx+8,sy+8,5,3.6,0,0,7);cx.fill();
+      if(Math.floor(anim*2+tx)%3===0)R(cx,sx+5,sy+6,3,1,'rgba(255,255,255,.5)');
+      cx.fillStyle='#3a8a40';cx.beginPath();cx.arc(sx+10,sy+10,2.4,0,7);cx.fill();
+      R(cx,sx+9.4,sy+9.4,1.4,1.4,'#e88ac8');}
+    else if(v===25){ // TRZCINA / SITOWIE (deptalne)
+      R(cx,sx,sy,16,16,baseCol());
+      const sw=Math.sin(anim*3+tx)*(reduceMotion?0:1);
+      for(let i=0;i<4;i++){const bx=sx+3+i*3;R(cx,bx+sw*(i-1.5)*.4,sy+4,1.2,10,'#4a7a3a');
+        R(cx,bx+sw*(i-1.5)*.4-.4,sy+3,2,2.4,'#6e5a2a');}}
+    else if(v===26){ // PIENIEK
+      R(cx,sx,sy,16,16,baseCol());
+      cx.fillStyle='rgba(0,0,0,.2)';cx.beginPath();cx.ellipse(sx+8,sy+13,5,1.8,0,0,7);cx.fill();
+      rr(cx,sx+4,sy+7,8,6,2,'#6e5236');R(cx,sx+4,sy+6,8,2.4,'#8a6a44');
+      cx.strokeStyle='#5a4028';cx.lineWidth=1;cx.beginPath();cx.arc(sx+8,sy+7.2,2.4,0,7);cx.stroke();cx.beginPath();cx.arc(sx+8,sy+7.2,1.1,0,7);cx.stroke();
+      R(cx,sx+4,sy+7,3,1.4,'#3a7a3e');}   // mech
+    else if(v===27){ // OGNISKO
+      R(cx,sx,sy,16,16,baseCol());
+      R(cx,sx+3,sy+11,10,2.4,'#6e4a28');R(cx,sx+4,sy+12,8,1.4,'#5a3a1e');
+      R(cx,sx+2,sy+12,12,1,'#42424e');   // kamienie
+      const fl=reduceMotion?1:1+Math.sin(anim*14+tx)*.35;
+      cx.fillStyle='#e04848';cx.beginPath();cx.moveTo(sx+8,sy+3-fl*2);cx.lineTo(sx+4,sy+11);cx.lineTo(sx+12,sy+11);cx.fill();
+      cx.fillStyle='#f5a032';cx.beginPath();cx.moveTo(sx+8,sy+5);cx.lineTo(sx+5.5,sy+11);cx.lineTo(sx+10.5,sy+11);cx.fill();
+      cx.fillStyle='#fff7d6';cx.beginPath();cx.moveTo(sx+8,sy+7.5);cx.lineTo(sx+7,sy+11);cx.lineTo(sx+9,sy+11);cx.fill();
+      if(!reduceMotion&&Math.floor(anim*6+tx)%3===0)R(cx,sx+8,sy+1,1.4,1.4,'#f5a032');}
+    else if(v===28){ // ŁĄKA KWIETNA (deptalna)
+      R(cx,sx,sy,16,16,'#357a3a');
+      const cc=['#e04848','#f5c542','#e88ac8','#ece9f4','#6fd8e8','#c86fa8'];
+      for(let i=0;i<5;i++){const fx=sx+2+((tx*7+i*5+ty*3)%12),fy=sy+3+((ty*5+i*7+tx)%11);
+        R(cx,fx,fy,2,2,cc[(tx+ty+i)%6]);R(cx,fx+.6,fy+.6,.8,.8,'#fff7d6');}}
+    else if(v===29){ // DROGOWSKAZ
+      R(cx,sx,sy,16,16,baseCol());
+      cx.fillStyle='rgba(0,0,0,.2)';cx.beginPath();cx.ellipse(sx+8,sy+14,3,1.4,0,0,7);cx.fill();
+      R(cx,sx+7,sy+3,2,11,'#6e4a28');
+      R(cx,sx+8,sy+4,7,2.6,'#c8a86a');cx.fillStyle='#c8a86a';cx.beginPath();cx.moveTo(sx+15,sy+4);cx.lineTo(sx+17,sy+5.3);cx.lineTo(sx+15,sy+6.6);cx.fill();
+      R(cx,sx-1,sy+7.5,7,2.6,'#b09858');cx.fillStyle='#b09858';cx.beginPath();cx.moveTo(sx-1,sy+7.5);cx.lineTo(sx-3,sy+8.8);cx.lineTo(sx-1,sy+10.1);cx.fill();
+      R(cx,sx+9,sy+4.8,4,1,'#5a3a1e');R(cx,sx+1,sy+8.3,3,1,'#5a3a1e');}
+    else if(v===31){ // PAPROĆ (deptalna)
+      R(cx,sx,sy,16,16,baseCol());
+      cx.strokeStyle='#3a7a3e';cx.lineWidth=1.2;
+      for(const a of[-.6,-.2,.2,.6]){cx.beginPath();cx.moveTo(sx+8,sy+14);
+        cx.quadraticCurveTo(sx+8+a*10,sy+8,sx+8+a*16,sy+4);cx.stroke();}
+      R(cx,sx+7.4,sy+11,1.4,3,'#2e6a34');}
   }
   // łódka (Wisła / jezioro / Bałtyk)
   if(REGIONS[REG].boat){
