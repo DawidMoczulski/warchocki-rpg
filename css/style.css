@@ -53,13 +53,14 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
   display:none;z-index:6}
 #actBtn:active{transform:translateY(3px);box-shadow:0 1px 0 var(--gold-dim)}
 body.touch #actBtn.show{display:block}
-#atkBtn,#spcBtn{position:absolute;width:64px;height:64px;border-radius:50%;border:0;z-index:6;
+#atkBtn,#spcBtn,#burstBtn{position:absolute;width:64px;height:64px;border-radius:50%;border:0;z-index:6;
   font-family:'Press Start 2P',monospace;font-size:22px;cursor:pointer;display:none;
   box-shadow:0 5px 0 rgba(0,0,0,.4),0 8px 20px rgba(0,0,0,.5)}
 #atkBtn{left:14px;bottom:16px;background:rgba(224,72,72,.9)}
 #spcBtn{left:90px;bottom:46px;background:rgba(111,216,232,.88)}
-#atkBtn:active,#spcBtn:active{transform:translateY(3px)}
-body.touch #atkBtn,body.touch #spcBtn{display:block}
+#burstBtn{left:160px;bottom:88px;width:56px;height:56px;background:rgba(245,197,66,.9)}
+#atkBtn:active,#spcBtn:active,#burstBtn:active{transform:translateY(3px)}
+body.touch #atkBtn,body.touch #spcBtn,body.touch #burstBtn{display:block}
 #subs{color:var(--cyan)}
 .tbtn{display:flex;flex-direction:column;gap:8px;width:100%;margin-bottom:12px;text-align:left;
   background:linear-gradient(160deg,var(--panel2),#221c3e);border:2px solid var(--edge);border-radius:12px;color:var(--pearl);

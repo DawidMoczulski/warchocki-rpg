@@ -17,13 +17,16 @@ const store={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},
 const pickA=a=>a[(Math.random()*a.length)|0];
 
 /* ---------------- STEROWANIE: edytowalne przypisania klawiszy ---------------- */
-const DEFAULT_KEYS={action:'KeyE',attack:'Space',special:'KeyZ',swap:'KeyC',eat:'KeyQ',
+const DEFAULT_KEYS={action:'KeyE',attack:'Space',special:'KeyZ',burst:'KeyQ',swap:'KeyC',eat:'KeyR',
   map:'KeyM',pause:'KeyP',fullscreen:'KeyF',up:'KeyW',down:'KeyS',left:'KeyA',right:'KeyD'};
-const KEY_LABELS={action:'✋ Akcja / [E]',attack:'👊 Cios',special:'⚡ Super',swap:'🔄 Zmiana postaci',
-  eat:'🍴 Jedzenie',map:'🗺️ Mapa',pause:'⏸ Pauza',fullscreen:'⛶ Pełny ekran',
+const KEY_LABELS={action:'✋ Akcja / [E]',attack:'👊 Cios',special:'⚡ Umiejętność',burst:'💥 SUPER-HIT',
+  swap:'🔄 Zmiana postaci',eat:'🍴 Jedzenie',map:'🗺️ Mapa',pause:'⏸ Pauza',fullscreen:'⛶ Pełny ekran',
   up:'⬆️ Góra',down:'⬇️ Dół',left:'⬅️ Lewo',right:'➡️ Prawo'};
 let KEYMAP=(()=>{try{return Object.assign({},DEFAULT_KEYS,JSON.parse(store.get('wrpg_keys')||'{}'));}
   catch(e){return Object.assign({},DEFAULT_KEYS);}})();
+/* migracja starych zapisów: jedzenie siedziało na Q, teraz Q = SUPER-HIT */
+if(!KEYMAP.burst)KEYMAP.burst='KeyQ';
+if(KEYMAP.eat===KEYMAP.burst)KEYMAP.eat='KeyR';
 function saveKeys(){store.set('wrpg_keys',JSON.stringify(KEYMAP));}
 const keyName=code=>({Space:'SPACJA',Enter:'ENTER',Escape:'ESC',ArrowUp:'↑',ArrowDown:'↓',
   ArrowLeft:'←',ArrowRight:'→',ShiftLeft:'SHIFT',ShiftRight:'SHIFT',ControlLeft:'CTRL',
@@ -70,7 +73,7 @@ loadSave();
 /* ---------------- AUDIO: klipy z YT + piosenki ---------------- */
 /* audio jako pliki w assets/audio/ (fetch przy initAudio; muzyka bitewna leniwie) */
 const AUDIO_BASE='assets/audio/';
-const AUDIO_KEYS=["song", "metro_rhythm", "s_dziki", "s_elegancko", "s_metro", "s_67", "v_piszczel", "v_spawanie", "v_los", "v_spontan", "v_zycie", "v_elegancko", "v_cochcecie", "v_kladesie", "v_napoje", "v_paleta", "v_czesc", "c_etam", "c_kopytem", "c_elegancko2", "c_ziomali", "c_strach", "c_zaspiewam", "c_uciekajcie", "c_maliny", "c_problemy", "c_kamera", "c_rolextiktok", "c_wolnyptak", "c_ziomal_dumnie", "c_rozchwytywany", "c_jarek_sprawdz", "c_diamenty", "c_krolbalu", "c_buty", "c_randka", "c_kosz", "c_serduszka", "c_dwabramki", "c_niepoddajemy", "c_spaceruje", "c_pestka", "c_koniecswiata", "c_truskawka", "c_kawa", "c_tygrysy", "c_rdzewieje", "c_prokop", "c_ryba", "c_rolexlewa", "c_ktoby", "m_roboty", "m_wiatr", "m_puszki", "m_ministerstwo", "m_kopernik", "m_magia", "m_rolexlong", "m_meczlong", "d_siemanko", "d_mordeczko", "d_wariacie", "d_lecimy", "d_chodz", "d_song"];
+const AUDIO_KEYS=["song", "burst_byku", "metro_rhythm", "s_dziki", "s_elegancko", "s_metro", "s_67", "v_piszczel", "v_spawanie", "v_los", "v_spontan", "v_zycie", "v_elegancko", "v_cochcecie", "v_kladesie", "v_napoje", "v_paleta", "v_czesc", "c_etam", "c_kopytem", "c_elegancko2", "c_ziomali", "c_strach", "c_zaspiewam", "c_uciekajcie", "c_maliny", "c_problemy", "c_kamera", "c_rolextiktok", "c_wolnyptak", "c_ziomal_dumnie", "c_rozchwytywany", "c_jarek_sprawdz", "c_diamenty", "c_krolbalu", "c_buty", "c_randka", "c_kosz", "c_serduszka", "c_dwabramki", "c_niepoddajemy", "c_spaceruje", "c_pestka", "c_koniecswiata", "c_truskawka", "c_kawa", "c_tygrysy", "c_rdzewieje", "c_prokop", "c_ryba", "c_rolexlewa", "c_ktoby", "m_roboty", "m_wiatr", "m_puszki", "m_ministerstwo", "m_kopernik", "m_magia", "m_rolexlong", "m_meczlong", "d_siemanko", "d_mordeczko", "d_wariacie", "d_lecimy", "d_chodz", "d_song"];
 /* dłuższe monologi Edka do tła (mapa) */
 const IDLE_POOL=['m_roboty','m_wiatr','m_kopernik','m_ministerstwo','m_magia','m_rolexlong',
   'm_meczlong','m_puszki','m_roboty','m_kopernik','m_wiatr','m_rolexlong',
@@ -1101,6 +1104,7 @@ function dealDmg(f,chId,mult,opts){
   /* WIZUALNY IMPAKT: gwiazda + iskry żywiołu lecące OD napastnika */
   const hitAng=Math.atan2(f.y-oy,f.x-ox);
   if(!opts.light)fxImpact(f.x,f.y-10,eCol,crit||!!f.boss,hitAng);
+  if(BURSTS[chId]&&!opts.noEnergy)gainBurst(chId,dmg);   // energia SUPER-HITU z żywiołu postaci
   if(armored)fxSparks(f.x,f.y-8,'#e8e4f0',5,160,{life:.35,g:420,ang:hitAng-.6,spread:1.4,sz:1.3});
   if(Math.random()<.3)addHit(f.x,f.y-30,pickA(c.hitTxt),c.hitCol);
   SFX.hit();
@@ -1262,6 +1266,117 @@ function trySpecial(){
       toast('🌊 FALA BAŁTYCKA! Hejterzy zmyci!');
       beep(70,.6,'sawtooth',.1,35);break;}
   }
+}
+/* =====================================================================
+   SUPER-HIT EDKA [Q] — jak burst w Genshinie:
+   energia ładuje się z obrażeń 💎 ELEGANCJI, po odpaleniu krótki
+   przerywnik (tańczący Edek + hook piosenki), potem taneczna seria
+   wybuchów wokół Edka, w rytmie kawałka (147,7 BPM).
+   ===================================================================== */
+const BURSTS={
+  edek:{jingle:'burst_byku',col:'#f5c542',bar:'#f5c542',
+    ready:'[Q] 💥 EDWARDEM BYKU!',
+    full:'💥 SUPER-HIT GOTOWY! Wciśnij [Q], byku!',cut:1.35},
+  dych:{jingle:'d_song',col:'#2f6b33',bar:'#7bc950',
+    ready:'[Q] 💥 DZIKI DYCH!',
+    full:'💥 SUPER-HIT GOTOWY! Wciśnij [Q], mordeczko!',cut:1.5},
+};
+let burstE={};               // energia 0..100, per postać
+let burstChar='edek';        // czyj burst właśnie leci
+let burstCut=0,burstCut0=1.35; // czas/długość przerywnika
+let burstBlasts=[];          // zaplanowane wybuchy {t,x,y,big,kind}
+let burstDance=0;            // po przerywniku: Edek tańczy / Dych leży i wstaje
+const BURST_BEAT=.203;       // pół bitu piosenki Edka
+function gainBurst(chId,dmg){
+  const was=burstE[chId]||0;
+  burstE[chId]=Math.min(100,was+6+dmg*.05);
+  if(was<100&&burstE[chId]>=100){
+    toast(BURSTS[chId].full);
+    fxRing(P.x,P.y-8,26,BURSTS[chId].bar,{life:.4,w:2});
+    SFX.dia();
+  }
+}
+/* jingiel bursta: 6 s piosenki postaci przez kanał głosu */
+function playBurstJingle(key){
+  const buf=BUFS[key]||BUFS.song;
+  if(!AC||!buf||muted)return;
+  if(curVoice)stopVoice();
+  const s=AC.createBufferSource();s.buffer=buf;
+  const g=AC.createGain();g.connect(voiceGain);s.connect(g);s._g=g;
+  curVoice=s;duck(true);
+  s.onended=()=>{if(curVoice===s){curVoice=null;duck(false);}};
+  s.start(0,0,6);
+  setTimeout(()=>{if(curVoice===s)fadeOut(s);},5650);
+}
+function tryBurst(){
+  if(scene!=='world'||burstCut>0||burstDance>0)return;
+  const B=BURSTS[S.ch];
+  if(!B){toast('💥 SUPER-HIT mają na razie Edward i Dych, byku!');SFX.no();return;}
+  if((burstE[S.ch]||0)<100){
+    toast('💥 SUPER-HIT: '+Math.floor(burstE[S.ch]||0)+'% — bij hejterów żywiołem '+CHARS[S.ch].el+'!');
+    SFX.no();return;}
+  burstE[S.ch]=0;burstChar=S.ch;burstCut=burstCut0=B.cut;
+  playBurstJingle(B.jingle);
+  worldFlash=Math.max(worldFlash,.25);
+}
+function startBurstBlasts(){
+  if(burstChar==='dych'){
+    /* Dych się wywrócił — jeden wielki ciemnozielony wybuch + fale wtórne */
+    burstBlasts=[
+      {t:0,x:P.x,y:P.y,kind:'butla'},
+      {t:.35,x:P.x,y:P.y,kind:'fala'},
+      {t:.7,x:P.x,y:P.y,kind:'fala'},
+    ];
+    burstDance=2.4;   // leży, potem się zbiera
+    return;
+  }
+  /* Edek — choreografia: lewo, prawo, przód, tył, skosy, finał na środku */
+  const steps=[[26,0],[-26,0],[0,-30],[0,30],[34,-24],[-34,24],[-34,-24],[34,24],[0,-4]];
+  burstBlasts=steps.map((s,i)=>({t:i*BURST_BEAT,x:P.x+s[0],y:P.y+s[1],big:i===steps.length-1}));
+  burstDance=4.5;   // tańczy do końca 6-sekundowego hooku (1,35 s zjada przerywnik)
+}
+function burstBlast(b){
+  if(b.kind==='butla'){ // CIEMNOZIELONY WYBUCH Dycha: szkło, piana, mega odrzut
+    fxStarFlash(b.x,b.y-8,'#7bc950',20,{life:.3});
+    fxStarFlash(b.x,b.y-8,'#e8f4d8',10,{life:.2,spin:-5});
+    fxRing(b.x,b.y-6,70,'#2f6b33',{life:.5,w:5});
+    fxRing(b.x,b.y-6,52,'#7bc950',{life:.4,w:3});
+    fxRing(b.x,b.y+6,62,'#1e4a26',{life:.5,w:3,ground:true});
+    for(let i=0;i<(reduceMotion?10:26);i++){ // odłamki butelki
+      const a=Math.random()*6.28,v=90+Math.random()*160;
+      fxP({x:b.x,y:b.y-8,vx:Math.cos(a)*v,vy:Math.sin(a)*v-70,g:330,
+        life:.5+Math.random()*.4,life0:.9,sz:1.8+Math.random()*1.6,
+        col:Math.random()<.5?'#1e4a26':'#2f6b33',add:false,shrink:true,sq:true});
+    }
+    fxSparks(b.x,b.y-8,'#e8f4d8',14,150,{life:.5});  // piana
+    fxDust(b.x,b.y+6,8);
+    addShake(6,.4);addHitStop(.06);
+    beep(55,.4,'sawtooth',.11,28);
+    for(const f of foes)if(!f.dead&&Math.hypot(f.x-b.x,f.y-b.y)<74){
+      dealDmg(f,'dych',2.4,{ox:b.x,oy:b.y,noEnergy:true});
+      if(!f.dead&&!f.boss){const d=Math.max(1,Math.hypot(f.x-b.x,f.y-b.y));
+        f.kb=.5;f.kbx=(f.x-b.x)/d*340;f.kby=(f.y-b.y)/d*340;}
+    }
+    return;
+  }
+  if(b.kind==='fala'){ // wtórna zielona fala wstrząsowa
+    fxRing(b.x,b.y-4,88,'#2f6b33',{life:.45,w:3});
+    fxRing(b.x,b.y+6,74,'#7bc950',{life:.4,w:2,ground:true});
+    addShake(2.5,.2);
+    beep(90,.2,'sawtooth',.07,45);
+    return;
+  }
+  const col='#f5c542',r=b.big?46:30;
+  fxStarFlash(b.x,b.y-6,col,b.big?18:12,{life:.3});
+  fxStarFlash(b.x,b.y-6,'#fff7d6',b.big?9:6,{life:.2,spin:-5});
+  fxRing(b.x,b.y-4,b.big?42:26,col,{life:.3,w:3});
+  fxRing(b.x,b.y+6,b.big?36:22,'#ffffff',{life:.25,w:2,ground:true});
+  fxSparks(b.x,b.y-6,col,b.big?16:9,b.big?190:140,{life:.5});
+  fxDust(b.x,b.y+6,4);
+  addShake(b.big?5:2.6,b.big?.3:.16);
+  beep(b.big?70:110,.18,'sawtooth',.09,40);
+  for(const f of foes)if(!f.dead&&Math.hypot(f.x-b.x,f.y-b.y)<r)
+    dealDmg(f,'edek',b.big?2.2:1.4,{ox:b.x,oy:b.y,noEnergy:true});
 }
 function hurtPlayer(srcF){
   if(hurtT>0||dashT>0)return;
@@ -2222,7 +2337,7 @@ function cook(r){
   for(const[k,v]of Object.entries(r.need)){S.ingr[k]-=v;if(S.ingr[k]<=0)delete S.ingr[k];}
   S.food[r.out]=(S.food[r.out]||0)+1;save();
   const f=FOOD[r.out];SFX.buy();burstConfetti();
-  toast('🍳 Ugotowano: '+f.ic+' '+f.n+'!<br><span style="color:#8f88b0">Zjedz w plecaku 🎒 (Q)</span>');
+  toast('🍳 Ugotowano: '+f.ic+' '+f.n+'!<br><span style="color:#8f88b0">Zjedz w plecaku 🎒 ('+keyName(KEYMAP.eat)+')</span>');
   if(!curVoice&&S.ch==='edek'&&Math.random()<.5)vsay('v_elegancko');
   renderCook();refreshHUD();
 }
@@ -2494,6 +2609,7 @@ addEventListener('keydown',e=>{
   if(e.code===K.attack){if(scene==='world')tryAttack();else doAction();}
   if(e.code==='KeyX'&&scene==='world')tryAttack();   // stały alias ciosu
   if(e.code===K.special&&scene==='world')trySpecial();
+  if(e.code===K.burst&&scene==='world')tryBurst();
   if(e.code===K.swap&&scene==='world')switchChar();
   if(e.code===K.eat&&scene==='world')quickEat();
   if(scene==='world'&&(e.code==='Digit1'||e.code==='Digit2'||e.code==='Digit3')){
@@ -2523,7 +2639,9 @@ addEventListener('pointercancel',e=>{if(joy&&e.pointerId===joy.id)joy=null;});
 $('actBtn').addEventListener('click',()=>{if(paused)return;initAudio();doAction();});
 $('atkBtn').addEventListener('pointerdown',e=>{e.stopPropagation();if(paused)return;initAudio();tryAttack();});
 $('spcBtn').addEventListener('pointerdown',e=>{e.stopPropagation();if(paused)return;initAudio();trySpecial();});
+$('burstBtn').addEventListener('pointerdown',e=>{e.stopPropagation();if(paused)return;initAudio();tryBurst();});
 function moveVec(){
+  if(burstDance>0&&burstChar==='dych')return[0,0];  // Dych leży po wywrotce — nie chodzi
   let dx=0,dy=0;
   if(keys.ArrowLeft||keys[KEYMAP.left])dx-=1;if(keys.ArrowRight||keys[KEYMAP.right])dx+=1;
   if(keys.ArrowUp||keys[KEYMAP.up])dy-=1;if(keys.ArrowDown||keys[KEYMAP.down])dy+=1;
@@ -2614,7 +2732,7 @@ function drawPortrait(who){
 function doAction(){
   if(scene==='dialog'){if(dlgChars<dlgLine.t.length)dlgChars=dlgLine.t.length;else nextLine();return;}
   if(scene!=='world')return;
-  if(!prompt)return;
+  if(!prompt){trySpecial();return;}   // E bez interakcji w zasięgu = umiejętność (jak w Genshinie)
   if(prompt.npc)talkTo(prompt.npc);
   else if(prompt.door)enterDoor(prompt.door);
   else if(prompt.colQ)pickCol(prompt.colQ,prompt.colI);
@@ -4001,6 +4119,17 @@ function doSelfie(){
 function updateWorld(dt){
   updateFX(dt);
   if(hitStop>0){hitStop-=dt;return;}   // hit-stop: świat zamiera na ułamek sekundy
+  /* SUPER-HIT: przerywnik zatrzymuje świat, potem lecą wybuchy w rytmie */
+  if(burstCut>0){
+    burstCut-=dt;
+    if(burstCut<=0)startBurstBlasts();
+    return;
+  }
+  if(burstDance>0)burstDance-=dt;
+  if(burstBlasts.length){
+    for(const b of burstBlasts){b.t-=dt;if(b.t<=0){burstBlast(b);b.done=true;}}
+    burstBlasts=burstBlasts.filter(b=>!b.done);
+  }
   /* PALNIK Zenka: strumień ognia przez chwilę po użyciu */
   if(flameT>0){flameT-=dt;
     const dv=DV[flameDir];
@@ -4476,6 +4605,22 @@ function drawWorld(){
   const ents=[];
   const drawHero=(ch,x,y,dir,fr,blink)=>{
     if(blink&&Math.floor(anim*10)%2)return;
+    /* SUPER-HIT: Edek tańczy — podskoki + kołysanie w rytmie wybuchów */
+    if(burstDance>0&&ch==='edek'&&burstChar==='edek'&&!reduceMotion){
+      const hop=-Math.abs(Math.sin(anim*7.75))*3.5;
+      cx.save();cx.translate(x-camX,y+4-camY+hop);
+      cx.rotate(Math.sin(anim*7.75)*.13);
+      drawCharBody(cx,ch,-8,-24,0,Math.floor(anim*6)%2);
+      cx.restore();return;
+    }
+    /* SUPER-HIT Dycha: leży po wywrotce, potem chwiejnie wstaje */
+    if(burstDance>0&&ch==='dych'&&burstChar==='dych'&&!reduceMotion){
+      let rot=1.5;                              // leży na boku
+      if(burstDance<.7)rot=1.5*(burstDance/.7)+Math.sin(anim*18)*.06; // wstaje, chwieje się
+      cx.save();cx.translate(x-camX,y+2-camY);cx.rotate(rot);
+      drawCharBody(cx,ch,-8,-22,0,0);
+      cx.restore();return;
+    }
     /* squash & stretch: wybrzuszenie przy zamachu, spłaszczenie przy obrywaniu */
     let sX=1,sY=1;
     if(atkAnim>0&&!reduceMotion){
@@ -4656,9 +4801,18 @@ function drawWorld(){
   {const ready=spcT<=0,c=CHARS[S.ch];
    cx.font='7px "Press Start 2P"';
    cx.fillStyle=ready?'#f5c542':'rgba(245,197,66,.35)';
-   cx.fillText(ready?('[Z] '+c.el+' '+c.spcN):('[Z] '+Math.ceil(spcT)+'s'),8,H-52);
+   cx.fillText(ready?('[E/Z] '+c.el+' '+c.spcN):('[E/Z] '+Math.ceil(spcT)+'s'),8,H-52);
+   /* SUPER-HIT [Q]: pasek energii (postacie z burstem) */
+   {const B=BURSTS[S.ch];
+    if(B){
+      const e=burstE[S.ch]||0,full=e>=100;
+      cx.fillStyle=full?(Math.floor(anim*4)%2?'#fff7d6':B.bar):'rgba(245,197,66,.4)';
+      cx.fillText(full?B.ready:'[Q] SUPER-HIT '+Math.floor(e)+'%',8,H-64);
+      R(cx,8,H-62,70,4,'rgba(0,0,0,.55)');
+      R(cx,9,H-61,68*Math.min(1,e/100),2,full?B.bar:'#8a6fc8');
+    }}
    if(BUFF.t>0){cx.fillStyle='#7bc950';cx.font='6px "Press Start 2P"';
-     cx.fillText('🍴 BUFF '+Math.ceil(BUFF.t)+'s',8,H-62);}}
+     cx.fillText('🍴 BUFF '+Math.ceil(BUFF.t)+'s',8,H-74);}}
   // pasek HP bossa
   {const bf=foes.find(f=>f.boss);
    if(bf){
@@ -4695,6 +4849,69 @@ function drawWorld(){
   if(slowAll>0){cx.fillStyle='rgba(111,216,232,'+Math.min(.1,slowAll*.04)+')';cx.fillRect(0,0,W,H);} // STOP-KLATKA: chłodny filtr
   if(hurtFlash>0){cx.fillStyle='rgba(224,60,60,'+Math.min(.35,hurtFlash*.5)+')';cx.fillRect(0,0,W,H);} // puls obrażeń
   if(worldFlash>0){cx.fillStyle='rgba(255,255,255,'+Math.min(.9,worldFlash)+')';cx.fillRect(0,0,W,H);}
+  /* PRZERYWNIK SUPER-HITU: pełnoekranowa scenka jak burst w Genshinie */
+  if(burstCut>0){
+    const dych=burstChar==='dych';
+    const mainCol=dych?'#2f6b33':'#f5c542',glowCol=dych?'#7bc950':'#f5c542';
+    const k=1-burstCut/burstCut0;
+    const a=Math.min(1,k*6,(1-k)*6);   // szybkie wejście i zejście
+    cx.fillStyle='rgba(9,7,18,'+(.62*a)+')';cx.fillRect(0,0,W,H);
+    /* wirujące promienie zza postaci */
+    cx.save();cx.translate(W/2,H/2+6);cx.globalCompositeOperation='lighter';
+    cx.globalAlpha=.15*a;cx.fillStyle=mainCol;
+    for(let i=0;i<10;i++){const an=anim*.9+i*.628;
+      cx.beginPath();cx.moveTo(0,0);cx.arc(0,0,W*.7,an,an+.22);cx.closePath();cx.fill();}
+    cx.globalAlpha=.5*a;
+    const gg=cx.createRadialGradient(0,0,4,0,0,64);
+    gg.addColorStop(0,glowCol);gg.addColorStop(1,glowCol+'00');
+    cx.fillStyle=gg;cx.beginPath();cx.arc(0,0,64,0,7);cx.fill();
+    cx.restore();
+    if(dych){
+      /* DYCH: chwieje się z butelką i się WYWRACA */
+      let rot,drop=0;
+      if(k<.5)rot=Math.sin(anim*11)*.16*(k/.5+.3);        // buja się coraz mocniej
+      else{const kk=Math.min(1,(k-.5)/.38);rot=kk*kk*1.5;drop=kk*22;} // grawitacja robi swoje
+      if(k>=.88)rot=1.5+Math.sin((k-.88)*60)*.05;          // drgnięcie po glebie
+      cx.save();cx.translate(W/2,H/2+40+drop);
+      cx.rotate(rot);cx.scale(4,4);cx.globalAlpha=a;
+      drawCharBody(cx,'dych',-8,-24,0,0);
+      /* ciemnozielona butelka po piwie w łapie */
+      cx.save();cx.translate(8.5,-9);cx.rotate(.45+rot*.4);
+      R(cx,-1.5,-6.5,3,8,'#1e4a26');       // korpus
+      R(cx,-.7,-10,1.4,4,'#1e4a26');       // szyjka
+      R(cx,-.9,-3.2,1.8,2.4,'#d8cf9a');    // etykieta
+      R(cx,-1.1,-6,.7,3.4,'#3d7a44');      // odblask szkła
+      cx.restore();
+      cx.restore();
+      cx.globalAlpha=a;cx.textAlign='center';
+      cx.font='10px "Press Start 2P"';
+      cx.fillStyle='#000';cx.fillText('JESTEM DYCH!',W/2+2,H/2-62+2);
+      cx.fillStyle='#7bc950';cx.fillText('JESTEM DYCH!',W/2,H/2-62);
+      cx.font='13px "Press Start 2P"';
+      cx.fillStyle='#000';cx.fillText('DZIKI DYCH, DZIKI!',W/2+2,H/2-42+2);
+      cx.fillStyle='#e8f4d8';cx.fillText('DZIKI DYCH, DZIKI!',W/2,H/2-42);
+    }else{
+      /* EDEK: wielki tańczący — kołysze się i podskakuje */
+      cx.save();cx.translate(W/2,H/2+40);
+      cx.rotate(Math.sin(anim*9)*.14);
+      cx.translate(0,-Math.abs(Math.sin(anim*9))*9);
+      cx.scale(4,4);cx.globalAlpha=a;
+      drawCharBody(cx,'edek',-8,-24,0,Math.floor(anim*8)%2);
+      cx.restore();
+      cx.globalAlpha=a;cx.textAlign='center';
+      cx.font='10px "Press Start 2P"';
+      cx.fillStyle='#000';cx.fillText('JESTEM WARCHOCKIM',W/2+2,H/2-62+2);
+      cx.fillStyle='#f5c542';cx.fillText('JESTEM WARCHOCKIM',W/2,H/2-62);
+      cx.font='13px "Press Start 2P"';
+      cx.fillStyle='#000';cx.fillText('EDWARDEM BYKU!',W/2+2,H/2-42+2);
+      cx.fillStyle='#fff7d6';cx.fillText('EDWARDEM BYKU!',W/2,H/2-42);
+    }
+    /* iskrzące gwiazdki wokół sceny */
+    if(!reduceMotion&&Math.random()<.5)
+      fxStarFlash(camX+W/2+(Math.random()-.5)*180,camY+H/2+(Math.random()-.5)*110,
+        glowCol,3+Math.random()*4,{life:.4});
+    cx.textAlign='left';cx.globalAlpha=1;
+  }
   camX-=shX;camY-=shY;   // cofnij wstrząs kamery
 }
 function drawBuildings(){
