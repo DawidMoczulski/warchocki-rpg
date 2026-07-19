@@ -73,7 +73,7 @@ loadSave();
 /* ---------------- AUDIO: klipy z YT + piosenki ---------------- */
 /* audio jako pliki w assets/audio/ (fetch przy initAudio; muzyka bitewna leniwie) */
 const AUDIO_BASE='assets/audio/';
-const AUDIO_KEYS=["song", "burst_byku", "metro_rhythm", "s_dziki", "s_elegancko", "s_metro", "s_67", "v_piszczel", "v_spawanie", "v_los", "v_spontan", "v_zycie", "v_elegancko", "v_cochcecie", "v_kladesie", "v_napoje", "v_paleta", "v_czesc", "c_etam", "c_kopytem", "c_elegancko2", "c_ziomali", "c_strach", "c_zaspiewam", "c_uciekajcie", "c_maliny", "c_problemy", "c_kamera", "c_rolextiktok", "c_wolnyptak", "c_ziomal_dumnie", "c_rozchwytywany", "c_jarek_sprawdz", "c_diamenty", "c_krolbalu", "c_buty", "c_randka", "c_kosz", "c_serduszka", "c_dwabramki", "c_niepoddajemy", "c_spaceruje", "c_pestka", "c_koniecswiata", "c_truskawka", "c_kawa", "c_tygrysy", "c_rdzewieje", "c_prokop", "c_ryba", "c_rolexlewa", "c_ktoby", "m_roboty", "m_wiatr", "m_puszki", "m_ministerstwo", "m_kopernik", "m_magia", "m_rolexlong", "m_meczlong", "d_siemanko", "d_mordeczko", "d_wariacie", "d_lecimy", "d_chodz", "d_song"];
+const AUDIO_KEYS=["song", "burst_byku", "metro_rhythm", "s_dziki", "s_elegancko", "s_metro", "s_67", "v_piszczel", "v_spawanie", "v_los", "v_spontan", "v_zycie", "v_elegancko", "v_cochcecie", "v_kladesie", "v_napoje", "v_paleta", "v_czesc", "c_etam", "c_kopytem", "c_elegancko2", "c_ziomali", "c_strach", "c_zaspiewam", "c_uciekajcie", "c_maliny", "c_problemy", "c_kamera", "c_rolextiktok", "c_wolnyptak", "c_ziomal_dumnie", "c_rozchwytywany", "c_jarek_sprawdz", "c_diamenty", "c_krolbalu", "c_buty", "c_randka", "c_kosz", "c_serduszka", "c_dwabramki", "c_niepoddajemy", "c_spaceruje", "c_pestka", "c_koniecswiata", "c_truskawka", "c_kawa", "c_tygrysy", "c_rdzewieje", "c_prokop", "c_ryba", "c_rolexlewa", "c_ktoby", "c_odganiam", "c_pszczolki", "c_spokoj", "c_morzejazda", "c_zyciemorze", "c_mielno", "c_wywalilem", "c_typy", "c_czapka", "c_gofry", "d_mops", "d_megaweekend", "d_razem", "m_roboty", "m_wiatr", "m_puszki", "m_ministerstwo", "m_kopernik", "m_magia", "m_rolexlong", "m_meczlong", "d_siemanko", "d_mordeczko", "d_wariacie", "d_lecimy", "d_chodz", "d_song"];
 /* dłuższe monologi Edka do tła (mapa) */
 const IDLE_POOL=['m_roboty','m_wiatr','m_kopernik','m_ministerstwo','m_magia','m_rolexlong',
   'm_meczlong','m_puszki','m_roboty','m_kopernik','m_wiatr','m_rolexlong',
@@ -700,6 +700,7 @@ let selfieT=45,dropT=14,leafT=0,smokeT=0,worldFlash=0,boatY=8*16,boatV=12;
 /* walka */
 let foes=[],hitFX=[],foeT=6,bossShots=[];
 let hurtT=0,atkT=0,atkAnim=0,atkDir=0,spcT=0,dashT=0,dashDir=0;
+let odganiamAt=0;   // cooldown klipu „Odganiam się" (czas w `anim`)
 const BOSS_LEASH=320; /* promień areny bossa (px) — dalej = boss wraca na środek i walka od nowa (arena jest duża i murowana) */
 const DV=[[0,1],[-1,0],[1,0],[0,-1]]; // wektory kierunków (dół/lewo/prawo/góra)
 /* ekipa: reszta drużyny idzie za graczem (max 2 z tyłu) */
@@ -846,7 +847,7 @@ function setRegion(id){
   ensureConnectivity(cfg);   // gwarancja dojścia do wszystkich drzwi/domen/areny
   resetAmbient();
   spawnForage();
-  foes=[];hitFX=[];foeT=1.5;PROJ=[];bossShots=[];dmgNums=[];
+  foes=[];hitFX=[];foeT=1.5;PROJ=[];bossShots=[];dmgNums=[];miniBlasts=[];
   for(let i=0;i<cfg.foesMax;i++)spawnFoe();
   if(S){S.region=id;
     if(!S.visited[id]){S.visited[id]=1;
@@ -865,7 +866,7 @@ function travelTo(id){
   toast('🚌 '+cfg.n+'!');
   SFX.ok();
   if(id==='chodziez')vsay('c_kosz');
-  else if(id==='morze')vsay('v_napoje');
+  else if(id==='morze')vsay(Math.random()<.55?'c_morzejazda':'v_napoje');   // „a nad morzem to była jazda!"
   else if(id==='krakow')vsay('c_krolbalu');
   else if(id==='tatry')vsay('m_wiatr');
 }
@@ -903,6 +904,22 @@ const FOE_TYPES={
     shoots:true,shotType:'ogien',tri:true,elite:true,en:'SMOCZĄTKO'},           // lata, zieje potrójnym ogniem
   golem:{hp:420,atk:19,spd:28,c:'#8fa8c0',dia:16,pts:3800,kbres:true,armor:.35,
     slam:true,elite:true,en:'LODOWY GOLEM'},                                    // pancerny, uderza w ziemię (AoE)
+  /* --- MINI-BOSSOWIE DOMEN (mini:true) — pojawiają się od poziomu domeny `unlock`,
+         każdy z 2-3 atakami z katalogu MB_MOVES --- */
+  soltys:{hp:380,atk:17,spd:46,c:'#6a5a3a',dia:22,pts:6000,mini:true,elite:true,unlock:2,
+    en:'SOŁTYS HEJTU',moves:['widly','summon','slamfala'],minion:'hejter'},      // widły, zwołuje wieś, tupie
+  paparazzo:{hp:340,atk:16,spd:64,c:'#2a2a34',dia:22,pts:6000,mini:true,elite:true,unlock:2,
+    flying:true,en:'PAPARAZZO PRIME',moves:['flesz3','summon','teleport'],minion:'golab'}, // seria fleszy, gołębie-szpiedzy, blink
+  betoniarz:{hp:540,atk:19,spd:36,c:'#8a8a92',dia:26,pts:7200,mini:true,elite:true,unlock:5,
+    kbres:true,armor:.3,en:'BETONIARZ Z BAZARU',moves:['kettle1','slamfala','mur']},       // beton w łeb, fala, MUR
+  dj:{hp:440,atk:18,spd:52,c:'#5a2a7a',dia:26,pts:7200,mini:true,elite:true,unlock:5,
+    en:'DJ SZAMAN WEEKENDU',moves:['beaty','fala','buff']},                      // drop beatów, fala basu, hype dla ziomków
+  komornik:{hp:580,atk:20,spd:48,c:'#23233a',dia:32,pts:9000,mini:true,elite:true,unlock:10,
+    en:'CYBER-KOMORNIK 3000',moves:['laser3','teleport','kradnij']},             // lasery, blink, ZAJĘCIE 💎
+  smog:{hp:520,atk:19,spd:56,c:'#5a6a5a',dia:32,pts:9000,mini:true,elite:true,unlock:10,
+    flying:true,en:'SMOG WAWELSKI',moves:['smog3','trucizna','przelot']},        // chmura: pluje, truje ziemię, przelatuje
+  rolexiarz:{hp:500,atk:19,spd:54,c:'#8a6a1a',dia:32,pts:9000,mini:true,elite:true,unlock:10,
+    en:'ROLEXIARZ PODRÓBA',moves:['rolex3','flex','slamfala']},                  // rzuca podróbkami, flexuje (heal)
   /* bossowie */
   krol:{hp:900,atk:20,spd:64,c:'#6e4730',hood:'#4a2f1e',skin:'#8a5a3b',dia:0,pts:0},
   mdres:{hp:1200,atk:22,spd:58,c:'#0e0e16',hood:'#c8384a',skin:'#e8c9a0',dia:0,pts:0},
@@ -922,6 +939,111 @@ function spawnFoe(){
     const t=pickA(cfg.foeTypes),td=FOE_TYPES[t];
     foes.push({t,x,y,hp:td.hp,hp0:td.hp,dx:0,dy:0,wt:Math.random()*2,stun:0,kb:0,kbx:0,kby:0,flash:0});
     return;
+  }
+}
+/* =====================================================================
+   MINI-BOSSOWIE — katalog ataków (MB_MOVES) + telegrafowane wybuchy
+   ===================================================================== */
+let miniBlasts=[];   // naziemne wybuchy z ostrzeżeniem {x,y,warn,r,atk,poison}
+function mbShoot(f,type,n,sp){
+  const a=Math.atan2(P.y-f.y,P.x-f.x);
+  const offs=n===1?[0]:n===2?[-.2,.2]:[-.35,0,.35];
+  for(const off of offs)
+    bossShots.push({x:f.x,y:f.y-8,dx:Math.cos(a+off)*sp,dy:Math.sin(a+off)*sp,
+      life:2.2,t:type,atk:Math.round(f.atk*.85)});
+  beep(type==='flash'?700:type==='rolex'?1000:300,.12,'square',.06,150);
+}
+function mbBlastAt(x,y,r,atk,poison){
+  miniBlasts.push({x,y,warn:.8,r,atk,poison:!!poison});
+}
+const MB_MOVES={
+  widly:  f=>{mbShoot(f,'widly',1,180);addHit(f.x,f.y-30,'A SIO MI TU!','#c8a858');},
+  kettle1:f=>{mbShoot(f,'kettle',1,130);},
+  flesz3: f=>{mbShoot(f,'flash',3,150);},
+  laser3: f=>{mbShoot(f,'laser',3,160);},
+  rolex3: f=>{mbShoot(f,'rolex',3,150);addHit(f.x,f.y-30,'ORYGINAŁ, BYKU!','#f5c542');},
+  smog3:  f=>{mbShoot(f,'smogp',3,120);},
+  summon: f=>{ // przyzwanie 2 pomagierów (limit na arenie)
+    if(foes.length>=12)return;
+    const t=FOE_TYPES[f.t].minion||'hejter';
+    for(let i=0;i<2;i++){
+      const a=Math.random()*6.28,x=f.x+Math.cos(a)*26,y=f.y+Math.sin(a)*26;
+      const td2=FOE_TYPES[t],h=Math.round(td2.hp*.8);
+      foes.push({t,x,y,room:f.room,hp:h,hp0:h,atk:td2.atk,dx:0,dy:0,wt:.3,stun:.5,kb:0,kbx:0,kby:0,flash:0});
+      fxRing(x,y,14,'#8a6fc8',{life:.3,w:2});fxSparks(x,y-8,'#8a6fc8',6,90,{life:.4});
+    }
+    addHit(f.x,f.y-30,'DO MNIE!','#8a6fc8');beep(240,.2,'square',.07,110);},
+  slamfala:f=>{f.warnT=.65;f.warnR=44;addHit(f.x,f.y-30,'ŁUP!','#f5a032');},
+  mur:    f=>{f.shield=2.4;fxRing(f.x,f.y-8,24,'#c9c4dd',{life:.4,w:3});
+    addHit(f.x,f.y-30,'MUR!','#c9c4dd');beep(150,.25,'square',.08,70);},
+  beaty:  f=>{ // drop: 3 beaty spadają tam gdzie stoi gracz
+    for(let i=0;i<3;i++)mbBlastAt(P.x+(Math.random()-.5)*56,P.y+(Math.random()-.5)*40,24,Math.round(f.atk*.9));
+    addHit(f.x,f.y-30,'DROP!','#b98cf0');beep(80,.3,'sawtooth',.09,40);},
+  fala:   f=>{ // fala basu: odpycha gracza + lekkie obrażenia
+    fxRing(f.x,f.y-6,60,'#b98cf0',{life:.4,w:4});
+    fxRing(f.x,f.y+4,52,'#8a6fc8',{life:.35,w:2,ground:true});
+    addShake(3,.25);beep(60,.4,'sawtooth',.1,30);
+    const d=Math.max(1,Math.hypot(P.x-f.x,P.y-f.y));
+    if(d<70){const kx=P.x+(P.x-f.x)/d*26,ky=P.y+(P.y-f.y)/d*26;
+      if(canWalk(kx,P.y))P.x=kx;if(canWalk(P.x,ky))P.y=ky;
+      hurtPlayer({x:f.x,y:f.y,atk:Math.round(f.atk*.5)});}},
+  buff:   f=>{ // hype: ziomki dostają szybkości
+    for(const o of foes)if(o!==f&&!o.dead&&o.room===f.room){o.haste=4;
+      fxSparks(o.x,o.y-14,'#b98cf0',4,60,{life:.4,g:0,up:10,sz:1.2});}
+    addHit(f.x,f.y-30,'HYPE!','#b98cf0');},
+  teleport:f=>{ // blink w okolicę gracza
+    fxRing(f.x,f.y-8,20,'#6fd8e8',{life:.3,w:2});fxSparks(f.x,f.y-8,'#6fd8e8',8,100,{life:.4});
+    for(let i=0;i<8;i++){
+      const a=Math.random()*6.28,nx=P.x+Math.cos(a)*44,ny=P.y+Math.sin(a)*44;
+      if(!SOLID(at(Math.floor(nx/16),Math.floor(ny/16)))){f.x=nx;f.y=ny;break;}
+    }
+    fxRing(f.x,f.y-8,20,'#6fd8e8',{life:.3,w:2});fxStarFlash(f.x,f.y-10,'#6fd8e8',8,{life:.2});
+    beep(900,.12,'triangle',.07,1400);},
+  kradnij:f=>{ // szarża z ZAJĘCIEM: trafienie zabiera 💎
+    const d=Math.max(1,Math.hypot(P.x-f.x,P.y-f.y));
+    f.kb=.4;f.kbx=(P.x-f.x)/d*320;f.kby=(P.y-f.y)/d*320;f.steal=.55;
+    addHit(f.x,f.y-30,'ZAJĘCIE KOMORNICZE!','#e04848');beep(180,.2,'sawtooth',.08,80);},
+  trucizna:f=>{ // trujące kałuże pod graczem
+    for(let i=0;i<3;i++)mbBlastAt(P.x+(Math.random()-.5)*60,P.y+(Math.random()-.5)*44,22,Math.round(f.atk*.6),true);
+    addHit(f.x,f.y-30,'KWAŚNY DESZCZ!','#7bc950');},
+  przelot:f=>{ // przelot przez gracza
+    const d=Math.max(1,Math.hypot(P.x-f.x,P.y-f.y));
+    f.kb=.5;f.kbx=(P.x-f.x)/d*340;f.kby=(P.y-f.y)/d*340;
+    addHit(f.x,f.y-30,'SZUUU!','#5a6a5a');},
+  flex:   f=>{ // flex: leczy się (max 3 razy)
+    f.flexN=(f.flexN||0)+1;if(f.flexN>3)return;
+    const h=Math.round(f.hp0*.09);f.hp=Math.min(f.hp0,f.hp+h);
+    addDmgNum(f.x,f.y-24,'+'+h,'#7bc950');
+    fxSparks(f.x,f.y-12,'#f5c542',10,80,{life:.6,g:-40,up:20});
+    addHit(f.x,f.y-34,'PATRZ NA ZEGAREK!','#f5c542');},
+};
+function updateMiniBlasts(dt){
+  for(const b of miniBlasts){
+    b.warn-=dt;
+    if(b.warn<=0&&!b.done){
+      b.done=true;
+      fxStarFlash(b.x,b.y-4,b.poison?'#7bc950':'#b98cf0',10,{life:.25});
+      fxRing(b.x,b.y,b.r,b.poison?'#7bc950':'#b98cf0',{life:.3,w:3,ground:true});
+      fxSparks(b.x,b.y-4,b.poison?'#7bc950':'#b98cf0',8,120,{life:.4});
+      addShake(2,.15);beep(b.poison?300:90,.15,'sawtooth',.07,45);
+      if(Math.hypot(P.x-b.x,P.y-b.y)<b.r){
+        hurtPlayer({x:b.x,y:b.y,atk:b.atk});
+        if(b.poison){poison.t=3.5;poison.dmg=Math.max(2,Math.round(b.atk*.25));poison.tick=.7;
+          addHit(P.x,P.y-34,'ZATRUCIE!','#7bc950');}
+      }
+    }
+  }
+  miniBlasts=miniBlasts.filter(b=>!b.done);
+}
+function drawMiniBlasts(){
+  for(const b of miniBlasts){ // ostrzeżenie: pulsujący, kurczący się okrąg
+    const sx=b.x-camX,sy=b.y-camY,k=Math.max(0,b.warn/.8);
+    cx.globalAlpha=.5+Math.sin(anim*20)*.2;
+    cx.strokeStyle=b.poison?'#7bc950':'#b98cf0';cx.lineWidth=1.6;
+    cx.beginPath();cx.ellipse(sx,sy,b.r*(.4+.6*k),b.r*(.4+.6*k)*.5,0,0,7);cx.stroke();
+    cx.globalAlpha=.16;cx.fillStyle=b.poison?'#7bc950':'#b98cf0';
+    cx.beginPath();cx.ellipse(sx,sy,b.r,b.r*.5,0,0,7);cx.fill();
+    cx.globalAlpha=1;
   }
 }
 function addHit(x,y,txt,col){
@@ -1106,6 +1228,8 @@ function dealDmg(f,chId,mult,opts){
   const tdArm=FOE_TYPES[f.t];
   if(tdArm&&tdArm.armor){dmg*=1-tdArm.armor;                      // elita w pancerzu
     if(Math.random()<.25)addHit(f.x,f.y-30,'PANCERZ!','#c9c4dd');}
+  if(f.shield>0){dmg*=.12;addHit(f.x,f.y-30,'MUR!','#c9c4dd');    // MUR Betoniarza
+    fxSparks(f.x,f.y-10,'#c9c4dd',4,90,{life:.3});}
   dmg=Math.max(1,Math.round(dmg));
   f.hp-=dmg;f.flash=.15;
   addDmgNum(f.x,f.y-18,dmg,eCol,crit);
@@ -1179,6 +1303,13 @@ function killFoe(f){
   S.dia+=td.dia;save();refreshHUD();SFX.dia();
   addHit(f.x,f.y-8,'+'+td.dia+'💎','#6fd8e8');
   addViews(td.pts,false);
+  if(td.mini){ // mini-boss: gwarantowane materiały + fanfary
+    const mch=3+((Math.random()*2)|0),mdi=Math.random()<.5?1:0;
+    S.mats.ch+=mch;if(mdi)S.mats.di+=mdi;save();refreshHUD();
+    addHit(f.x,f.y-20,'+'+mch+'⚙️'+(mdi?' +1💠':''),'#b98cf0');
+    burstConfetti();addShake(4,.3);
+    toast('💀 MINI-BOSS POKONANY: '+td.en+'!');
+  }
   // liczniki questów walki
   if(REG==='wawa'&&qs('seba')===1){S.k.seba=(S.k.seba||0)+1;save();
     if(S.k.seba===6)toast('👊 Dzielnia czysta! Wracaj do Seby!');
@@ -1404,6 +1535,17 @@ function hurtPlayer(srcF){
   fxSparks(P.x,P.y-12,'#e04848',6,110,{life:.4});
   fxStarFlash(P.x,P.y-12,'#ffffff',6,{life:.12});
   addDmgNum(P.x,P.y-26,'-'+dmg,'#e04848',false);
+  /* „Odganiam się, odganiam… AUUAA!" — przy KONKRETNYM ciosie albo gdy mało życia.
+     Przerywa bieżącą gadkę (to okrzyk bólu, ma być słyszalny). */
+  if(S.ch==='edek'&&anim>odganiamAt){
+    const maxHp=chHpMax('edek');
+    const bigHit=dmg>=Math.max(12,maxHp*.09);
+    const lowHp=(PHP.edek||0)>0&&(PHP.edek||0)<maxHp*.35;
+    if(bigHit||lowHp){
+      odganiamAt=anim+(lowHp?9:16);
+      vsay('c_odganiam');
+    }
+  }
   /* żmija zatruwa — DoT na kilka sekund */
   if(srcF&&FOE_TYPES[srcF.t]&&FOE_TYPES[srcF.t].poison){
     poison.t=4;poison.dmg=Math.max(2,Math.round(baseAtk*.22));poison.tick=.7;
@@ -1445,7 +1587,7 @@ function partyWipe(){
     }
     if(bossReset)bossShots=[];
     toast('😵 Cała ekipa na deskach... -5💎.'+(bossReset?'<br>⚔️ BOSS wraca na arenę z pełnym HP!':' Ale my się nie poddajemy!'));
-    vsay('c_niepoddajemy');
+    vsay(Math.random()<.5?'c_wywalilem':'c_niepoddajemy');   // „nawet w piasku się wywaliłem, ale co tam"
   }
 }
 function updateFoes(dt){
@@ -1466,6 +1608,14 @@ function updateFoes(dt){
     if(f.stun>0){f.stun-=dt;continue;}
     if(f.kb>0){f.kb-=dt;
       if(f.chDust>0){f.chDust-=dt;if(Math.random()<.6)fxDust(f.x,f.y+8,1);} // kurz szarży
+      /* KOMORNIK: kradzież sprawdzana TAKŻE w trakcie szarży (kb robi continue) */
+      if(f.steal>0){f.steal-=dt;
+        if(Math.hypot(P.x-f.x,P.y-f.y)<20){
+          f.steal=0;hurtPlayer(f);
+          const zab=Math.min(S.dia,3);
+          if(zab>0){S.dia-=zab;save();refreshHUD();
+            addHit(P.x,P.y-34,'-'+zab+'💎 ZAJĘTE!','#e04848');}
+        }}
       const nx=f.x+f.kbx*dt,ny=f.y+f.kby*dt;
       if(!SOLID(at(Math.floor(nx/16),Math.floor(f.y/16))))f.x=nx;
       if(!SOLID(at(Math.floor(f.x/16),Math.floor(ny/16))))f.y=ny;
@@ -1486,7 +1636,7 @@ function updateFoes(dt){
       continue;
     }
     const d=Math.hypot(P.x-f.x,P.y-f.y);
-    const spd2=td.spd*(f.boss&&f.ph2?1.35:1)*(f.sub?2.1:1);
+    const spd2=td.spd*(f.boss&&f.ph2?1.35:1)*(f.sub?2.1:1)*(f.haste>0?1.35:1);
     if((d<86||f.boss||td.elite)&&d>2){f.dx=(P.x-f.x)/d*spd2;f.dy=(P.y-f.y)/d*spd2;}
     else{f.wt-=dt;
       if(f.wt<=0){f.wt=1.5+Math.random()*2;const a=Math.random()*7;
@@ -1585,6 +1735,41 @@ function updateFoes(dt){
       if(f.sub&&Math.random()<.3)FXG.push({x:f.x+(Math.random()-.5)*8,y:f.y+4,
         r:2.5,life:.4,life0:.5,col:'#6fd8e8'});   // smuga fali na wodzie
     }
+    /* MINI-BOSS: cykl ataków z katalogu MB_MOVES (2-3 ruchy na typ) */
+    if(td.mini){
+      if(f.atk===undefined)f.atk=td.atk;
+      if(f.shield>0)f.shield-=dt;
+      f.mvT=(f.mvT===undefined?1.6:f.mvT)-dt;
+      if(f.mvT<=0&&d<240&&f.warnT===undefined){
+        f.mvT=2.3+Math.random()*1.3;
+        const mv=pickA(td.moves);
+        if(MB_MOVES[mv])MB_MOVES[mv](f);
+      }
+    }
+    /* generyczny SLAM mini-bossa (telegraf ustawiony przez MB_MOVES.slamfala) */
+    if(f.warnT!==undefined){
+      f.warnT-=dt;
+      if(f.warnT<=0){
+        const rr2=f.warnR||44;
+        delete f.warnT;
+        fxRing(f.x,f.y+4,rr2,'#f5a032',{life:.4,w:4,ground:true});
+        fxRing(f.x,f.y-4,rr2*.75,'#fff7d6',{life:.3,w:2});
+        fxDust(f.x,f.y+8,10);addShake(3.6,.28);
+        beep(60,.3,'sawtooth',.1,30);
+        if(Math.hypot(P.x-f.x,P.y-f.y)<rr2)hurtPlayer(f);
+      }
+    }
+    /* KOMORNIK w szarży: trafienie = kradzież 💎 */
+    if(f.steal>0){
+      f.steal-=dt;
+      if(Math.hypot(P.x-f.x,P.y-f.y)<20){
+        f.steal=0;hurtPlayer(f);
+        const zab=Math.min(S.dia,3);
+        if(zab>0){S.dia-=zab;save();refreshHUD();
+          addHit(P.x,P.y-34,'-'+zab+'💎 ZAJĘTE!','#e04848');}
+      }
+    }
+    if(f.haste>0)f.haste-=dt;
     /* BOSS: fazy + ataki specjalne + ARENA (leash — ucieczka gracza = walka od nowa) */
     if(f.boss){
       /* faza szału: żar unosi się z bossa */
@@ -1650,6 +1835,7 @@ function updateFoes(dt){
     }
   }
   foes=foes.filter(f=>!f.dead);
+  updateMiniBlasts(dt);   // telegrafowane wybuchy mini-bossów
   // pociski bossów (+ świetlista smuga za każdym)
   for(const b of bossShots){
     b.life-=dt;b.x+=b.dx*dt;b.y+=b.dy*dt;
@@ -1936,7 +2122,7 @@ function quickEat(){
 }
 
 /* głosy Dycha — prawdziwe klipy z YT */
-const DYCH_CLIPS=['d_siemanko','d_mordeczko','d_wariacie','d_lecimy','d_chodz'];
+const DYCH_CLIPS=['d_siemanko','d_mordeczko','d_wariacie','d_lecimy','d_chodz','d_mops','d_megaweekend','d_razem'];
 const DYCH_LINES=[
   'No i DZIKO!','Dwa roboty to już gang, byku.','Wbijam na rejon, mordeczko!',
   'W głowie mam ogień!','Edek to brat. Ta sama fabryka, inny sznyt.',
@@ -1996,7 +2182,7 @@ const DOMAINS={
   grota:{r:'tatry',x:4,y:10,n:'LODOWA GROTA',floor:17,acc:8,wall:16,gate:24,
     foes:['zazdrosnik','dres','balwan'],elite:'golem',ing:['miod','czosnek','ziolo'],col:'#bfe8f4'},
 };
-let DOM={cur:null,rooms:[],gates:[],crystals:[],chest:null,prevReg:null,prevX:0,prevY:0,done:false};
+let DOM={cur:null,rooms:[],gates:[],crystals:[],usedMini:[],chest:null,prevReg:null,prevX:0,prevY:0,done:false};
 /* generator: 4 nieregularne komnaty (blob z elips) połączone korytarzami z bramami */
 function buildDomainMap(cfg){
   rect(0,0,MW-1,MH-1,cfg.wall);
@@ -2053,10 +2239,10 @@ function mkDomFoe(t,x,y,room){
 }
 function enterDomain(id){
   const cfg=DOMAINS[id],lvl=S.domLvl[id]||0;
-  DOM={cur:id,rooms:[],gates:[],crystals:[],chest:null,prevReg:REG,prevX:P.x,prevY:P.y,done:false};
+  DOM={cur:id,rooms:[],gates:[],crystals:[],usedMini:[],chest:null,prevReg:REG,prevX:P.x,prevY:P.y,done:false};
   REG='arena';MW=REGIONS.arena.w;MH=REGIONS.arena.h;
   M=new Uint8Array(MW*MH);buildDomainMap(cfg);
-  resetAmbient();foes=[];hitFX=[];PROJ=[];bossShots=[];dmgNums=[];foeT=1e9;
+  resetAmbient();foes=[];hitFX=[];PROJ=[];bossShots=[];dmgNums=[];miniBlasts=[];foeT=1e9;
   REGIONS.arena.spawn=[DOM.rooms[0].cx,DOM.rooms[0].cy];
   P.x=DOM.rooms[0].cx;P.y=DOM.rooms[0].cy;resetFollowers();
   /* surowce do ZBIERANIA w komnatach 1-3 + kryształy domeny w 2-3 */
@@ -2083,21 +2269,34 @@ function domSpawnRoom(i){
     let x=rm.cx+Math.cos(a)*rr,y=rm.cy+Math.sin(a)*rr*.7;
     if(SOLID(at(Math.floor(x/16),Math.floor(y/16)))){x=rm.cx+Math.cos(a)*rr*.45;y=rm.cy+Math.sin(a)*rr*.35;} // nie w ścianie
     foes.push(mkDomFoe(t,x,y,i));}};
-  const eliteSpawn=t=>{
-    const f=mkDomFoe(t,rm.cx,rm.cy,i);f.stun=1;foes.push(f);
+  const eliteSpawn=(t,ox,oy)=>{
+    const f=mkDomFoe(t,rm.cx+(ox||0),rm.cy+(oy||0),i);f.stun=1;foes.push(f);
     fxRing(f.x,f.y,34,DOMAINS[DOM.cur].col,{life:.5,w:3});
     fxSparks(f.x,f.y-10,DOMAINS[DOM.cur].col,14,140,{life:.6});
     addShake(3,.3);
-    toast('⚠️ '+FOE_TYPES[t].en+'!',2800);};
+    toast((FOE_TYPES[t].mini?'💀 MINI-BOSS: ':'⚠️ ')+FOE_TYPES[t].en+'!',2800);};
+  /* mini-boss z puli odblokowanej poziomem domeny (bez powtórek w jednym runie) */
+  const pickMini=()=>{
+    const pool=Object.keys(FOE_TYPES).filter(k=>{const t2=FOE_TYPES[k];
+      return t2.mini&&t2.unlock<=lvl+1&&!DOM.usedMini.includes(k);});
+    if(!pool.length)return null;
+    const top=Math.max(...pool.map(k=>FOE_TYPES[k].unlock));      // preferuj najwyższy próg
+    const best=pool.filter(k=>FOE_TYPES[k].unlock===top);
+    const id2=pickA(Math.random()<.7?best:pool);
+    DOM.usedMini.push(id2);return id2;};
   if(i===1){ring(3+Math.min(3,lvl),pickA(cfg.foes),58);ring(2,pickA(cfg.foes),86);
-    toast('⚔️ KOMNATA 2: hejterzy!');}
-  if(i===2){ring(2+Math.min(3,lvl),pickA(cfg.foes),64);eliteSpawn(cfg.elite);}
+    toast('⚔️ KOMNATA 2: hejterzy!');
+    if(S.ch==='edek')vsay('c_typy');   // „no wariacie, zobacz na tych typów jak idą"
+    if(lvl+1>=2){const mb=pickMini();if(mb)eliteSpawn(mb,0,-30);}}
+  if(i===2){ring(2+Math.min(3,lvl),pickA(cfg.foes),64);eliteSpawn(cfg.elite);
+    if(lvl+1>=5){const mb=pickMini();if(mb)eliteSpawn(mb,40,0);}}
   if(i===3){
     const td=FOE_TYPES.straznik,gh=Math.round(td.hp*(1+.45*lvl));
     foes.push({t:'straznik',guard:true,room:3,gatk:Math.round(td.atk*.7)+Math.round(lvl*1.6),
       x:rm.cx,y:rm.cy-24,hp:gh,hp0:gh,atk:td.atk+Math.round(lvl*1.6),
       dx:0,dy:0,wt:.4,stun:.8,kb:0,kbx:0,kby:0,flash:0});
-    if(lvl>=1)eliteSpawn(cfg.elite);
+    if(lvl>=1)eliteSpawn(cfg.elite,0,40);
+    if(lvl+1>=10){const mb=pickMini();if(mb)eliteSpawn(mb,-44,0);}
     ring(2,pickA(cfg.foes),70);
     toast('⚠️ OSTATNIA KOMNATA: STRAŻNIK DOMENY!<br>Uważaj na salwy!',3400);SFX.no();
   }
@@ -2112,6 +2311,7 @@ function domOpenGate(gi){
   fxSparks(g.x,g.y,DOMAINS[DOM.cur].col,12,120,{life:.5});
   addShake(2,.2);
   toast('🚪 BRAMA OTWARTA! Dalej, byku!');SFX.ok();
+  if(Math.random()<.4&&!curVoice&&S.ch==='edek')vsay('c_spokoj');   // „spokój, spokój"
 }
 function domUpdate(){
   if(REG!=='arena'||!DOM.cur||DOM.done)return;
@@ -2178,7 +2378,7 @@ function domOpenChest(){
 function exitDomain(){
   stopBattleMusic();
   const backReg=DOM.prevReg||'wawa',bx=DOM.prevX,by=DOM.prevY;
-  DOM={cur:null,rooms:[],gates:[],crystals:[],chest:null,prevReg:null,prevX:0,prevY:0,done:false};
+  DOM={cur:null,rooms:[],gates:[],crystals:[],usedMini:[],chest:null,prevReg:null,prevX:0,prevY:0,done:false};
   setRegion(backReg);
   P.x=bx;P.y=by;resetFollowers();
   camX=Math.max(0,Math.min(MW*16-W,P.x-W/2));camY=Math.max(0,Math.min(MH*16-H,P.y-H/2));
@@ -2436,6 +2636,7 @@ function renderShop(){
       else S.gearOwn[id]=1;
       save();refreshHUD();SFX.buy();
       toast(inf.ic+' Kupione: '+inf.n+'!');
+      if(kind==='food'&&Math.random()<.25&&!curVoice&&S.ch==='edek')vsay('c_gofry'); // „gofry po 85 zł… dobrze że mam swoje napoje"
       renderShop();
     });
     row.appendChild(b);el.appendChild(row);
@@ -2688,7 +2889,8 @@ function gatherForage(node){
   const ing=INGREDIENTS[node.type];
   addHit(node.x,node.y-6,'+'+amt+ing.ic,ing.col);SFX.dia();
   toast(ing.ic+' Zebrano: '+ing.n+' ×'+amt+'<br><span style="color:#8f88b0">Ugotuj coś: 🍳</span>');
-  if(Math.random()<.3&&!curVoice&&S.ch==='edek')vsay(pickA(['c_maliny','c_truskawka','c_kawa']));
+  if(S.ch==='edek'&&node.type==='miod'&&!curVoice)vsay('c_pszczolki');   // "bzyz bzyz, tylko żeby mnie nie pogryzły"
+  else if(Math.random()<.3&&!curVoice&&S.ch==='edek')vsay(pickA(['c_maliny','c_truskawka','c_kawa','c_pszczolki']));
 }
 /* sprite surowca (dodaje detali mapie) */
 function drawForageNode(g,sx,sy){
@@ -2796,9 +2998,20 @@ stage.addEventListener('pointerdown',e=>{
   else if(scene==='mgSimon')simonTap(gx,gy);
   else if(scene==='mgMecz')meczTap();
 });
-addEventListener('pointermove',e=>{if(joy&&e.pointerId===joy.id){joy.dx=e.clientX-joy.sx;joy.dy=e.clientY-joy.sy;}});
+addEventListener('pointermove',e=>{
+  if(!joy)return;
+  /* mysz puszczona poza oknem = brak pointerup — wykryj po e.buttons i zwolnij joystick */
+  if(e.pointerType==='mouse'&&e.buttons===0){joy=null;return;}
+  if(e.pointerId===joy.id){joy.dx=e.clientX-joy.sx;joy.dy=e.clientY-joy.sy;}
+});
 addEventListener('pointerup',e=>{if(joy&&e.pointerId===joy.id)joy=null;});
 addEventListener('pointercancel',e=>{if(joy&&e.pointerId===joy.id)joy=null;});
+/* utrata fokusu (alt-tab, klik poza grę, menu przeglądarki) gubi keyup/pointerup —
+   wyczyść WSZYSTKIE wciśnięte klawisze i joystick, żeby postać nie biegła sama */
+function resetInput(){for(const k in keys)keys[k]=false;joy=null;}
+addEventListener('blur',resetInput);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)resetInput();});
+addEventListener('contextmenu',resetInput);   // prawy klik = menu kontekstowe zjada zdarzenia
 $('actBtn').addEventListener('click',()=>{if(paused)return;initAudio();doAction();});
 $('atkBtn').addEventListener('pointerdown',e=>{e.stopPropagation();if(paused)return;initAudio();tryAttack();});
 $('spcBtn').addEventListener('pointerdown',e=>{e.stopPropagation();if(paused)return;initAudio();trySpecial();});
@@ -3934,6 +4147,16 @@ function drawFoeExtras(f,sx,sy){
     cx.fillStyle='rgba(255,255,255,.7)';cx.fillRect(sx+7.4,sy-8.6,1.2,1.2);}
   if(f.guard){cx.strokeStyle='#8a6fc8';cx.lineWidth=1.5;cx.globalAlpha=.6;
     cx.beginPath();cx.arc(sx+8,sy+10,15+Math.sin(anim*4)*2,0,7);cx.stroke();cx.globalAlpha=1;}
+  /* MUR Betoniarza: migocząca tarcza wokół */
+  if(f.shield>0){
+    cx.save();cx.globalCompositeOperation='lighter';
+    cx.globalAlpha=.4+Math.sin(anim*18)*.2;
+    cx.strokeStyle='#c9c4dd';cx.lineWidth=2;
+    cx.beginPath();cx.arc(sx+8,sy+8,15+Math.sin(anim*9)*1.5,0,7);cx.stroke();
+    cx.globalAlpha=.2;cx.fillStyle='#c9c4dd';
+    cx.beginPath();cx.arc(sx+8,sy+8,15,0,7);cx.fill();
+    cx.restore();cx.globalAlpha=1;
+  }
   /* telegraf strzału: rosnąca, pulsująca kula światła tuż przed wystrzałem */
   if(f.chargeT>0){
     const kk=1-Math.min(1,f.chargeT/.5);
@@ -4212,11 +4435,116 @@ function drawFoeGolem(f,sx,sy,b){ // LODOWY GOLEM — bryła lodu na nogach
     cx.beginPath();cx.ellipse(cxr,sy+22,44*k+6,(44*k+6)*.5,0,0,7);cx.stroke();
   }
 }
+/* --- MINI-BOSSOWIE: sprite'y --- */
+function drawMbSoltys(f,sx,sy,b){ // SOŁTYS HEJTU — kaszkiet, kamizelka, widły
+  const c2=sx+8;
+  R(cx,c2-5,sy+16,4,8,'#3a3226');R(cx,c2+1,sy+16,4,8,'#3a3226');
+  rr(cx,c2-7,sy+3+b,14,14,3,'#6a5a3a');                       // kożuszek
+  R(cx,c2-7,sy+3+b,14,2,'#8a7a52');R(cx,c2-1,sy+5+b,2,10,'#4a3e28');
+  rr(cx,c2-4,sy-5+b,8,8,2.4,'#e8c9a0');                       // twarz
+  R(cx,c2-3,sy-2+b,6,1.6,'#8a6a4a');                          // wąsisko
+  rr(cx,c2-5,sy-8+b,10,4,2,'#4a4238');R(cx,c2-6,sy-4.6+b,12,1.6,'#4a4238'); // kaszkiet
+  R(cx,c2-3,sy-3.6+b,2,1.4,'#c02020');R(cx,c2+1,sy-3.6+b,2,1.4,'#c02020');
+  cx.save();cx.translate(c2+(P.x<f.x?-9:9),sy+6+b);cx.rotate(P.x<f.x?-.4:.4); // widły
+  R(cx,-1,-2,2,14,'#8a5a2e');
+  for(let i=0;i<3;i++)R(cx,-3+i*2.6,-7,1.4,5,'#c8c8d4');
+  cx.restore();
+}
+function drawMbPaparazzo(f,sx,sy){ // PAPARAZZO PRIME — wielki dron z obiektywem
+  const c2=sx+8,fb=Math.sin(anim*10)*2;
+  cx.fillStyle='rgba(0,0,0,.2)';cx.beginPath();cx.ellipse(c2,sy+24,8,2.2,0,0,7);cx.fill();
+  for(const ox of[-11,11]){ // śmigła
+    R(cx,c2+ox-1,sy+2+fb,2,2,'#4a4a58');
+    cx.globalAlpha=.55;R(cx,c2+ox-7,sy+1+fb,14,1.4,'#8f88b0');cx.globalAlpha=1;}
+  rr(cx,c2-9,sy+4+fb,18,10,3,'#2a2a34');                      // kadłub
+  rr(cx,c2-5,sy+6+fb,10,7,2,'#3a3a48');
+  cx.fillStyle='#16324a';cx.beginPath();cx.arc(c2,sy+9+fb,3.6,0,7);cx.fill(); // obiektyw
+  cx.fillStyle='#6fd8e8';cx.beginPath();cx.arc(c2-1,sy+8+fb,1.4,0,7);cx.fill();
+  if(f.chargeT>0||Math.floor(anim*3)%3===0){cx.fillStyle='#fff';
+    cx.beginPath();cx.arc(c2+6,sy+5+fb,1.6,0,7);cx.fill();}   // flesz mruga
+  R(cx,c2-7,sy+14+fb,14,1.6,'#c02020');                       // pasek REC
+}
+function drawMbBetoniarz(f,sx,sy,b){ // BETONIARZ — szara góra mięśni z kręgiem betonu
+  const c2=sx+8;
+  R(cx,c2-6,sy+17,5,8,'#5a5a62');R(cx,c2+1,sy+17,5,8,'#5a5a62');
+  rr(cx,c2-9,sy+1+b,18,17,3,'#8a8a92');                       // beton-korpus
+  R(cx,c2-6,sy+5+b,4,3,'#6e6e76');R(cx,c2+3,sy+9+b,4,4,'#6e6e76'); // łaty betonu
+  cx.strokeStyle='#5a5a62';cx.lineWidth=1.2;                  // pęknięcia
+  cx.beginPath();cx.moveTo(c2-4,sy+3+b);cx.lineTo(c2-1,sy+8+b);cx.lineTo(c2-5,sy+13+b);cx.stroke();
+  rr(cx,c2-4,sy-6+b,8,8,2.4,'#9a9aa2');                       // łeb
+  R(cx,c2-3,sy-3+b,2.4,2,'#e04848');R(cx,c2+1,sy-3+b,2.4,2,'#e04848');
+  R(cx,c2-2,sy+.4+b,4,1.2,'#3a3a42');
+  cx.fillStyle='#6e6e76';cx.beginPath();cx.arc(c2-12,sy+9+b,4.4,0,7);cx.fill(); // pięści
+  cx.beginPath();cx.arc(c2+12,sy+9+b,4.4,0,7);cx.fill();
+}
+function drawMbDj(f,sx,sy,b){ // DJ SZAMAN — kaptur, słuchawki, pulsuje w rytm
+  const c2=sx+8,puls=1+Math.sin(anim*8)*.06;
+  cx.save();cx.translate(c2,sy+12+b);cx.scale(puls,puls);cx.translate(-c2,-(sy+12+b));
+  R(cx,c2-5,sy+16,4,8,'#2a1a3a');R(cx,c2+1,sy+16,4,8,'#2a1a3a');
+  rr(cx,c2-8,sy+2+b,16,15,3,'#5a2a7a');                       // bluza
+  R(cx,c2-8,sy+8+b,16,2,'#b98cf0');                           // neon na bluzie
+  rr(cx,c2-4,sy-6+b,8,8,2.4,'#d8b890');
+  rr(cx,c2-5,sy-8+b,10,4,2,'#3a1a4a');                        // kaptur
+  R(cx,c2-6,sy-4+b,2.4,4,'#b98cf0');R(cx,c2+3.6,sy-4+b,2.4,4,'#b98cf0'); // słuchawki
+  R(cx,c2-5,sy-8.6+b,10,1.4,'#b98cf0');
+  R(cx,c2-3,sy-3+b,2,1.6,'#6fd8e8');R(cx,c2+1,sy-3+b,2,1.6,'#6fd8e8');
+  cx.restore();
+  for(let i=0;i<2;i++){ // nutki wokół
+    const na=anim*3+i*3.14,nx=c2+Math.cos(na)*14,ny=sy+2+Math.sin(na*1.4)*6;
+    cx.fillStyle='#b98cf0';R(cx,nx,ny,2,2,'#b98cf0');R(cx,nx+1.4,ny-3,1,4,'#b98cf0');}
+}
+function drawMbKomornik(f,sx,sy,b){ // CYBER-KOMORNIK 3000 — robot w garniturze z teczką
+  const c2=sx+8;
+  R(cx,c2-5,sy+16,4,8,'#16161e');R(cx,c2+1,sy+16,4,8,'#16161e');
+  rr(cx,c2-7,sy+2+b,14,15,2.4,'#23233a');                     // garnitur
+  R(cx,c2-1,sy+2+b,2,12,'#0e0e16');R(cx,c2-1,sy+4+b,2,4,'#e04848'); // krawat
+  R(cx,c2-7,sy+2+b,3,10,'#2e2e4a');R(cx,c2+4,sy+2+b,3,10,'#2e2e4a'); // klapy
+  rr(cx,c2-4,sy-6+b,8,8,2,'#3a3a4e');                         // głowa-monitor
+  R(cx,c2-3,sy-4+b,6,3.4,'#0e2a1a');                          // ekran
+  cx.fillStyle='#7bc950';cx.font='4px monospace';             // zielone cyfry
+  cx.fillText(Math.floor(anim*4)%2?'-3':'-💎',c2-2.6,sy-1+b);
+  cx.save();cx.translate(c2+(P.x<f.x?-10:10),sy+11+b);        // teczka
+  rr(cx,-4,-3,8,6,1.4,'#4a3a2a');R(cx,-1,-4,2,1.6,'#6a5a3a');
+  cx.restore();
+}
+function drawMbSmog(f,sx,sy){ // SMOG WAWELSKI — żywa chmura z czerwonymi ślepiami
+  const c2=sx+8,fb=Math.sin(anim*5)*2.4;
+  cx.globalAlpha=.92;
+  cx.fillStyle='#4a5a4a';cx.beginPath();cx.ellipse(c2,sy+10+fb,13,8,0,0,7);cx.fill();
+  cx.fillStyle='#5a6a5a';cx.beginPath();cx.arc(c2-7,sy+7+fb,6,0,7);cx.fill();
+  cx.beginPath();cx.arc(c2+6,sy+6+fb,7,0,7);cx.fill();
+  cx.fillStyle='#7a8a72';cx.beginPath();cx.arc(c2,sy+4+fb,6,0,7);cx.fill();
+  cx.globalAlpha=1;
+  R(cx,c2-5,sy+7+fb,3,2.4,'#e03028');R(cx,c2+2,sy+7+fb,3,2.4,'#e03028'); // ślepia
+  cx.globalAlpha=.5;cx.fillStyle='#8fa87a';                   // kapiące krople
+  for(let i=0;i<3;i++){const dy2=((anim*22+i*9)%16);
+    cx.beginPath();cx.arc(c2-6+i*6,sy+16+fb+dy2*.5,1.4,0,7);cx.fill();}
+  cx.globalAlpha=1;
+}
+function drawMbRolexiarz(f,sx,sy,b){ // ROLEXIARZ PODRÓBA — złoty dres, zegarki na obu łapach
+  const c2=sx+8;
+  R(cx,c2-5,sy+16,4,8,'#6a5a1a');R(cx,c2+1,sy+16,4,8,'#6a5a1a');
+  rr(cx,c2-7,sy+2+b,14,15,3,'#8a6a1a');                       // złoty dres
+  R(cx,c2-6.4,sy+3+b,1.4,12,'#f5c542');R(cx,c2+5,sy+3+b,1.4,12,'#f5c542'); // lampasy
+  rr(cx,c2-4,sy-6+b,8,8,2.4,'#e8c9a0');
+  rr(cx,c2-5,sy-8+b,10,3.4,1.6,'#f5c542');                    // złota czapka
+  R(cx,c2-3,sy-3+b,2,1.6,'#1a1a24');R(cx,c2+1,sy-3+b,2,1.6,'#1a1a24');
+  cx.fillStyle='#f5c542';cx.beginPath();cx.arc(c2,sy+7+b,2.6,0,7);cx.fill(); // łańcuch z medalionem
+  for(const ox of[-9,9]){ // ZEGARKI na łapach (po 2!)
+    R(cx,c2+ox-2,sy+9+b,4,3,'#c8a030');
+    cx.fillStyle='#fff7d6';cx.beginPath();cx.arc(c2+ox,sy+10.4+b,1.6,0,7);cx.fill();
+    R(cx,c2+ox-2,sy+13+b,4,3,'#c8a030');
+    cx.fillStyle='#fff7d6';cx.beginPath();cx.arc(c2+ox,sy+14.4+b,1.6,0,7);cx.fill();}
+  if(Math.floor(anim*2)%2){cx.fillStyle='#fff7d6';            // błysk podróbki
+    R(cx,c2+(P.x<f.x?-11:11),sy+8+b,1.6,1.6,'#fff7d6');}
+}
 const FOE_DRAW={pies:drawFoeDog,oburzona:drawFoeLady,zlyrobot:drawFoeRobot,
   dron:drawFoeDron,mewa:drawFoeMewa,krab:drawFoeKrab,kozica:drawFoeKozica,balwan:drawFoeBalwan,
   zmija:drawFoeZmija,wilk:drawFoeWilk,golab:drawFoeGolab,rywal:drawFoeRywal,zlomiarz:drawFoeZlomiarz,
   rycerz:drawFoeRycerz,odyniec:drawFoeOdyniec,utopiec:drawFoeUtopiec,
-  smoczatko:drawFoeSmoczatko,golem:drawFoeGolem};
+  smoczatko:drawFoeSmoczatko,golem:drawFoeGolem,
+  soltys:drawMbSoltys,paparazzo:drawMbPaparazzo,betoniarz:drawMbBetoniarz,dj:drawMbDj,
+  komornik:drawMbKomornik,smog:drawMbSmog,rolexiarz:drawMbRolexiarz};
 function drawNPC(c,n,sx,sy){
   if(n.robo){ // Dych jako NPC (zanim dołączy do ekipy)
     drawDychBody(c,sx,sy,0,Math.floor(anim*2)%2);
@@ -4495,7 +4823,8 @@ function updateWorld(dt){
       const roll=Math.random();
       const want=roll<.3?1:roll<.75?2:3;
       const ch=[];
-      while(ch.length<want){const c=pickA(IDLE_POOL);if(!ch.includes(c))ch.push(c);}
+      const pool=REG==='morze'?IDLE_POOL.concat(['c_zyciemorze','c_mielno','c_czapka','c_morzejazda','c_zyciemorze','c_mielno']):IDLE_POOL;
+      while(ch.length<want){const c=pickA(pool);if(!ch.includes(c))ch.push(c);}
       vsayChain(ch);
       idleT=chainDur(ch)+3+Math.random()*6;  // przerwa dopiero PO całym bloku
     }else idleT=1;                           // coś innego gra — sprawdź ponownie za chwilę
@@ -4879,6 +5208,7 @@ function drawWorld(){
     }
   }
   drawFXunder();  // kurz i pyły przy ziemi — pod sprite'ami
+  drawMiniBlasts();  // ostrzeżenia przed wybuchami mini-bossów
   /* aura mocy pod bossem (złota; czerwona i szybsza w fazie szału) */
   for(const f of foes)if(f.boss){
     const sx=f.x-camX,sy=f.y-camY;
@@ -4981,6 +5311,26 @@ function drawWorld(){
       cx.fillStyle='#e03028';cx.beginPath();cx.ellipse(sx,sy,6*el,2.8*el,ang,0,7);cx.fill();
       cx.fillStyle='#ff9a90';cx.beginPath();cx.ellipse(sx,sy,3*el,1.4*el,ang,0,7);cx.fill();
       cx.fillStyle='#fff7f2';cx.beginPath();cx.arc(sx-b.dx*.02,sy-b.dy*.02,1.1,0,7);cx.fill();
+    }else if(b.t==='widly'){        // widły Sołtysa — lecą zębami do przodu
+      cx.save();cx.translate(sx,sy);cx.rotate(Math.atan2(b.dy,b.dx));
+      R(cx,-8,-1,10,2,'#8a5a2e');
+      R(cx,2,-4,2,8,'#a8a8b4');
+      for(let i=0;i<3;i++)R(cx,4,-4+i*3,4,1.4,'#c8c8d4');
+      cx.restore();
+    }else if(b.t==='rolex'){        // podróbka rolexa — złota, wiruje
+      cx.save();cx.translate(sx,sy);cx.rotate(anim*11);
+      R(cx,-1.6,-6,3.2,12,'#c8a030');
+      cx.fillStyle='#f5c542';cx.beginPath();cx.arc(0,0,4,0,7);cx.fill();
+      cx.fillStyle='#fff7d6';cx.beginPath();cx.arc(0,0,2.2,0,7);cx.fill();
+      R(cx,-.5,-2,1,2,'#1a1a24');
+      cx.restore();
+    }else if(b.t==='smogp'){        // kula smogu — brudna chmurka
+      const p2=1+Math.sin(anim*10)*.2;
+      cx.globalAlpha=.85;
+      cx.fillStyle='#5a6a5a';cx.beginPath();cx.arc(sx,sy,5*p2,0,7);cx.fill();
+      cx.fillStyle='#7a8a72';cx.beginPath();cx.arc(sx-2,sy-1,3*p2,0,7);cx.fill();
+      cx.fillStyle='#8fa87a';cx.beginPath();cx.arc(sx+2,sy+1,2.4*p2,0,7);cx.fill();
+      cx.globalAlpha=1;
     }else if(b.t==='klawa'){        // klawiatura rzucona przez Rycerza — wiruje
       cx.save();cx.translate(sx,sy);cx.rotate(anim*9);
       rr(cx,-6,-4,12,8,1.6,'#2a2a3a');
