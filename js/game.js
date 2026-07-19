@@ -4634,6 +4634,78 @@ const vig=document.createElement('canvas');vig.width=W;vig.height=H;
   gr.addColorStop(0,'rgba(0,0,0,0)');gr.addColorStop(1,'rgba(10,8,24,.5)');
   g.fillStyle=gr;g.fillRect(0,0,W,H);})();
 function drawVignette(){cx.drawImage(vig,0,0);}
+/* ---------------- HUD 2.0: głowy postaci + kołowe umiejętności ---------------- */
+/* mała okrągła głowa postaci (kadrowana z drawCharBody) */
+function drawHeadIcon(id,hx,hy,r){
+  cx.save();
+  cx.beginPath();cx.arc(hx,hy,r,0,7);
+  cx.fillStyle='#1c1838';cx.fill();
+  cx.clip();
+  /* delikatna poświata w kolorze żywiołu — ciemne postacie (Dych) są czytelne */
+  const g=cx.createRadialGradient(hx,hy-r*.3,1,hx,hy,r);
+  g.addColorStop(0,CHARS[id].col+'55');g.addColorStop(1,CHARS[id].col+'00');
+  cx.fillStyle=g;cx.beginPath();cx.arc(hx,hy,r,0,7);cx.fill();
+  const s=r/5.2;
+  cx.translate(hx-8*s,hy-4.6*s);cx.scale(s,s);
+  drawCharBody(cx,id,0,0,0,0);
+  cx.restore();
+}
+/* okrągła umiejętność: napełnia się jak naczynie, błyszczy gdy gotowa */
+function drawSkillOrb(ox,oy,r,fill,col,icon,ready,key,subtxt){
+  cx.save();
+  cx.beginPath();cx.arc(ox,oy,r,0,7);
+  cx.fillStyle='rgba(10,8,22,.74)';cx.fill();
+  /* „ciecz": poziom + falująca powierzchnia */
+  cx.save();cx.beginPath();cx.arc(ox,oy,r,0,7);cx.clip();
+  const lvl=oy+r-2*r*Math.max(0,Math.min(1,fill));
+  cx.beginPath();cx.moveTo(ox-r,oy+r+2);cx.lineTo(ox-r,lvl);
+  for(let x=-r;x<=r;x+=2)
+    cx.lineTo(ox+x,lvl+(ready?0:Math.sin(anim*3.2+x*.55)*1.3));
+  cx.lineTo(ox+r,oy+r+2);cx.closePath();
+  cx.fillStyle=col+(ready?'d0':'7a');cx.fill();
+  if(!ready&&fill>0&&fill<1){ // jaśniejsza linia powierzchni cieczy
+    cx.strokeStyle=col;cx.globalAlpha=.9;cx.lineWidth=1;
+    cx.beginPath();
+    for(let x=-r;x<=r;x+=2){const yy=lvl+Math.sin(anim*3.2+x*.55)*1.3;
+      x===-r?cx.moveTo(ox+x,yy):cx.lineTo(ox+x,yy);}
+    cx.stroke();cx.globalAlpha=1;
+  }
+  if(ready){ // gotowe: pulsujący blask + przesuwający się refleks
+    cx.globalCompositeOperation='lighter';
+    cx.globalAlpha=.22+Math.sin(anim*5)*.12;
+    cx.fillStyle=col;cx.beginPath();cx.arc(ox,oy,r,0,7);cx.fill();
+    const sw=((anim*34)%(r*5))-r*2.5;
+    cx.globalAlpha=.32;cx.fillStyle='#fff';
+    cx.save();cx.translate(ox+sw,oy);cx.rotate(.6);
+    cx.fillRect(-2,-r*1.7,3.5,r*3.4);cx.restore();
+  }
+  cx.restore();
+  /* symbol umiejętności */
+  cx.globalAlpha=ready?1:.55;
+  cx.font=Math.round(r*1.05)+'px serif';cx.textAlign='center';cx.textBaseline='middle';
+  cx.fillText(icon,ox,oy+1);
+  cx.textBaseline='alphabetic';cx.globalAlpha=1;
+  /* obwódka + aura gotowości + iskra krążąca po obwodzie */
+  cx.lineWidth=1.6;cx.strokeStyle=ready?'#fff':'rgba(236,233,244,.45)';
+  cx.beginPath();cx.arc(ox,oy,r,0,7);cx.stroke();
+  if(ready){
+    cx.save();cx.globalCompositeOperation='lighter';
+    cx.globalAlpha=.45+Math.sin(anim*6)*.25;
+    cx.strokeStyle=col;cx.lineWidth=2.4;
+    cx.beginPath();cx.arc(ox,oy,r+2.4,0,7);cx.stroke();
+    const a=anim*2.4,pxs=ox+Math.cos(a)*(r+2.4),pys=oy+Math.sin(a)*(r+2.4);
+    cx.globalAlpha=.9;cx.fillStyle='#fff';
+    cx.beginPath();cx.arc(pxs,pys,1.4,0,7);cx.fill();
+    cx.restore();
+  }
+  /* mały licznik (sekundy cd / % energii) + klawisz pod spodem */
+  cx.font='5px "Press Start 2P"';cx.textAlign='center';
+  if(!ready&&subtxt){cx.fillStyle='#000';cx.fillText(subtxt,ox+1,oy+r*.62+1);
+    cx.fillStyle='#fff';cx.fillText(subtxt,ox,oy+r*.62);}
+  cx.fillStyle=ready?'#fff7d6':'rgba(236,233,244,.55)';
+  cx.fillText(key,ox,oy+r+8);
+  cx.textAlign='left';cx.restore();
+}
 
 /* ---------------- ŚWIAT: update ---------------- */
 function canWalk(x,y){
@@ -5428,35 +5500,41 @@ function drawWorld(){
     cx.restore();
   }
   cx.globalAlpha=1;cx.textAlign='left';
-  // HP DRUŻYNY (każdy członek osobno)
+  // HP DRUŻYNY — głowy postaci zamiast ikonek
   for(let i=0;i<S.party.length;i++){
     const id=S.party[i],act=id===S.ch;
-    const y=H-12-(S.party.length-1-i)*13;
+    const y=H-10-(S.party.length-1-i)*17;
     const m=chHpMax(id),v=Math.max(0,Math.round(PHP[id]||0)),fr=m?v/m:0;
-    cx.font='8px "Press Start 2P"';cx.globalAlpha=act?1:.6;
-    cx.fillText(CHARS[id].el,5,y);
-    R(cx,19,y-7,46,7,'rgba(0,0,0,.55)');
-    R(cx,20,y-6,44*fr,5,v<=0?'#555':fr>.5?'#7bc950':fr>.25?'#f5c542':'#e04848');
-    if(act){cx.strokeStyle='#ece9f4';cx.lineWidth=1;cx.strokeRect(19,y-7,46,7);}
+    const hr=act?7.5:6;
+    cx.globalAlpha=act?1:.65;
+    drawHeadIcon(id,12,y-6,hr);
+    cx.lineWidth=act?1.6:1;
+    cx.strokeStyle=act?CHARS[id].col:'rgba(236,233,244,.4)';
+    cx.beginPath();cx.arc(12,y-6,hr+.8,0,7);cx.stroke();
+    if(v<=0){ // padł: przygaszona głowa + czerwony X
+      cx.globalAlpha=.9;cx.strokeStyle='#e04848';cx.lineWidth=1.6;
+      cx.beginPath();cx.moveTo(7,y-11);cx.lineTo(17,y-1);
+      cx.moveTo(17,y-11);cx.lineTo(7,y-1);cx.stroke();
+    }
+    R(cx,23,y-9,46,7,'rgba(0,0,0,.55)');
+    R(cx,24,y-8,44*fr,5,v<=0?'#555':fr>.5?'#7bc950':fr>.25?'#f5c542':'#e04848');
+    if(act){cx.strokeStyle='#ece9f4';cx.lineWidth=1;cx.strokeRect(23,y-9,46,7);}
     cx.font='5px "Press Start 2P"';cx.fillStyle=v<=0?'#e04848':'#ece9f4';
-    cx.fillText(v<=0?'PADŁ':v+'/'+m,68,y-1);
+    cx.fillText(v<=0?'PADŁ':v+'/'+m,72,y-3);
     cx.globalAlpha=1;
   }
-  {const ready=spcT<=0,c=CHARS[S.ch];
-   cx.font='7px "Press Start 2P"';
-   cx.fillStyle=ready?'#f5c542':'rgba(245,197,66,.35)';
-   cx.fillText(ready?('[E/Z] '+c.el+' '+c.spcN):('[E/Z] '+Math.ceil(spcT)+'s'),8,H-52);
-   /* SUPER-HIT [Q]: pasek energii (postacie z burstem) */
-   {const B=BURSTS[S.ch];
-    if(B){
-      const e=burstE[S.ch]||0,full=e>=100;
-      cx.fillStyle=full?(Math.floor(anim*4)%2?'#fff7d6':B.bar):'rgba(245,197,66,.4)';
-      cx.fillText(full?B.ready:'[Q] SUPER-HIT '+Math.floor(e)+'%',8,H-64);
-      R(cx,8,H-62,70,4,'rgba(0,0,0,.55)');
-      R(cx,9,H-61,68*Math.min(1,e/100),2,full?B.bar:'#8a6fc8');
-    }}
+  // UMIEJĘTNOŚCI: okrągłe naczynia (E = skill, Q = SUPER-HIT) w prawym dolnym rogu
+  {const c=CHARS[S.ch],B=BURSTS[S.ch];
+   const ready=spcT<=0,cdFill=c.spcCd?1-Math.max(0,spcT)/c.spcCd:1;
+   if(B){
+     drawSkillOrb(W-58,H-40,10.5,cdFill,c.col,c.el,ready,'E',Math.ceil(spcT)+'s');
+     const e=burstE[S.ch]||0,full=e>=100;
+     drawSkillOrb(W-26,H-44,14.5,e/100,B.bar,'💥',full,'Q',Math.floor(e)+'%');
+   }else{
+     drawSkillOrb(W-26,H-44,12.5,cdFill,c.col,c.el,ready,'E',Math.ceil(spcT)+'s');
+   }
    if(BUFF.t>0){cx.fillStyle='#7bc950';cx.font='6px "Press Start 2P"';
-     cx.fillText('🍴 BUFF '+Math.ceil(BUFF.t)+'s',8,H-74);}}
+     cx.fillText('🍴 BUFF '+Math.ceil(BUFF.t)+'s',8,H-10-S.party.length*17-4);}}
   // pasek HP bossa
   {const bf=foes.find(f=>f.boss);
    if(bf){
@@ -5485,9 +5563,9 @@ function drawWorld(){
     const sx=d.x*16-camX+8,sy=d.y*16-camY-4;
     if(sx>0&&sx<W&&sy>0&&sy<H){cx.textAlign='center';cx.fillText(d.n,sx,sy);cx.textAlign='left';}
   }
-  // nazwa regionu
+  // nazwa regionu (nad orbami umiejętności)
   cx.font='6px "Press Start 2P"';cx.fillStyle='rgba(236,233,244,.5)';
-  cx.textAlign='right';cx.fillText(REGIONS[REG].n,W-8,H-10);cx.textAlign='left';
+  cx.textAlign='right';cx.fillText(REGIONS[REG].n,W-8,H-68);cx.textAlign='left';
   // ciepłe światło + winieta + flesz
   cx.fillStyle='rgba(255,180,80,.045)';cx.fillRect(0,0,W,H);
   drawVignette();
