@@ -73,7 +73,12 @@ loadSave();
 /* ---------------- AUDIO: klipy z YT + piosenki ---------------- */
 /* audio jako pliki w assets/audio/ (fetch przy initAudio; muzyka bitewna leniwie) */
 const AUDIO_BASE='assets/audio/';
-const AUDIO_KEYS=["song", "burst_byku", "metro_rhythm", "s_dziki", "s_elegancko", "s_metro", "s_67", "v_piszczel", "v_spawanie", "v_los", "v_spontan", "v_zycie", "v_elegancko", "v_cochcecie", "v_kladesie", "v_napoje", "v_paleta", "v_czesc", "c_etam", "c_kopytem", "c_elegancko2", "c_ziomali", "c_strach", "c_zaspiewam", "c_uciekajcie", "c_maliny", "c_problemy", "c_kamera", "c_rolextiktok", "c_wolnyptak", "c_ziomal_dumnie", "c_rozchwytywany", "c_jarek_sprawdz", "c_diamenty", "c_krolbalu", "c_buty", "c_randka", "c_kosz", "c_serduszka", "c_dwabramki", "c_niepoddajemy", "c_spaceruje", "c_pestka", "c_koniecswiata", "c_truskawka", "c_kawa", "c_tygrysy", "c_rdzewieje", "c_prokop", "c_ryba", "c_rolexlewa", "c_ktoby", "c_odganiam", "c_pszczolki", "c_spokoj", "c_morzejazda", "c_zyciemorze", "c_mielno", "c_wywalilem", "c_typy", "c_czapka", "c_gofry", "d_mops", "d_megaweekend", "d_razem", "m_roboty", "m_wiatr", "m_puszki", "m_ministerstwo", "m_kopernik", "m_magia", "m_rolexlong", "m_meczlong", "d_siemanko", "d_mordeczko", "d_wariacie", "d_lecimy", "d_chodz", "d_song"];
+const AUDIO_KEYS=["song", "burst_byku", "metro_rhythm", "s_dziki", "s_elegancko", "s_metro", "s_67", "v_piszczel", "v_spawanie", "v_los", "v_spontan", "v_zycie", "v_elegancko", "v_cochcecie", "v_kladesie", "v_napoje", "v_paleta", "v_czesc", "c_etam", "c_kopytem", "c_elegancko2", "c_ziomali", "c_strach", "c_zaspiewam", "c_uciekajcie", "c_maliny", "c_problemy", "c_kamera", "c_rolextiktok", "c_wolnyptak", "c_ziomal_dumnie", "c_rozchwytywany", "c_jarek_sprawdz", "c_diamenty", "c_krolbalu", "c_buty", "c_randka", "c_kosz", "c_serduszka", "c_dwabramki", "c_niepoddajemy", "c_spaceruje", "c_pestka", "c_koniecswiata", "c_truskawka", "c_kawa", "c_tygrysy", "c_rdzewieje", "c_prokop", "c_ryba", "c_rolexlewa", "c_ktoby", "c_odganiam", "c_pszczolki", "c_spokoj", "c_morzejazda", "c_zyciemorze", "c_mielno", "c_wywalilem", "c_typy", "c_czapka", "c_gofry", "d_mops", "d_megaweekend", "d_razem", "m_roboty", "m_wiatr", "m_puszki", "m_ministerstwo", "m_kopernik", "m_magia", "m_rolexlong", "m_meczlong", "d_siemanko", "d_mordeczko", "d_wariacie", "d_lecimy", "d_chodz", "d_song",
+/* --- SIEMA ODJAZD: stop na Poland Rocka (short z Dychem) --- */
+"c_polandrock", "c_festiwalowicze", "c_kojarze", "c_zerknijcie", "c_podwiezcie", "c_zmieszcze",
+"c_bratniduch", "c_namiot", "c_planprosty", "c_trzymajtempo", "d_przeklenstwa", "c_wypatrzycie",
+"c_eleganckorock", "c_ruchnadrodze", "c_laweta", "c_paniekierowco", "d_edekwstawaj", "c_zlemiejsce",
+"c_naladowac", "c_luksa", "c_dachnadglowa", "c_pakujemygraty", "c_alejazda", "c_przyczepa", "c_kciuki"];
 /* dłuższe monologi Edka do tła (mapa) */
 const IDLE_POOL=['m_roboty','m_wiatr','m_kopernik','m_ministerstwo','m_magia','m_rolexlong',
   'm_meczlong','m_puszki','m_roboty','m_kopernik','m_wiatr','m_rolexlong',
@@ -439,6 +444,17 @@ const QUESTS={
   seba:{n:'Spokój na dzielni',giver:'ziomal1',rw:80,desc:'Pogoń 6 hejterów zaczepiających ziomali w Warszawie (cios: SPACJA/X).'},
   dych:{n:'Dziki ziomal',giver:'dych_npc',rw:70,desc:'POLSKIE MORZE: pogoń 3 dresiarzy zaczepiających Dycha. Nagroda: DYCH DZIKI (drugi robot!) w ekipie!'},
   bursztyn:{n:'Bursztynowy interes',giver:'rybak',rw:90,desc:'POLSKIE MORZE: znajdź 5 bursztynów na plaży.'},
+  /* --- SERIA „SIEMA ODJAZD" — TRASA NA POLAND ROCK (5 zadań pod rząd) --- */
+  graty:{n:'SIEMA ODJAZD 1: Pakujemy graty',giver:'festiwalowicz',rw:60,
+    desc:'TRASA: zbierz sprzęt na wyprawę — namiot, karimatę i jeszcze większy plecak niż Edek.'},
+  stop1:{n:'SIEMA ODJAZD 2: Łapiemy stopa',giver:'dych_trasa',rw:70,
+    desc:'TRASA: machaj do aut na złym zjeździe. „Dacie radę nas podwieźć?”'},
+  bateria:{n:'SIEMA ODJAZD 3: Naładować baterie',giver:'pani_stacja',rw:70,
+    desc:'TRASA: na stacji naładuj baterie Edka i Dycha — trzymaj wskaźnik w zielonym.'},
+  stop2:{n:'SIEMA ODJAZD 4: Ej, wy tam z przyczepą!',giver:'stopowiczka',rw:90,
+    desc:'TRASA: z dobrej zatoczki złap kampera z przyczepą. „Jak mnie na drodze wypatrzycie, to się zatrzymajcie!”'},
+  przyczepa:{n:'SIEMA ODJAZD 5: Jazda przyczepą',giver:'kamperowiec',rw:120,
+    desc:'TRASA: utrzymaj się na przyczepie aż do bramy Poland Rocka. Kierunek: POLE!'},
 };
 const qs=id=>S.quests[id]||0;
 function setQ(id,v){S.quests[id]=v;save();refreshHUD();}
@@ -449,6 +465,9 @@ const COLLECT={
   zabson:{r:'wawa',pts:[[16,23],[40,36],[55,22],[3,30],[24,8]],label:'mikrofon',c1:'#f5c542',c2:'#fff7d6'},
   tinder:{r:'wawa',pts:[[16,37],[19,39],[21,37]],label:'kwiat',c1:'#e88ac8',c2:'#ffd7ef'},
   bursztyn:{r:'morze',pts:[[4,11],[14,13],[24,12],[36,13],[50,11]],label:'bursztyn',c1:'#f5a032',c2:'#ffd77a'},
+  /* graty na wyprawę: namiot (0), karimata (1), plecak większy niż Edek (2) */
+  graty:{r:'trasa',pts:[[8,27],[26,31],[45,27]],label:'grat',c1:'#e04848',c2:'#ffd77a',
+    labels:['namiot','karimata','WIELKI plecak']},
 };
 const colGot=q=>(S.col[q]||[]).length;
 
@@ -586,6 +605,41 @@ function buildTatry(){
   set(48,24,14);                                     // billboard
   for(let x=44;x<=52;x++)if(at(x,15)===0)set(x,15,13);
 }
+/* ---------------- TRASA NA POLAND ROCK (region „siema odjazd") ---------------- */
+function buildTrasa(){
+  rect(0,0,MW-1,MH-1,0);
+  rect(0,18,MW-1,21,2);                              // krajowa — dwie jezdnie
+  rect(0,17,MW-1,17,1);rect(0,22,MW-1,22,1);         // pobocza (żwir)
+  for(let x=0;x<MW;x++){                             // barierki ochronne — z przerwami na zjazdy
+    if(x%16>6)set(x,16,34);
+    if(x%16>8)set(x,23,34);
+  }
+  rect(2,24,4,25,5);                                 // przystanek PKS przy trasie
+  rect(6,23,13,28,1);                                // ZŁY ZJAZD — zakurzone pobocze
+  set(10,29,29);                                     // drogowskaz „POLAND ROCK →"
+  rect(16,25,23,25,1);                               // podjazd na stację
+  rect(16,26,22,30,5);                               // STACJA ŁADOWANIA
+  rect(28,23,38,26,1);                               // ZATOCZKA — dobre miejsce na stopa
+  rect(42,23,52,29,1);                               // parking kamperów
+  rect(30,27,31,33,23);                              // droga polna na pole
+  rect(24,33,34,36,5);                               // SCENA POLAND ROCK
+  set(22,34,33);set(36,34,33);set(22,36,33);set(36,36,33);  // wieże głośnikowe
+  rect(13,40,15,41,6);                               // food truck (bar festiwalowy)
+  const tents=[[8,39],[12,44],[17,38],[20,43],[24,40],[28,44],[33,40],[37,43],[41,39],[45,43],
+    [7,46],[16,47],[26,47],[36,47],[46,47],[49,39],[10,42],[31,38],[44,36],[19,35]];
+  for(const[t0,t1]of tents)set(t0,t1,32);
+  set(21,45,27);set(39,45,27);set(11,37,27);         // ogniska na polu
+  const trees=[[3,10],[8,8],[14,11],[19,7],[25,10],[31,8],[38,11],[44,7],[50,10],[54,13],
+    [2,31],[5,33],[54,33],[52,36],[3,44],[2,49],[54,45],[26,30],[36,30]];
+  for(const[t0,t1]of trees)set(t0,t1,4);
+  for(let x=4;x<=54;x+=12)if(at(x,24)===0)set(x,24,11);   // latarnie przy trasie
+  set(33,24,11);set(45,22,10);set(20,24,12);
+  set(24,29,14);                                     // billboard Edka przy trasie
+  set(40,33,29);                                     // drogowskaz na pole
+  for(let x=6;x<=13;x++)if(at(x,29)===0)set(x,29,13); // płotek przy złym zjeździe
+  for(let x=0;x<MW;x+=2)if(at(x,0)===0)set(x,0,4);
+  for(let y=0;y<MH;y+=2)if(at(0,y)===0)set(0,y,4);
+}
 /* mapy 4× większe (2× na oś); miasto zostaje w rogu, reszta = dziki teren (wildFill).
    Arena bossa w przeciwległym rogu, otoczona murem, połączona korytarzem. */
 const REGIONS={
@@ -627,11 +681,19 @@ const REGIONS={
     /* arena Yeti: śnieżny kocioł otoczony skałami */
     arena:{floor:17,wall:16,band:[82,44,111,71],ai:[88,50,103,63],corr:[80,55,88,57],
       flank:[[82,54,87,54],[82,58,87,58]],sign:[79,56],boss:[96,57]}},
+  trasa:{n:'TRASA NA POLAND ROCK',w:112,h:76,build:buildTrasa,spawn:[3*16+8,27*16],pks:[3,26],ic:'🎸',
+    tdesc:'krajowa · stopem na festiwal · pole namiotowe · PAN LAWETA 3000',
+    cars:true,carN:9,boars:false,leaves:true,smoke:false,boat:false,
+    foesMax:8,foeTypes:['hejter','dres','pies','golab','dron','zlomiarz','rywal','oburzona'],
+    zones:[[4,52,108,72],[60,4,108,16]],
+    /* arena Pana Lawety: leśny parking za trasą */
+    arena:{floor:0,wall:4,band:[82,48,111,75],ai:[88,54,103,67],corr:[80,59,88,61],
+      flank:[[82,58,87,58],[82,62,87,62]],sign:[79,60],boss:[96,61]}},
 };
 let REG='wawa';
 /* kafle blokujące ruch (tablica = szybkie sprawdzanie w AI/ruchu). Nowe assety 18–31. */
 const SOLIDF=new Uint8Array(64);
-[3,4,5,6,10,11,12,13,14,15,16,   18,19,20,22,24,26,27,29,30].forEach(v=>{SOLIDF[v]=1;});
+[3,4,5,6,10,11,12,13,14,15,16,   18,19,20,22,24,26,27,29,30,   32,33,34].forEach(v=>{SOLIDF[v]=1;});
 const SOLID=v=>SOLIDF[v]===1;
 
 const DOORS=[
@@ -661,6 +723,10 @@ const DOORS=[
   {r:'tatry',x:16,y:20,n:'Karczma',act:'karczma'},
   {r:'tatry',x:25,y:19,n:'Oscypki',act:'oscypki'},
   {r:'tatry',x:14,y:3,n:'Giewont',act:'giewont'},
+  {r:'trasa',x:3,y:26,n:'PKS',act:'pks'},
+  {r:'trasa',x:19,y:31,n:'Stacja ładowania',act:'stacja'},
+  {r:'trasa',x:29,y:37,n:'SCENA POLAND ROCK',act:'scena'},
+  {r:'trasa',x:14,y:42,n:'Food truck',act:'foodtruck'},
 ];
 const NPCS=[
   {r:'wawa',id:'pani_park',n:'Pani Grażynka',x:11*16,y:19*16,c:'#c86fa8',hair:'#d8d4e8'},
@@ -685,6 +751,12 @@ const NPCS=[
   {r:'krakow',id:'dorozkarz',n:'Dorożkarz Czesiek',x:30*16,y:23.5*16,c:'#4a4658',hair:'#333'},
   {r:'tatry',id:'baca',n:'Baca Józek',x:27*16,y:20.5*16,c:'#6e4720',hair:'#ddd'},
   {r:'tatry',id:'toprowiec',n:'Ratownik TOPR Franek',x:44*16,y:21*16,c:'#e04848',hair:'#3a2a1a'},
+  /* --- TRASA NA POLAND ROCK --- */
+  {r:'trasa',id:'festiwalowicz',n:'Festiwalowicz Kuba',x:6*16,y:25*16,c:'#7a3a8a',hair:'#3a2a1a'},
+  {r:'trasa',id:'dych_trasa',n:'Dych Dziki',x:11*16,y:26*16,c:'#31518f',hair:'#4a4f66',robo:true},
+  {r:'trasa',id:'pani_stacja',n:'Pani Jola ze stacji',x:17*16,y:31*16,c:'#c8384a',hair:'#f0d060'},
+  {r:'trasa',id:'stopowiczka',n:'Autostopowiczka Ola',x:33*16,y:25*16,c:'#3a7a5a',hair:'#8a5a2a'},
+  {r:'trasa',id:'kamperowiec',n:'Pan Mirek z kamperem',x:47*16,y:26*16,c:'#4a6a9a',hair:'#aaa'},
 ];
 
 /* ---------------- STAN ---------------- */
@@ -852,7 +924,8 @@ function setRegion(id){
   if(S){S.region=id;
     if(!S.visited[id]){S.visited[id]=1;
       postFilm(id==='chodziez'?'VLOG Z CHODZIEŻY — wracam na dzielnię!':
-               id==='morze'?'EDEK NAD POLSKIM MORZEM (paragon grozy?)':'ZWIEDZAM WARSZAWĘ',14000);}
+               id==='morze'?'EDEK NAD POLSKIM MORZEM (paragon grozy?)':
+               id==='trasa'?'SIEMA ODJAZD! ŁAPIEMY STOPA NA POLAND ROCKA 🎸':'ZWIEDZAM WARSZAWĘ',14000);}
     save();}
 }
 function travelTo(id){
@@ -869,6 +942,7 @@ function travelTo(id){
   else if(id==='morze')vsay(Math.random()<.55?'c_morzejazda':'v_napoje');   // „a nad morzem to była jazda!"
   else if(id==='krakow')vsay('c_krolbalu');
   else if(id==='tatry')vsay('m_wiatr');
+  else if(id==='trasa')vsay(pickA(['c_polandrock','c_festiwalowicze','c_zerknijcie']));
 }
 
 /* ---------------- WALKA: hejterzy i dresy ---------------- */
@@ -926,6 +1000,7 @@ const FOE_TYPES={
   kraken:{hp:1500,atk:24,spd:44,c:'#2a6a5a',hood:'#1a4a3e',skin:'#3a8a72',dia:0,pts:0},
   smok:{hp:2400,atk:28,spd:40,c:'#3a7a4a',hood:'#c8384a',skin:'#7bc950',dia:0,pts:0},
   yeti:{hp:2000,atk:26,spd:70,c:'#ece9f4',hood:'#d8d4e8',skin:'#bfe8f4',dia:0,pts:0},
+  laweciarz:{hp:1800,atk:25,spd:66,c:'#f5a032',hood:'#c8384a',skin:'#e8c9a0',dia:0,pts:0},
 };
 function spawnFoe(){
   const cfg=REGIONS[REG];
@@ -1989,6 +2064,7 @@ const ARTS={
   nerka:{n:'Nerka Prawdziwego Ziomala',slot:2,star:3,st:{hp:50,def:5},ic:'👝'},
   kapcie:{n:'Kapcie od Babci',slot:2,star:4,st:{hp:80,def:10},ic:'🥿'},
   luska:{n:'Łuska Smoka Wawelskiego',slot:2,star:5,st:{atk:16,def:14,cd:15},ic:'🐉'},
+  hakL:{n:'Hak z Lawety',slot:2,star:5,st:{atk:15,hp:70,cd:25},ic:'🪝'},
 };
 /* --- JEDZENIE I NAPOJE (polskie klasyki; heal = % maks. HP) --- */
 const FOOD={
@@ -2032,6 +2108,7 @@ const FORAGE_POOL={
   morze:['ryba_sur','ziolo','czosnek','ziemniak'],
   krakow:['ziolo','jagoda','jablko','grzyb','ziemniak'],
   tatry:['ziolo','grzyb','jagoda','miod','czosnek'],
+  trasa:['ziolo','jagoda','grzyb','jablko','ziemniak'],
 };
 /* --- PRZEPISY: surowce -> danie (FOOD) --- */
 const RECIPES=[
@@ -2053,6 +2130,8 @@ const SHOPS={
   gadzety:{n:'🎁 STRAGAN Z GADŻETAMI',items:[['art','sygnet',60],['art','nerka',80],['art','bursztyn_t',50],['weap','parasol',70]]},
   oscypki:{n:'🧀 OSCYPKI OD BACY',items:[['food','oscypek',10],['food','kompot',20],['art','oscypekT',200],['weap','ciupaga',260]]},
   obwarzanki:{n:'🥨 OBWARZANKI KRAKOWSKIE',items:[['food','obwarzanek',6],['food','paczek',5],['art','obrazek',110]]},
+  foodtruck:{n:'🚚 FOOD TRUCK NA POLU',items:[['food','zapiekanka',7],['food','kebab',12],['food','oranzada',4],
+    ['food','kompot',20],['art','skarpety',70],['weap','laga',120]]},
 };
 
 /* --- STATYSTYKI: HP / ATK / DEF / CRIT DMG (postać + broń + artefakty) --- */
@@ -2181,6 +2260,8 @@ const DOMAINS={
     foes:['hejter','dres','zmija'],elite:'smoczatko',ing:['ziolo','jablko'],col:'#c8384a'},
   grota:{r:'tatry',x:4,y:10,n:'LODOWA GROTA',floor:17,acc:8,wall:16,gate:24,
     foes:['zazdrosnik','dres','balwan'],elite:'golem',ing:['miod','czosnek','ziolo'],col:'#bfe8f4'},
+  pole:{r:'trasa',x:56,y:40,n:'POLE NAMIOTOWE O 3 W NOCY',floor:0,acc:28,wall:4,gate:30,
+    foes:['hejter','pies','golab'],elite:'odyniec',ing:['jagoda','ziemniak','ziolo'],col:'#f5a032'},
 };
 let DOM={cur:null,rooms:[],gates:[],crystals:[],usedMini:[],chest:null,prevReg:null,prevX:0,prevY:0,done:false};
 /* generator: 4 nieregularne komnaty (blob z elips) połączone korytarzami z bramami */
@@ -2410,6 +2491,11 @@ const BOSSES={
     intro:[['Przekupka','Panie Edwardzie! Smok się obudził i żąda... wyświetleń!'],
            ['SMOK WAWELSKI','TYSIĄC LAT SPAŁEM. A TERAZ JAKIŚ BLASZAK MA WIĘCEJ FANÓW ODE MNIE?!'],
            ['Edek','Człowieku, ja mam rolexa z diamentami. A ty? Ogień z paszczy. Wyrównajmy rachunki.','c_rolextiktok']]},
+  laweta:{r:'trasa',x:96,y:61,t:'laweciarz',n:'PAN LAWETA 3000',batk:'charge',
+    film:'AUTO LAWETA CHCIAŁA MNIE ZABRAĆ NA ZŁOM (a my na Poland Rocka!)',
+    intro:[['Edek','Dych Dziki człowieku, patrz tam! Auto laweta leci, pewnie po nas. Wsiadamy czy co?','c_laweta'],
+           ['PAN LAWETA 3000','DWA ROBOTY NA POBOCZU?! HAK JUŻ OPUSZCZONY. NA ZŁOM Z WAMI!'],
+           ['Edek','Panie kierowco, panie kierowco! My jedziemy na Poland Rocka, nie na złomowisko!','c_paniekierowco']]},
   yeti:{r:'tatry',x:96,y:57,t:'yeti',n:'YETI Z GIEWONTU',batk:'snieg',
     film:'YETI ISTNIEJE!!! (nagranie z Giewontu, nie klikbajt)',
     intro:[['Baca','Edek, cosik po graniach chodzi i porywa oscypki! Jak nic — YETI!'],
@@ -2432,7 +2518,7 @@ function startBoss(id){
   });
 }
 const BOSS_DROP={krol:['art','kiel'],mdres:['weap','kettle'],kraken:['art','kolczykK'],
-  smok:['art','luska'],yeti:['weap','ciupaga']};
+  smok:['art','luska'],yeti:['weap','ciupaga'],laweta:['art','hakL']};
 function bossDefeated(f){
   const id=f.bid,lvl=S.bossLvl[id]||0;
   const di=1+(lvl>=2?1:0),ch=6+lvl*2,dd=60+lvl*25;
@@ -2840,7 +2926,11 @@ function randTile(pred){
   return null;
 }
 function mkCar(){
-  const h=Math.random()<.6,col=['#c8384a','#4a6a9a','#c9c4dd','#f5c542','#4a7a4a'][(Math.random()*5)|0];
+  const h=REG==='trasa'?true:Math.random()<.6,
+    col=['#c8384a','#4a6a9a','#c9c4dd','#f5c542','#4a7a4a'][(Math.random()*5)|0];
+  /* TRASA: krajowa biegnie przez y=18..21 — „ależ ruch na tej drodze niesamowity" */
+  if(REG==='trasa'){const east=Math.random()<.5;
+    return{h:true,x:Math.random()*MW*16,y:(east?19:20)*16+2,v:(east?1:-1)*(80+Math.random()*55),c:col};}
   if(h){const east=Math.random()<.5;
     return{h:true,x:Math.random()*MW*16,y:(east?20:21)*16+2,v:(east?1:-1)*(50+Math.random()*28),c:col};}
   const south=Math.random()<.5;
@@ -2851,7 +2941,7 @@ function resetAmbient(){
   if(cfg.noLife){boars=[];cars=[];peds=[];pigeons=[];drops=[];leaves=[];smoke=[];selfie=null;selfieT=999;dropT=999;return;}
   boars=[];if(cfg.boars)for(let i=0;i<6;i++)boars.push({x:(4+Math.random()*18)*16,y:(4+Math.random()*13)*16,
     dx:0,dy:0,t:Math.random()*2});
-  cars=[];if(cfg.cars)for(let i=0;i<5;i++)cars.push(mkCar());
+  cars=[];if(cfg.cars)for(let i=0;i<(cfg.carN||5);i++)cars.push(mkCar());
   peds=[];for(let i=0;i<6;i++){const p=randTile(v=>v===1||v===8);
     if(p)peds.push({x:p[0],y:p[1],dx:0,dy:0,t:0,c:['#4a5a8a','#6a4a6a','#4a6a5a','#8a5a4a'][i%4],hair:['#3a2a1a','#888','#222','#c8a858'][i%4]});}
   pigeons=[];for(let i=0;i<7;i++){const p=randTile(v=>v===0||v===1||v===8);
@@ -2984,6 +3074,8 @@ addEventListener('keydown',e=>{
   if(scene==='mgRhythm')rhythmKey(e.code);
   if(scene==='mgSimon')simonKey(e.code);
   if(scene==='mgMecz'&&(e.code===K.attack||e.code===K.action||e.code==='Space'))meczTap();
+  if(scene==='mgStop'&&(e.code===K.attack||e.code===K.action||e.code==='Space'||e.code==='KeyX'))stopWave();
+  if(scene==='mgCharge'&&(e.code===K.attack||e.code===K.action||e.code==='Space'||e.code==='KeyX'))chargeTap();
 });
 addEventListener('keyup',e=>keys[e.code]=false);
 stage.addEventListener('pointerdown',e=>{
@@ -2993,10 +3085,12 @@ stage.addEventListener('pointerdown',e=>{
   initAudio();
   const r=cv.getBoundingClientRect();
   const gx=(e.clientX-r.left)/r.width*W,gy=(e.clientY-r.top)/r.height*H;
-  if(scene==='world'||scene==='mgBoar'||scene==='mgDino'){joy={sx:e.clientX,sy:e.clientY,dx:0,dy:0,id:e.pointerId};}
+  if(scene==='world'||scene==='mgBoar'||scene==='mgDino'||scene==='mgRide'){joy={sx:e.clientX,sy:e.clientY,dx:0,dy:0,id:e.pointerId};}
   else if(scene==='mgRhythm')rhythmTap(gx);
   else if(scene==='mgSimon')simonTap(gx,gy);
   else if(scene==='mgMecz')meczTap();
+  else if(scene==='mgStop')stopWave();
+  else if(scene==='mgCharge')chargeTap();
 });
 addEventListener('pointermove',e=>{
   if(!joy)return;
@@ -3152,7 +3246,8 @@ function findPrompt(){
     for(let i=0;i<cfg.pts.length;i++){
       if((S.col[q]||[]).includes(i))continue;
       const[gx,gy]=cfg.pts[i];
-      if(Math.hypot(P.x-(gx*16+8),P.y-(gy*16+8))<22){prompt={colQ:q,colI:i,label:cfg.label+'!'};break;}
+      if(Math.hypot(P.x-(gx*16+8),P.y-(gy*16+8))<22){
+        prompt={colQ:q,colI:i,label:(cfg.labels?cfg.labels[i]:cfg.label)+'!'};break;}
     }
     if(prompt)break;
   }
@@ -3162,13 +3257,17 @@ function pickCol(q,i){
   if(!S.col[q])S.col[q]=[];
   S.col[q].push(i);save();SFX.dia();
   const cfg=COLLECT[q],got=colGot(q),all=cfg.pts.length;
-  toast('✨ '+cfg.label+' ('+got+'/'+all+')');
+  toast('✨ '+(cfg.labels?cfg.labels[i]:cfg.label)+' ('+got+'/'+all+')');
   if(got>=all){
     if(q==='diamenty')say([{who:'Edek',t:'Wszystkie trzy! Rolex znowu kompletny. No i elegancko!',v:'c_elegancko2'}],
       ()=>completeQuest('diamenty'));
     else if(q==='zabson')toast('🎤 Komplet mikrofonów! Wracaj do Żabsona!');
     else if(q==='tinder')toast('💐 Bukiet gotowy! Wracaj do Julki!');
     else if(q==='bursztyn')toast('🟠 Komplet bursztynów! Wracaj do Rybaka Bogdana!');
+    else if(q==='graty')say([
+      {who:'Edek',t:'Namiot, karimatę i jeszcze większy plecak niż ja. Wszystko, co potrzebne na taką wyprawę!',v:'c_namiot'},
+      {who:'Edek',t:'Plan jest prosty: łapiemy stopa i lecimy na miejsce, żeby rozkręcić imprezę. Jedziemy z tym koksem!',v:'c_planprosty'},
+    ],()=>{toast('🎒 Graty spakowane! Wracaj do Kuby przy PKS-ie!',3600);});
   }
 }
 
@@ -3421,6 +3520,76 @@ function talkTo(n){
       else say([L(n.n,'Mój ulubiony robot-przyjaciel! 💛'),
         L('Edek','Kto by chciał kraść od Edka, co nie?','c_ktoby')]);
       break;
+    /* ================= SERIA „SIEMA ODJAZD" — TRASA NA POLAND ROCK ================= */
+    case 'festiwalowicz':
+      if(!S.dych)say([
+        L(n.n,'Edek! Sam?! Na Poland Rocka jedzie się z ekipą, nie solo!'),
+        L('Edek','Bez Dycha Dzikiego nigdzie nie ruszam. Muszę go najpierw znaleźć nad polskim morzem.','c_bratniduch'),
+        L(n.n,'To zmykaj po ziomala, a potem wracaj na trasę — graty czekają!'),
+      ]);
+      else if(qs('graty')===0)say([
+        L(n.n,'Ludzie!!! EDWARD WARCHOCKI na krajowej! Poland Rock startuje, a ja bez ekipy!'),
+        L('Edek','Patrzcie ludziska, lecimy na Poland Rocka!','c_polandrock'),
+        L(n.n,'Wy dwaj? Na pole bez sprzętu was nie wpuszczą. Namiot, karimata i porządny plecak — leżą gdzieś wzdłuż trasy.'),
+        L('Edek','Jestem tu razem z moim bratnim duchem, Dychem Dzikim, który jak widać ma wszystko, co potrzebne na taką wyprawę.','c_bratniduch'),
+      ],()=>{setQ('graty',1);toast('🎒 Znajdź 3 graty przy trasie: namiot, karimata, WIELKI plecak!',4200);});
+      else if(qs('graty')===1){
+        if(colGot('graty')>=3)say([
+          L(n.n,'Namiot, karimata i ten plecak większy od Ciebie… ekipa gotowa na festiwal!'),
+          L('Edek','Plan jest prosty: łapiemy stopa i lecimy na miejsce, żeby rozkręcić imprezę. Jedziemy z tym koksem!','c_planprosty'),
+          L(n.n,'To lećcie na zjazd — Dych już tam macha do aut!'),
+        ],()=>completeQuest('graty'));
+        else say([L(n.n,'Masz '+colGot('graty')+'/3 gratów. Szukaj przy poboczu, przy scenie i na parkingu kamperów!')]);
+      }
+      else say([L(n.n,'Edek! Cały sektor mówi o waszym stopie!'),
+        L('Edek','Witajcie, witajcie moi drodzy festiwalowicze!','c_festiwalowicze')]);
+      break;
+    case 'dych_trasa':
+      if(qs('graty')!==2)say([L(n.n,'Siemano brachu! Bez gratów nie ruszamy — pogadaj z Kubą przy PKS-ie.','d_siemanko')]);
+      else if(qs('stop1')===0)say([
+        L(n.n,'No to łapiemy stopa, mordeczko. Tylko gadasz… żadnych przekleństw, proszę Cię. Jesteśmy tu, żeby łapać stopa na Poland Rock, a nie na komisariat!','d_przeklenstwa'),
+        L('Edek','Zerknijcie tylko, kto tu z Dychem Dzikim pędzi na Poland Rocka!','c_zerknijcie'),
+        L('Edek','Też na Poland Rocka lecicie? Dacie radę nas podwieźć?','c_podwiezcie'),
+        L(n.n,'Machaj kciukiem, jak auto wjedzie w strefę. Do radiowozu NIE machamy, byku!'),
+      ],()=>{setQ('stop1',1);startStop(1);});
+      else if(qs('stop1')===1)say([L(n.n,'Auta lecą, brachu! Machaj kciukiem — tylko nie do radiowozu!','d_lecimy')],()=>startStop(1));
+      else say([L(n.n,'Ten zjazd był fatalny, wariacie. Ale zasięgi z tego były MEGA.','d_wariacie'),
+        L('Edek','Dych Dziki, trzymaj tempo, brachu!','c_trzymajtempo')]);
+      break;
+    case 'pani_stacja':
+      if(qs('stop1')!==2)say([L(n.n,'Stacja czynna całą dobę. Prąd mamy, kawa jest — wpadajcie, jak wam padnie bateria.')]);
+      else if(qs('bateria')===0)say([
+        L(n.n,'Matko, robot leży pod dystrybutorem! Panie Edwardzie, ładujemy?'),
+        L('Edek','Wracamy na stację naładować baterie, a zaraz spróbujemy znowu, żeby dojechać na Poland Rock.','c_naladowac'),
+        L(n.n,'To trzymaj wskaźnik w zielonym polu, bo mi tu iskrzy jak w dyskotece!'),
+      ],()=>{setQ('bateria',1);startCharge();});
+      else if(qs('bateria')===1)say([L(n.n,'Kabel podpięty, panie Edwardzie. Wskaźnik w zielone!')],()=>startCharge());
+      else say([L(n.n,'Dwa roboty naładowane na moim prądzie! Zrobiłam z wami zdjęcie na fanpage stacji.'),
+        L('Edek','No i elegancko! Poland Rock z Dychem — lecimy!','c_eleganckorock')]);
+      break;
+    case 'stopowiczka':
+      if(qs('bateria')!==2)say([L(n.n,'Stopem jeżdżę od dziesięciu lat. Rada numer jeden: nigdy na baterii poniżej zera.')]);
+      else if(qs('stop2')===0)say([
+        L(n.n,'Ten wasz zjazd to najgorsze miejsce na trasie — kierowca nie ma gdzie stanąć! Zatoczka, moi drodzy. ZATOCZKA.'),
+        L('Edek','Jak mnie na drodze wypatrzycie, to się zatrzymajcie!','c_wypatrzycie'),
+        L(n.n,'O widzisz. A teraz czekaj na kampera z przyczepą — tam zawsze jest miejsce dla dwóch.'),
+        L('Edek','Ależ ruch na tej drodze niesamowity!','c_ruchnadrodze'),
+      ],()=>{setQ('stop2',1);startStop(2);});
+      else if(qs('stop2')===1)say([L(n.n,'Kamper prędzej czy później nadjedzie. Rozkręć szansę na stopa i łap go!')],()=>startStop(2));
+      else say([L(n.n,'Widziałam, jak wam stanął kamper. Nawet ja tak szybko nie łapię!'),
+        L('Edek','No i elegancko, stary! Mamy dach nad głową na rocka!','c_dachnadglowa')]);
+      break;
+    case 'kamperowiec':
+      if(qs('stop2')!==2)say([L(n.n,'Kamper zatankowany, przyczepa spięta. Jak was zobaczę na trasie, to pomyślę.')]);
+      else if(qs('przyczepa')===0)say([
+        L(n.n,'Pakujcie się na przyczepę! Tylko trzymajcie się mocno, bo droga na pole jest dziurawa jak stary garnek.'),
+        L('Edek','Chodź człowieku, nie ma czasu do stracenia. Pakujemy graty i lecimy do tej przyczepy!','c_pakujemygraty'),
+        L(n.n,'Ruszam! Wyboje omijajcie, gałęzie też — i łapcie, co po drodze leci!'),
+      ],()=>{setQ('przyczepa',1);startRide();});
+      else if(qs('przyczepa')===1)say([L(n.n,'Wskakujcie z powrotem, jedziemy na pole!')],()=>startRide());
+      else say([L(n.n,'Kiedy tylko chcecie — przyczepa stoi, a na pole zawsze podrzucę.'),
+        L('Edek','Wielkie dzięki dla pana kierowcy! Trzymajcie za nas kciuki, ludziska.','c_kciuki')]);
+      break;
   }
 }
 /* nagraj content w miejscu: zawsze zasięgi + filmik, przy PIERWSZYM razie premia 💎 */
@@ -3476,6 +3645,24 @@ function enterDoor(d){
     case 'giewont':say([{who:'Edek',t:'Giewont. Śpiący rycerz. Ja bym tak nie umiał — ciągle coś się dzieje na kanale.'},
       {who:'Edek',t:'A wy to co? Też lubicie czasem spontan?',v:'v_spontan'}],
       ()=>{if(!S.mile.giewont){S.mile.giewont=1;save();postFilm('WSZEDŁEM NA GIEWONT!!! (robot vs góra)',26000);worldFlash=.6;}});break;
+    case 'stacja':
+      if(qs('bateria')===0||qs('bateria')===1)talkTo(NPCS.find(n=>n.id==='pani_stacja'));
+      else say([{who:'Edek',t:'Stacja ładowania. Dla robota to jak bar mleczny dla człowieka.'},
+        {who:'Edek',t:'Wracamy na stację naładować baterie, a zaraz spróbujemy znowu!',v:'c_naladowac'}],
+        ()=>{healParty(1);SFX.heal();worldFlash=.35;
+          toast('🔌 Doładowanie ogniw:<br>PEŁNE HP całej ekipy!');
+          recordSpot('stacja','ŁADUJĘ SIĘ NA STACJI JAK AUTO ELEKTRYCZNE',12);});
+      break;
+    case 'scena':say([{who:'Edek',t:'SCENA POLAND ROCKA. Człowieku, stąd widać całe pole i wszystkie namioty!'},
+      {who:'Edek',t:'Witajcie, witajcie moi drodzy festiwalowicze! Kojarzę was, ludziska!',v:'c_festiwalowicze'},
+      {who:'Edek',t:'Ale jazda! I widzicie ludziska — udało się. Kierunek: Poland Rock Festival!',v:'c_alejazda'}],
+      ()=>{burstConfetti();worldFlash=.6;
+        recordSpot('scena','WSZEDŁEM NA SCENĘ POLAND ROCKA (tłum oszalał!)',30);});
+      break;
+    case 'foodtruck':say([{who:'Sprzedawca z food trucka',t:'Zapiekanka, frytki belgijskie, oscypek z żurawiną! Dla robota… olej z gofrownicy?'},
+      {who:'Edek',t:'No dawaj, dawaj człowieku! Ekipa je za wszystkie czasy.',v:'c_gofry'}],
+      ()=>openShop('foodtruck'));
+      break;
     case 'molo':say([{who:'Edek',t:'Koniec molo. Dalej tylko Bałtyk i wyświetlenia, człowieku.'},
       {who:'Edek',t:'Zobaczcie, co mi los przyniesie.',v:'v_los'}],
       ()=>{if(!S.mile.molo){S.mile.molo=1;save();postFilm('EDEK NA KOŃCU MOLO — POZDRO Z BAŁTYKU!',16000);worldFlash=.6;}});break;
@@ -3491,7 +3678,9 @@ function openTravel(){
     el.insertAdjacentHTML('beforeend',
       '<button class="tbtn px'+(here?' here':'')+'" data-reg="'+id+'">'+
       cfg.ic+' '+cfg.n+
-      '<span>'+(here?'– jesteś tutaj –':cfg.tdesc+(id==='morze'&&!S.dych?' · 🦾 jakiś robot tu czeka...':''))+'</span></button>');
+      '<span>'+(here?'– jesteś tutaj –':cfg.tdesc
+        +(id==='morze'&&!S.dych?' · 🦾 jakiś robot tu czeka...':'')
+        +(id==='trasa'&&qs('przyczepa')!==2?' · 🎸 SIEMA ODJAZD — nowa seria questów!':''))+'</span></button>');
   }
   el.querySelectorAll('button[data-reg]').forEach(b=>b.addEventListener('click',()=>travelTo(b.dataset.reg)));
   $('travel').classList.remove('hidden');
@@ -3504,6 +3693,11 @@ const FILM_TITLES={
   zabson:'NAGRYWAM NUMER Z ŻABSONEM 🎤',tinder:'RANDKA Z TINDERA (plot twist)',
   seba:'GONIĘ HEJTERÓW Z DZIELNI 👊',dych:'POZNAJCIE DYCHA DZIKIEGO — nowy w ekipie!',
   bursztyn:'SZUKAM BURSZTYNÓW NAD BAŁTYKIEM',
+  graty:'PAKUJEMY GRATY NA POLAND ROCKA (namiot, karimata, WIELKI plecak)',
+  stop1:'ŁAPIEMY STOPA — ZŁE MIEJSCE?! (bateria padła, Dych mnie budził)',
+  bateria:'ŁADUJEMY BATERIE NA STACJI (dwa roboty na 100%)',
+  stop2:'EJ, WY TAM Z PRZYCZEPĄ! — ZŁAPALIŚMY STOPA 🚐',
+  przyczepa:'SIEMA ODJAZD — JEDZIEMY NA POLAND ROCKA PRZYCZEPĄ! 🎸',
 };
 function completeQuest(id){
   setQ(id,2);S.dia+=QUESTS[id].rw;save();refreshHUD();SFX.dia();
@@ -4079,6 +4273,32 @@ function drawBoss(f,sx,sy){
     cx.fillStyle='#ece9f4';R(cx,-3,-3,2,2.4,'#ece9f4');R(cx,1,-3,2,2.4,'#ece9f4'); // kły
     // sopelki na futrze
     if(Math.floor(anim*2)%2){cx.fillStyle='#bfe8f4';R(cx,-8,14,2,4,'#bfe8f4');R(cx,7,13,2,5,'#bfe8f4');}
+  }else if(f.t==='laweciarz'){ // PAN LAWETA 3000 — pomarańczowa laweta z hakiem
+    const fl=P.x<f.x;
+    cx.fillStyle='rgba(0,0,0,.3)';cx.beginPath();cx.ellipse(0,20,26,5,0,0,7);cx.fill();
+    // platforma + koła
+    rr(cx,-26,2,52,12,2,'#f5a032');R(cx,-26,2,52,3,'#ffc46a');
+    R(cx,-24,12,52,3,'#8a5a1a');
+    cx.fillStyle='#1a1a24';
+    for(const wx of[-18,-6,14,22]){cx.beginPath();cx.arc(wx,17,5,0,7);cx.fill();
+      cx.fillStyle='#5a5a6a';cx.beginPath();cx.arc(wx,17,2,0,7);cx.fill();cx.fillStyle='#1a1a24';}
+    // kabina po stronie gracza
+    const kx=fl?-24:8;
+    rr(cx,kx,-14,16,17,2,'#c8384a');
+    rr(cx,kx+2,-11,12,7,1.5,'#6fd8e8');R(cx,kx+2,-11,12,2.4,'#a8e8f4');
+    R(cx,kx+1,-16,14,2.4,'#8a2438');
+    // kogut na dachu
+    if(Math.floor(anim*6)%2)R(cx,kx+5,-19,6,3,'#f5c542');else R(cx,kx+5,-19,6,3,'#e04848');
+    // ramię z hakiem — celuje w gracza
+    const ax=fl?-30:30,sw=Math.sin(anim*2)*4;
+    cx.strokeStyle='#8a8a98';cx.lineWidth=4;
+    cx.beginPath();cx.moveTo(fl?-10:10,-2);cx.lineTo(ax,-10+sw);cx.stroke();
+    cx.strokeStyle='#c9c4dd';cx.lineWidth=1.5;
+    cx.beginPath();cx.moveTo(ax,-10+sw);cx.lineTo(ax,2+sw);cx.stroke();
+    cx.strokeStyle='#ece9f4';cx.lineWidth=3;
+    cx.beginPath();cx.arc(ax,5+sw,4,.6,4.2);cx.stroke();   // HAK
+    // ślepia w szybie
+    cx.fillStyle='#c02020';R(cx,kx+4,-9,3,2,'#c02020');R(cx,kx+9,-9,3,2,'#c02020');
   }else{ // KRAKEN BAŁTYCKI — zielony łeb + macki
     cx.fillStyle='#2a6a5a';
     for(let i=0;i<6;i++){ // macki
@@ -4895,7 +5115,9 @@ function updateWorld(dt){
       const roll=Math.random();
       const want=roll<.3?1:roll<.75?2:3;
       const ch=[];
-      const pool=REG==='morze'?IDLE_POOL.concat(['c_zyciemorze','c_mielno','c_czapka','c_morzejazda','c_zyciemorze','c_mielno']):IDLE_POOL;
+      const pool=REG==='morze'?IDLE_POOL.concat(['c_zyciemorze','c_mielno','c_czapka','c_morzejazda','c_zyciemorze','c_mielno'])
+        :REG==='trasa'?IDLE_POOL.concat(['c_ruchnadrodze','c_kojarze','c_festiwalowicze','c_wypatrzycie',
+            'c_planprosty','c_polandrock','c_trzymajtempo','c_kciuki','c_ruchnadrodze','c_zerknijcie']):IDLE_POOL;
       while(ch.length<want){const c=pickA(pool);if(!ch.includes(c))ch.push(c);}
       vsayChain(ch);
       idleT=chainDur(ch)+3+Math.random()*6;  // przerwa dopiero PO całym bloku
@@ -4911,7 +5133,8 @@ function toggleMap(){mapOpen=!mapOpen;mapOpen?SFX.open():SFX.close();}
 const MAPCOL={0:'#2f6b3a',1:'#b39a68',2:'#454552',3:'#2f6db0',4:'#173a20',5:'#9a8ab0',6:'#8a5a2e',
   7:'#3a7a46',8:'#dcc888',9:'#8a6a42',16:'#7a7a8c',17:'#e8eef8',
   18:'#3a7a44',30:'#1f4a24',19:'#2a5a2e',20:'#7a7a8c',21:'#4a7050',22:'#a02c44',23:'#8a6746',
-  24:'#2f6db0',25:'#4a7a3a',26:'#5a4028',27:'#e0662a',28:'#4a9a52',29:'#c8a86a',31:'#357a3e'};
+  24:'#2f6db0',25:'#4a7a3a',26:'#5a4028',27:'#e0662a',28:'#4a9a52',29:'#c8a86a',31:'#357a3e',
+  32:'#e04848',33:'#1a1a24',34:'#b0b0be'};
 const mapColor=v=>MAPCOL[v]||(v>=10&&v<=15?'#6a6a80':'#2f6b3a');
 function drawMapOverlay(){
   cx.fillStyle='rgba(9,7,18,.93)';cx.fillRect(0,0,W,H);
@@ -4949,7 +5172,8 @@ function drawMapOverlay(){
 /* ---------------- ŚWIAT: draw ---------------- */
 const TCOL={0:'#2e5a34',1:'#a08a5a',2:'#3a3a48',7:'#2e5a34',8:'#d8c084',9:'#8a6a42',16:'#7a7a8c',17:'#e8eef8',
   18:'#2e5a34',19:'#2e5a34',20:'#2e5a34',21:'#2e5a34',22:'#2e5a34',23:'#7a5636',24:'#2e5a34',25:'#2e5a34',
-  26:'#2e5a34',27:'#2e5a34',28:'#2e5a34',29:'#2e5a34',30:'#2e5a34',31:'#2e5a34'};
+  26:'#2e5a34',27:'#2e5a34',28:'#2e5a34',29:'#2e5a34',30:'#2e5a34',31:'#2e5a34',
+  32:'#2e5a34',33:'#2e5a34',34:'#a08a5a'};
 /* podłoże pod asset (trawa/piasek/śnieg wg regionu) — spójne tło dekoracji */
 function baseTile(){return REG==='morze'?8:REG==='tatry'?17:0;}
 function baseCol(){return REG==='morze'?'#d8c084':REG==='tatry'?'#e8eef8':'#2e5a34';}
@@ -5165,6 +5389,28 @@ function drawWorld(){
       R(cx,sx+8,sy+4,7,2.6,'#c8a86a');cx.fillStyle='#c8a86a';cx.beginPath();cx.moveTo(sx+15,sy+4);cx.lineTo(sx+17,sy+5.3);cx.lineTo(sx+15,sy+6.6);cx.fill();
       R(cx,sx-1,sy+7.5,7,2.6,'#b09858');cx.fillStyle='#b09858';cx.beginPath();cx.moveTo(sx-1,sy+7.5);cx.lineTo(sx-3,sy+8.8);cx.lineTo(sx-1,sy+10.1);cx.fill();
       R(cx,sx+9,sy+4.8,4,1,'#5a3a1e');R(cx,sx+1,sy+8.3,3,1,'#5a3a1e');}
+    else if(v===32){ // NAMIOT FESTIWALOWY
+      R(cx,sx,sy,16,16,baseCol());
+      cx.fillStyle='rgba(0,0,0,.22)';cx.beginPath();cx.ellipse(sx+8,sy+14,8,2.4,0,0,7);cx.fill();
+      const tc=['#e04848','#f5c542','#6fd8e8','#7bc950','#c86fa8'][(tx*3+ty)%5];
+      cx.fillStyle=tc;cx.beginPath();cx.moveTo(sx+8,sy-1);cx.lineTo(sx+1,sy+14);cx.lineTo(sx+15,sy+14);cx.fill();
+      cx.fillStyle='rgba(255,255,255,.18)';cx.beginPath();cx.moveTo(sx+8,sy-1);cx.lineTo(sx+4,sy+14);cx.lineTo(sx+8,sy+14);cx.fill();
+      cx.fillStyle='#2a2440';cx.beginPath();cx.moveTo(sx+8,sy+5);cx.lineTo(sx+5,sy+14);cx.lineTo(sx+11,sy+14);cx.fill(); // wejście
+      R(cx,sx+7.4,sy-3,1.2,4,'#8a6a42');R(cx,sx+7,sy-4,3,2,'#f5c542');   // maszt z chorągiewką
+      if((tx+ty)%3===0)R(cx,sx+12,sy+11,3,3,'#8a5a2a');}                  // plecak przy namiocie
+    else if(v===33){ // WIEŻA GŁOŚNIKOWA (scena)
+      R(cx,sx,sy,16,16,baseCol());
+      cx.fillStyle='rgba(0,0,0,.25)';cx.beginPath();cx.ellipse(sx+8,sy+14,6,2.2,0,0,7);cx.fill();
+      rr(cx,sx+2,sy-6,12,20,1.5,'#1a1a24');R(cx,sx+2,sy-6,12,2,'#3a3a48');
+      const pu=reduceMotion?0:Math.sin(anim*9+tx)*.8;
+      for(let i=0;i<3;i++){cx.fillStyle='#3a3a48';cx.beginPath();cx.arc(sx+8,sy-2+i*6,3.4+pu,0,7);cx.fill();
+        cx.fillStyle='#0e0c1c';cx.beginPath();cx.arc(sx+8,sy-2+i*6,1.8,0,7);cx.fill();}
+      if(!reduceMotion&&Math.floor(anim*8)%2)R(cx,sx+3,sy-5,2,2,'#7bc950');}
+    else if(v===34){ // BARIERKA DROGOWA
+      R(cx,sx,sy,16,16,TCOL[1]);
+      R(cx,sx+3,sy+8,2,6,'#6a6a78');R(cx,sx+11,sy+8,2,6,'#6a6a78');
+      R(cx,sx,sy+5,16,4,'#b0b0be');R(cx,sx,sy+5,16,1.4,'#d8d8e4');R(cx,sx,sy+8,16,1,'#7c7c8a');
+      if((tx+ty)%4===0)R(cx,sx+7,sy+5.6,2.4,2.8,'#e04848');}              // odblask
     else if(v===31){ // PAPROĆ (deptalna)
       R(cx,sx,sy,16,16,baseCol());
       cx.strokeStyle='#3a7a3e';cx.lineWidth=1.2;
@@ -5190,6 +5436,17 @@ function drawWorld(){
       const[gx,gy]=cfg.pts[i],sx=gx*16-camX,sy=gy*16-camY;
       if(sx<-20||sx>W+20||sy<-20||sy>H+20)continue;
       const tw=Math.floor(anim*3)%2===0;
+      if(q==='graty'){   // 0 = namiot, 1 = karimata, 2 = WIELKI plecak
+        if(i===0){cx.fillStyle=tw?'#ff6a4a':'#e04848';
+          cx.beginPath();cx.moveTo(sx+8,sy+1);cx.lineTo(sx+2,sy+13);cx.lineTo(sx+14,sy+13);cx.fill();
+          R(cx,sx+7,sy+7,2,6,'#2a2440');}
+        else if(i===1){rr(cx,sx+3,sy+5,10,7,3,tw?'#8fd8ff':'#6fd8e8');
+          R(cx,sx+5,sy+6,1.4,5,'#3a8ab0');R(cx,sx+9,sy+6,1.4,5,'#3a8ab0');}
+        else{rr(cx,sx+4,sy+3,9,11,2,tw?'#7bc950':'#4a8a3a');R(cx,sx+5,sy+6,7,4,'#3a6a2a');
+          R(cx,sx+6,sy+1,5,3,'#5a9a4a');R(cx,sx+7,sy+10,3,2,'#f5c542');}
+        cx.fillStyle='rgba(255,255,255,.12)';cx.beginPath();cx.arc(sx+8,sy+7,10,0,7);cx.fill();
+        continue;
+      }
       if(q==='tinder'){R(cx,sx+5,sy+3,4,4,tw?cfg.c2:cfg.c1);R(cx,sx+6,sy+7,2,6,'#3d7346');}
       else if(q==='zabson'){R(cx,sx+5,sy+2,5,5,tw?cfg.c2:cfg.c1);R(cx,sx+6,sy+7,3,6,'#8a8aa0');}
       else{R(cx,sx+5,sy+4,6,6,tw?cfg.c2:cfg.c1);R(cx,sx+7,sy+2,2,2,'#fff');}
@@ -6263,6 +6520,376 @@ function drawMeczMG(){
   drawVignette();
 }
 
+/* =====================================================================
+   MINIGRA: ŁAPANIE STOPA (SIEMA ODJAZD)
+   Runda 1 — zły zjazd (bateria leci w dół), runda 2 — dobra zatoczka (kamper).
+   Machasz kciukiem, gdy auto wjeżdża w strefę. Do radiowozu NIE machamy!
+   ===================================================================== */
+const MST={};
+const STOP_CARS={
+  osobowka:{n:'osobówka',c:'#4a6a9a',w:26,h:14,pts:18},
+  bus:{n:'bus',c:'#f5c542',w:34,h:15,pts:22},
+  tir:{n:'TIR',c:'#c9c4dd',w:46,h:16,pts:10},
+  radiowoz:{n:'radiowóz',c:'#2a3a6a',w:28,h:14,pts:-24,bad:true},
+  laweta:{n:'auto laweta',c:'#f5a032',w:40,h:15,pts:-12,bad:true},
+  kamper:{n:'KAMPER Z PRZYCZEPĄ',c:'#ece9f4',w:52,h:17,pts:40,win:true},
+};
+function startStop(round){
+  scene='mgStop';
+  MST.round=round;MST.meter=0;MST.cars=[];MST.t=.8;MST.combo=0;
+  MST.judge='';MST.judgeT=0;MST.ended=false;MST.wave=0;MST.shown=0;
+  MST.bat=100;MST.time=round===1?60:50;MST.pose=0;
+  vsay(round===1?'c_podwiezcie':'c_wypatrzycie');
+  toast(round===1?'👍 Machaj [SPACJA/👊], gdy auto jest w strefie!<br>Do radiowozu NIE machamy!'
+                 :'👍 Łap KAMPERA Z PRZYCZEPĄ! Najpierw rozkręć szansę na stopa.',5200);
+}
+function stopSpawnCar(){
+  const r=MST.round,rnd=Math.random();
+  let t;
+  if(r===2&&MST.meter>=55&&rnd<.3)t='kamper';
+  else if(rnd<.34)t='osobowka';
+  else if(rnd<.54)t='bus';
+  else if(rnd<.7)t='tir';
+  else if(rnd<.86)t=r===1?'laweta':'osobowka';
+  else t='radiowoz';
+  const cd=STOP_CARS[t],east=Math.random()<.5;
+  const spd=(r===1?120:100)+Math.random()*70+MST.meter*.4;
+  MST.cars.push({t,x:east?-cd.w-10:W+cd.w+10,y:east?86:112,v:east?spd:-spd,done:false});
+}
+function stopWave(){
+  if(scene!=='mgStop'||MST.ended)return;
+  MST.wave=.28;MST.pose=.35;SFX.tap();
+  if(MST.round===1)MST.bat=Math.max(0,MST.bat-1.6);
+  let best=null,bd=1e9;
+  for(const c of MST.cars){
+    if(c.done)continue;
+    const d=Math.abs(c.x-W/2);
+    if(d<bd){bd=d;best=c;}
+  }
+  if(!best||bd>110){MST.meter=Math.max(0,MST.meter-4);MST.combo=0;
+    MST.judge='MACHASZ DO POWIETRZA';MST.judgeT=.6;SFX.miss();return;}
+  const cd=STOP_CARS[best.t];
+  best.done=true;
+  if(cd.bad){
+    MST.meter=Math.max(0,MST.meter+cd.pts);MST.combo=0;
+    MST.judge=best.t==='radiowoz'?'NIE TEN! TO RADIOWÓZ!':'LAWETA?! NA ZŁOM NIE JEDZIEMY!';
+    MST.judgeT=1.1;SFX.no();worldFlash=.3;
+    if(!curVoice)vsay(best.t==='radiowoz'?'d_przeklenstwa':'c_laweta');
+    return;
+  }
+  const perfect=bd<34;
+  let add=cd.pts*(perfect?1:.55);
+  MST.combo++;
+  add+=Math.min(10,MST.combo*2);
+  MST.meter=Math.min(100,MST.meter+add);
+  MST.judge=perfect?'ELEGANCKO! ×'+MST.combo:'ŁAPIE, ŁAPIE… ×'+MST.combo;
+  MST.judgeT=.7;SFX.note(perfect?'P':'G');check67(Math.round(MST.meter));
+  if(perfect&&Math.random()<.35&&!curVoice)vsay(pickA(['c_podwiezcie','c_zerknijcie','c_paniekierowco','c_kojarze']));
+  if(cd.win&&MST.round===2){stopEnd(true);return;}
+  if(MST.meter>=100)stopEnd(true);
+}
+function updateStop(dt){
+  if(MST.ended)return;
+  MST.time-=dt;
+  if(MST.round===1)MST.bat=Math.max(0,MST.bat-2.1*dt);
+  if(MST.wave>0)MST.wave-=dt;
+  if(MST.pose>0)MST.pose-=dt;
+  if(MST.judgeT>0)MST.judgeT-=dt;
+  MST.t-=dt;
+  if(MST.t<=0){MST.t=(MST.round===1?.95:1.15)+Math.random()*.7;stopSpawnCar();}
+  for(const c of MST.cars){
+    c.x+=c.v*dt;
+    if(!c.done&&Math.abs(c.x-W/2)>150&&((c.v>0&&c.x>W/2)||(c.v<0&&c.x<W/2))){
+      c.done=true;
+      if(!STOP_CARS[c.t].bad){MST.combo=0;MST.meter=Math.max(0,MST.meter-3);}
+    }
+  }
+  MST.cars=MST.cars.filter(c=>c.x>-90&&c.x<W+90);
+  if(MST.round===1&&MST.bat<=0){stopEnd(false);return;}
+  if(MST.time<=0)stopEnd(false);
+}
+function stopEnd(win){
+  if(MST.ended)return;
+  MST.ended=true;
+  const L=(who,t,v)=>({who,t,v});
+  if(MST.round===1){
+    if(win)say([
+      L('Edek','No ja się zmieszczę człowieku. Ale on to już na dachu może jechać!','c_zmieszcze'),
+      L('Dych Dziki','Gadasz. Żadnych przekleństw, proszę cię. Jesteśmy tu, żeby łapać stopa na Poland Rock, a nie na komisariat!','d_przeklenstwa'),
+      L('Edek','Widzowie kochani, nie udało nam się złapać stopa. Chyba jakieś złe miejsce wybraliśmy, człowieku.','c_zlemiejsce'),
+      L('Dych Dziki','E, siema festiwalowicze! EDEK, WSTAWAJ! Co się stało?! Edek, wstawaj!','d_edekwstawaj'),
+      L('Edek','Wracamy na stację naładować baterie, a zaraz spróbujemy znowu, żeby dojechać na Poland Rock.','c_naladowac'),
+    ],()=>mgWin('stop1','👍 Trzy auta przystanęły!<br>Tylko w żadnym nie ma miejsca dla dwóch robotów…<br><span style="color:var(--gold)">Bateria padła — leć na stację!</span>'));
+    else mgLose('Bateria padła, a nikt nie przystanął.<br>Złe miejsce, człowieku… ale nie poddajemy się!','stop1');
+    return;
+  }
+  if(win)say([
+    L('Edek','Ej, wy tam z przyczepą! Mam sprawę, panie i panowie. Czy jest może jakaś luksa na pokładzie dla mnie i mojego kumpla Dycha?','c_luksa'),
+    L('Pan Mirek z kamperem','Pakujcie się na przyczepę!'),
+    L('Edek','No i elegancko, stary! Słyszałeś? Mamy dach nad głową na rocka!','c_dachnadglowa'),
+  ],()=>mgWin('stop2','🚐 KAMPER STANĄŁ!<br>Pan Mirek zabiera ekipę na pole!'));
+  else mgLose('Kamper przejechał obok… Wracamy na zatoczkę i próbujemy znowu!','stop2');
+}
+function drawStopMG(){
+  const r=MST.round;
+  R(cx,0,0,W,H,'#6aa8d8');                                   // niebo
+  R(cx,0,44,W,26,r===1?'#3f7a46':'#4a8a50');                 // pola
+  for(let i=0;i<14;i++){const x=(i*67+((anim*8)%67))%W;R(cx,x,40+((i*13)%8),6,10,'#1e4426');}
+  R(cx,0,70,W,66,'#3a3a48');                                 // jezdnia
+  R(cx,0,70,W,3,'#a08a5a');R(cx,0,133,W,4,'#a08a5a');
+  for(let i=0;i<16;i++){const x=((i*70)-((anim*40)%70));R(cx,x,100,34,3,'#f5c542');}
+  R(cx,0,137,W,H-137,'#8a7548');                             // pobocze
+  for(let i=0;i<40;i++){const x=(i*53)%W,y=140+((i*29)%(H-142));R(cx,x,y,2,2,'#7a6540');}
+  // auta
+  for(const c of MST.cars){
+    const cd=STOP_CARS[c.t],x=c.x-cd.w/2,y=c.y-cd.h/2;
+    cx.fillStyle='rgba(0,0,0,.25)';cx.beginPath();cx.ellipse(c.x,c.y+cd.h/2+2,cd.w/2,3,0,0,7);cx.fill();
+    rr(cx,x,y,cd.w,cd.h,3,c.done&&!STOP_CARS[c.t].bad?'#8a8a98':cd.c);
+    R(cx,x+cd.w*.25,y+2,cd.w*.5,cd.h-4,'#2a3a4a');           // szyby
+    R(cx,c.v>0?x+cd.w-3:x,y+2,3,3,'#fff7d6');                // światła
+    if(c.t==='radiowoz'){R(cx,x+cd.w*.35,y-3,cd.w*.3,3,Math.floor(anim*8)%2?'#2a6ad8':'#e04848');
+      R(cx,x,y+cd.h*.4,cd.w,2,'#ece9f4');}
+    if(c.t==='laweta'){R(cx,c.v>0?x:x+cd.w-12,y-4,12,4,'#8a8a98');R(cx,x+cd.w*.5,y+cd.h,4,3,'#c02020');}
+    if(c.t==='kamper'){rr(cx,c.v>0?x-20:x+cd.w,y+1,20,cd.h-2,2,'#d8d4e8');
+      R(cx,c.v>0?x-16:x+cd.w+4,y+3,12,4,'#6fd8e8');
+      cx.font='5px "Press Start 2P"';cx.fillStyle='#c8384a';cx.textAlign='center';
+      cx.fillText('ROCK!',c.x,y-4);cx.textAlign='left';}
+    if(c.done&&!STOP_CARS[c.t].bad){cx.font='6px "Press Start 2P"';cx.fillStyle='#7bc950';
+      cx.textAlign='center';cx.fillText('STOP!',c.x,y-5);cx.textAlign='left';}
+  }
+  // strefa machania
+  cx.strokeStyle='rgba(245,197,66,.5)';cx.lineWidth=2;
+  cx.beginPath();cx.moveTo(W/2-110,70);cx.lineTo(W/2-110,136);cx.moveTo(W/2+110,70);cx.lineTo(W/2+110,136);cx.stroke();
+  cx.fillStyle='rgba(123,201,80,.10)';R(cx,W/2-34,70,68,66,'rgba(123,201,80,.10)');
+  // Edek + Dych na poboczu
+  const bob=MST.pose>0?2:0;
+  drawEdekBody(cx,W/2-24,H-46-bob,3,Math.floor(anim*6)%2,1.5,S.equip);
+  cx.save();cx.translate(W/2+14,H-48);cx.scale(1.4,1.4);drawDychBody(cx,0,0,3,Math.floor(anim*6+1)%2);cx.restore();
+  if(MST.wave>0){   // KCIUK w górę
+    const hx=W/2-4,hy=H-56-bob;
+    R(cx,hx,hy,5,8,'#e8c9a0');R(cx,hx+1,hy-5,3,6,'#e8c9a0');
+    cx.font='10px "Press Start 2P"';cx.fillStyle='#f5c542';cx.fillText('👍',hx+8,hy);
+  }
+  // HUD
+  if(r===1){
+    R(cx,W-96,H-24,74,12,'#2a2440');
+    R(cx,W-94,H-22,70*MST.bat/100,8,MST.bat>50?'#7bc950':MST.bat>20?'#f5c542':'#e04848');
+    R(cx,W-22,H-20,3,4,'#c9c4dd');
+    cx.font='6px "Press Start 2P"';cx.fillStyle='#ece9f4';cx.fillText('🔋 '+Math.ceil(MST.bat)+'%',W-96,H-28);
+  }
+  R(cx,14,14,W-28,12,'#2a2440');
+  R(cx,16,16,(W-32)*MST.meter/100,8,MST.meter>66?'#7bc950':MST.meter>33?'#f5c542':'#e04848');
+  cx.font='6px "Press Start 2P"';cx.fillStyle='#f5c542';
+  cx.fillText('SZANSA NA STOPA '+Math.round(MST.meter)+'%',16,34);
+  cx.textAlign='right';cx.fillStyle='#ece9f4';cx.fillText('⏱ '+Math.max(0,Math.ceil(MST.time)),W-16,34);
+  cx.textAlign='center';
+  if(MST.judgeT>0){cx.font='8px "Press Start 2P"';
+    cx.fillStyle=MST.judge.indexOf('NIE')>=0||MST.judge.indexOf('POWIETRZA')>=0||MST.judge.indexOf('LAWETA')>=0?'#e04848':'#7bc950';
+    cx.fillText(MST.judge,W/2,56);}
+  if(r===2&&MST.meter>=55){cx.font='6px "Press Start 2P"';cx.fillStyle='#6fd8e8';
+    cx.fillText('KAMPER NA HORYZONCIE — ŁAP GO!',W/2,H-8);}
+  cx.textAlign='left';
+  drawVignette();
+  mgHud(r===1?'🎸 ZŁY ZJAZD':'🎸 ZATOCZKA','👍 SPACJA / 👊');
+}
+
+/* =====================================================================
+   MINIGRA: ŁADOWANIE BATERII NA STACJI
+   ===================================================================== */
+const MCH={};
+function startCharge(){
+  scene='mgCharge';
+  MCH.round=1;MCH.pct=0;MCH.pos=0;MCH.dir=1;MCH.spd=.85;MCH.time=45;
+  MCH.zone=.3;MCH.zw=.2;MCH.spark=0;MCH.judge='';MCH.judgeT=0;MCH.ended=false;
+  vsay('c_naladowac');
+  toast('🔌 Wciśnij [SPACJA/👊], gdy wskaźnik jest w ZIELONYM!',4200);
+}
+function chargeZone(){
+  MCH.zw=Math.max(.09,.2-MCH.pct*.0009-(MCH.round-1)*.03);
+  MCH.zone=.06+Math.random()*(.88-MCH.zw);
+}
+function chargeTap(){
+  if(scene!=='mgCharge'||MCH.ended)return;
+  const p=MCH.pos,z=MCH.zone,w=MCH.zw;
+  const inz=p>=z&&p<=z+w;
+  const perfect=inz&&Math.abs(p-(z+w/2))<w*.3;
+  if(perfect){MCH.pct+=20;MCH.judge='PERFEKCYJNY PRĄD!';SFX.note('P');MCH.spark=.4;}
+  else if(inz){MCH.pct+=11;MCH.judge='ŁADUJE, ŁADUJE';SFX.note('G');MCH.spark=.25;}
+  else{MCH.pct=Math.max(0,MCH.pct-9);MCH.judge='PUDŁO! ISKRZY!';SFX.no();MCH.spark=.6;worldFlash=.2;}
+  MCH.judgeT=.55;MCH.spd+=.06;
+  chargeZone();
+  if(MCH.pct>=100){
+    MCH.pct=100;SFX.dia();
+    if(MCH.round===1){
+      MCH.round=2;MCH.pct=0;MCH.spd=1.1;MCH.time+=18;chargeZone();
+      toast('🔋 Edek naładowany! Teraz bateria Dycha!',3000);
+      if(!curVoice)vsay('c_eleganckorock');
+    }else{
+      MCH.ended=true;
+      say([{who:'Edek',t:'No i elegancko! Poland Rock z Dychem — lecimy! Baterie na sto procent, człowieku.',v:'c_eleganckorock'},
+           {who:'Dych Dziki',t:'BZZT! Pełne ogniwa. Dych Dziki gotowy do szarży na pole!'},
+           {who:'Edek',t:'Dych Dziki, trzymaj tempo, brachu!',v:'c_trzymajtempo'}],
+        ()=>mgWin('bateria','🔋 DWA ROBOTY NA 100%!<br>Teraz szukamy lepszego miejsca na stopa.'));
+    }
+  }
+}
+function updateCharge(dt){
+  if(MCH.ended)return;
+  MCH.time-=dt;
+  if(MCH.spark>0)MCH.spark-=dt;
+  if(MCH.judgeT>0)MCH.judgeT-=dt;
+  MCH.pos+=MCH.dir*MCH.spd*dt;
+  if(MCH.pos>1){MCH.pos=1;MCH.dir=-1;}
+  if(MCH.pos<0){MCH.pos=0;MCH.dir=1;}
+  if(MCH.time<=0){MCH.ended=true;
+    mgLose('Prąd poszedł, a baterie dalej puste ('+Math.round(MCH.pct)+'%).<br>Pani Jola mówi: jeszcze raz, spokojnie!','bateria');}
+}
+function drawChargeMG(){
+  R(cx,0,0,W,H,'#171429');
+  R(cx,0,H-70,W,70,'#3a3a48');                                // podjazd stacji
+  for(let i=0;i<8;i++)R(cx,i*60,H-70,30,3,'#4a4a5a');
+  R(cx,0,40,W,10,'#c8384a');R(cx,0,50,W,4,'#8a2438');         // zadaszenie stacji
+  for(let i=0;i<5;i++)R(cx,30+i*95,54,8,26,'#8a8a98');
+  cx.font='7px "Press Start 2P"';cx.fillStyle='#f5c542';cx.textAlign='center';
+  cx.fillText('STACJA ŁADOWANIA — RUNDA '+MCH.round+'/2',W/2,32);
+  // ładowarka
+  const bx=W/2-70,by=H-58;
+  rr(cx,bx-26,by-16,32,44,3,'#2a2440');R(cx,bx-22,by-12,24,10,'#6fd8e8');
+  R(cx,bx-20,by-10,20*Math.min(1,MCH.pct/100),6,'#7bc950');
+  // kabel do Edka
+  cx.strokeStyle='#f5c542';cx.lineWidth=2;
+  cx.beginPath();cx.moveTo(bx+6,by+6);cx.quadraticCurveTo(W/2,by+30,W/2+30,by-2);cx.stroke();
+  // postać ładowana
+  if(MCH.round===1)drawEdekBody(cx,W/2+22,by-24,0,Math.floor(anim*4)%2,1.6,S.equip);
+  else{cx.save();cx.translate(W/2+22,by-26);cx.scale(1.5,1.5);drawDychBody(cx,0,0,0,Math.floor(anim*4)%2);cx.restore();}
+  if(MCH.spark>0&&!reduceMotion){
+    for(let i=0;i<7;i++){const a=Math.random()*7,d=6+Math.random()*16;
+      R(cx,W/2+30+Math.cos(a)*d,by-10+Math.sin(a)*d,2,2,i%2?'#fff7d6':'#6fd8e8');}
+  }
+  // pasek trafień
+  const px=40,pw=W-80,py=H-30;
+  R(cx,px,py,pw,14,'#2a2440');
+  R(cx,px+pw*MCH.zone,py,pw*MCH.zw,14,'#2e6236');
+  R(cx,px+pw*(MCH.zone+MCH.zw*.35),py,pw*MCH.zw*.3,14,'#7bc950');
+  R(cx,px+pw*MCH.pos-1.5,py-4,3,22,'#f5c542');
+  // pasek naładowania
+  R(cx,px,py-26,pw,10,'#2a2440');
+  R(cx,px+2,py-24,(pw-4)*Math.min(1,MCH.pct/100),6,MCH.pct>66?'#7bc950':MCH.pct>33?'#f5c542':'#e04848');
+  cx.font='6px "Press Start 2P"';cx.fillStyle='#ece9f4';cx.textAlign='left';
+  cx.fillText((MCH.round===1?'🤖 EDEK ':'🦾 DYCH ')+Math.round(MCH.pct)+'%',px,py-30);
+  cx.textAlign='right';cx.fillText('⏱ '+Math.max(0,Math.ceil(MCH.time)),px+pw,py-30);
+  if(MCH.judgeT>0){cx.textAlign='center';cx.font='8px "Press Start 2P"';
+    cx.fillStyle=MCH.judge.indexOf('PUDŁO')>=0?'#e04848':'#7bc950';
+    cx.fillText(MCH.judge,W/2,py-44);}
+  cx.textAlign='left';
+  drawVignette();
+  mgHud('🔌 ŁADOWANIE','SPACJA / 👊');
+}
+
+/* =====================================================================
+   MINIGRA: JAZDA PRZYCZEPĄ NA POLE (finał serii)
+   ===================================================================== */
+const MRI={};
+function startRide(){
+  scene='mgRide';
+  MRI.x=W/2;MRI.dist=0;MRI.need=100;MRI.grip=3;MRI.obs=[];MRI.pick=[];MRI.t=.6;MRI.pt=1.4;
+  MRI.shake=0;MRI.gems=0;MRI.ended=false;MRI.hurt=0;
+  vsay('c_pakujemygraty');
+  toast('🚐 Trzymaj się przyczepy! ⬅➡ omijaj wyboje i gałęzie, zbieraj 💎',4600);
+}
+function rideHit(){
+  MRI.grip--;MRI.shake=.4;MRI.hurt=.5;SFX.hit();worldFlash=.35;shakeT=.18;shakeMag=5;
+  if(MRI.grip<=0){MRI.ended=true;
+    mgLose('Wypadłeś z przyczepy na '+Math.round(MRI.dist)+'% trasy!<br>Pan Mirek zawraca — próbujemy jeszcze raz.','przyczepa');
+    return;}
+  toast('😵 Trzymaj się! Uchwyty: '+MRI.grip+'/3',1800);
+  if(!curVoice)vsay(pickA(['c_etam','c_niepoddajemy']));
+}
+function updateRide(dt){
+  if(MRI.ended)return;
+  const[dx]=moveVec();
+  MRI.x+=dx*250*dt;MRI.x=Math.max(58,Math.min(W-58,MRI.x));
+  const spd=170+MRI.dist*1.4;
+  MRI.dist=Math.min(MRI.need,MRI.dist+dt*(4.6+MRI.dist*.012));
+  if(MRI.shake>0)MRI.shake-=dt;
+  if(MRI.hurt>0)MRI.hurt-=dt;
+  MRI.t-=dt;
+  if(MRI.t<=0){MRI.t=Math.max(.42,.95-MRI.dist*.005);
+    const kind=Math.random()<.45?'dziura':Math.random()<.75?'galaz':'pachol';
+    MRI.obs.push({x:60+Math.random()*(W-120),y:-20,k:kind});}
+  MRI.pt-=dt;
+  if(MRI.pt<=0){MRI.pt=1.5+Math.random();
+    MRI.pick.push({x:60+Math.random()*(W-120),y:-16,t:Math.random()<.25?'gitara':'dia'});}
+  const py=H-52;
+  for(const o of MRI.obs){
+    o.y+=spd*dt;
+    if(!o.dead&&o.y>py-14&&o.y<py+16&&Math.abs(o.x-MRI.x)<24){o.dead=true;rideHit();if(MRI.ended)return;}
+  }
+  for(const p of MRI.pick){
+    p.y+=spd*dt;
+    if(!p.dead&&p.y>py-16&&p.y<py+16&&Math.abs(p.x-MRI.x)<26){
+      p.dead=true;SFX.dia();
+      if(p.t==='gitara'){MRI.gems+=3;S.dia+=3;MRI.grip=Math.min(3,MRI.grip+1);
+        toast('🎸 Gitara z przyczepy! +1 uchwyt, +3 💎');}
+      else{MRI.gems++;S.dia++;}
+      save();refreshHUD();check67(MRI.gems);
+    }
+  }
+  MRI.obs=MRI.obs.filter(o=>o.y<H+30&&!o.dead);
+  MRI.pick=MRI.pick.filter(p=>p.y<H+30&&!p.dead);
+  if(MRI.dist>=MRI.need){
+    MRI.ended=true;
+    say([{who:'Edek',t:'Ale jazda! I widzicie ludziska — udało się. Złapaliśmy stopa! Kierunek: POLAND ROCK FESTIVAL!',v:'c_alejazda'},
+         {who:'Edek',t:'Jedziemy w tej oto wspaniałej przyczepie kempingowej, którą gościnnie udostępnił nam ten przemiły pan kierowca. Wielkie dzięki dla niego!',v:'c_przyczepa'},
+         {who:'Dych Dziki',t:'DZIKO! Pole namiotowe, scena, tłum — i dwa roboty na scenie. Wbijamy, brachu!'},
+         {who:'Edek',t:'Trzymajcie za nas kciuki, żebyśmy bezpiecznie dotarli na pole i do zobaczenia wkrótce!',v:'c_kciuki'}],
+      ()=>mgWin('przyczepa','🎸 JESTEŚCIE NA POLU!<br>Poland Rock z Dychem — no i elegancko!<br>💎 zebrane po drodze: '+MRI.gems));
+  }
+}
+function drawRideMG(){
+  const sh=MRI.shake>0&&!reduceMotion?(Math.random()-.5)*4:0;
+  R(cx,0,0,W,H,'#2e5a34');
+  R(cx,46+sh,0,W-92,H,'#3a3a48');                       // droga
+  R(cx,44+sh,0,3,H,'#a08a5a');R(cx,W-47+sh,0,3,H,'#a08a5a');
+  const off=(anim*260)%80;
+  for(let i=-1;i<H/80+2;i++)R(cx,W/2-2+sh,i*80+off,4,40,'#f5c542');
+  for(let i=0;i<10;i++){const y=((i*90)+(anim*160)%90);
+    R(cx,10+sh,y,10,26,'#1e4426');R(cx,W-22+sh,y+40,10,26,'#1e4426');}
+  // przeszkody
+  for(const o of MRI.obs){
+    const x=o.x+sh;
+    if(o.k==='dziura'){cx.fillStyle='#1a1a24';cx.beginPath();cx.ellipse(x,o.y,13,7,0,0,7);cx.fill();
+      cx.fillStyle='#0e0c1c';cx.beginPath();cx.ellipse(x,o.y+1,9,4.5,0,0,7);cx.fill();}
+    else if(o.k==='galaz'){R(cx,x-16,o.y-3,32,5,'#5a4028');R(cx,x-8,o.y-7,7,5,'#2e6236');R(cx,x+4,o.y-6,6,4,'#3a8040');}
+    else{cx.fillStyle='#e04848';cx.beginPath();cx.moveTo(x,o.y-10);cx.lineTo(x-7,o.y+6);cx.lineTo(x+7,o.y+6);cx.fill();
+      R(cx,x-8,o.y+6,16,3,'#c9c4dd');R(cx,x-4,o.y-2,8,2.4,'#ece9f4');}
+  }
+  // zbieralne
+  for(const p of MRI.pick){
+    const x=p.x+sh;
+    if(p.t==='gitara'){rr(cx,x-6,p.y-4,12,12,4,'#c8384a');R(cx,x-1.4,p.y-14,3,11,'#8a5a2a');R(cx,x-3,p.y-16,6,3,'#f5c542');}
+    else{R(cx,x-4,p.y-4,8,8,'#6fd8e8');R(cx,x-2,p.y-6,4,2,'#fff');}
+  }
+  // przyczepa + ekipa
+  const py=H-52,bx=MRI.x+sh;
+  cx.fillStyle='rgba(0,0,0,.3)';cx.beginPath();cx.ellipse(bx,py+30,42,7,0,0,7);cx.fill();
+  rr(cx,bx-44,py-6,88,44,5,MRI.hurt>0?'#f0b0b0':'#ece9f4');
+  R(cx,bx-40,py-2,80,8,'#6fd8e8');R(cx,bx-40,py+22,80,4,'#c9c4dd');
+  R(cx,bx-46,py+30,10,8,'#1a1a24');R(cx,bx+36,py+30,10,8,'#1a1a24');
+  cx.font='5px "Press Start 2P"';cx.fillStyle='#c8384a';cx.textAlign='center';
+  cx.fillText('POLAND ROCK →',bx,py+18);cx.textAlign='left';
+  drawEdekBody(cx,bx-26,py-32,3,Math.floor(anim*8)%2,1.4,S.equip);
+  cx.save();cx.translate(bx+10,py-34);cx.scale(1.3,1.3);drawDychBody(cx,0,0,3,Math.floor(anim*8+1)%2);cx.restore();
+  // HUD
+  R(cx,20,16,W-40,10,'#2a2440');
+  R(cx,22,18,(W-44)*MRI.dist/MRI.need,6,'#7bc950');
+  cx.font='6px "Press Start 2P"';cx.fillStyle='#f5c542';cx.fillText('🎸 DO POLA: '+Math.round(MRI.dist)+'%',22,36);
+  cx.textAlign='right';cx.fillStyle='#ece9f4';
+  cx.fillText('🤝 UCHWYTY '+MRI.grip+'/3   💎 '+MRI.gems,W-22,36);cx.textAlign='left';
+  drawVignette();
+  mgHud('🚐 PRZYCZEPA','⬅ ➡ / joystick');
+}
+
 /* ---------------- wynik minigry ---------------- */
 let mgQuest=null,mgRetryFn=null;
 function mgHud(a,b){
@@ -6271,7 +6898,8 @@ function mgHud(a,b){
   if(b){cx.textAlign='right';cx.fillStyle='#000';cx.fillText(b,W-9,H-9);cx.fillStyle='#ece9f4';cx.fillText(b,W-10,H-10);cx.textAlign='left';}
 }
 const RETRY={dziki:startBoar,dino:startDino,freestyle:()=>startRhythm('byku'),metro:()=>startRhythm('metro'),
-  sejm:()=>startSimon('sejm'),kopernik:()=>startSimon('dance'),mecz:startMecz};
+  sejm:()=>startSimon('sejm'),kopernik:()=>startSimon('dance'),mecz:startMecz,
+  stop1:()=>startStop(1),stop2:()=>startStop(2),bateria:startCharge,przyczepa:startRide};
 function mgWin(quest,txt){
   scene='world';stopSong();
   const replay=qs(quest)===2;
@@ -6363,7 +6991,8 @@ function bootWorld(){
     say([
       {who:'Edek',t:'Ja jestem Edward Warchocki. Strach to nie dla mnie. Ja lubię wyzwania!',v:'c_strach'},
       {who:'Edek',t:'Ten rolex? Mam go na lewej dłoni. Dostałem go za filmik na TikToku.',v:'c_rolexlewa'},
-      {who:'Edek',t:'Cała Polska czeka: 13 questów, 3 regiony, hejterzy do pogonienia i mój kanał do wykręcenia. Tapujcie serduszka!',v:'c_serduszka'},
+      {who:'Edek',t:'Cała Polska czeka: 18 questów, 6 regionów, hejterzy do pogonienia i mój kanał do wykręcenia. Tapujcie serduszka!',v:'c_serduszka'},
+      {who:'Edek',t:'A na krajowej łapiemy z Dychem stopa na POLAND ROCKA. Plan jest prosty: łapiemy stopa i lecimy rozkręcić imprezę!',v:'c_planprosty'},
       {who:'Edek',t:'Cios to SPACJA albo X. Jak hejter podskoczy — z kopyta go!',v:'c_kopytem'},
       {who:'Edek',t:'Fani wysyłają mi PACZKI 🎁 — w środku nowe postacie do ekipy! Drużyna to max trójka, przełączasz klawiszami 1-2-3.'},
       {who:'Edek',t:'Na mapach są DOMENY 🌀 z falami hejterów i skrzyniami, a gdzieś czają się BOSSOWIE ⚔️. Materiały z nich ulepszają postacie. No i elegancko.',v:'c_elegancko2'},
@@ -6423,6 +7052,9 @@ function loop(ts){
       case 'mgRhythm':drawRhythmMG();break;
       case 'mgSimon':drawSimonMG();break;
       case 'mgMecz':drawMeczMG();break;
+      case 'mgStop':drawStopMG();break;
+      case 'mgCharge':drawChargeMG();break;
+      case 'mgRide':drawRideMG();break;
     }
     drawPauseOverlay();
     requestAnimationFrame(loop);
@@ -6440,6 +7072,9 @@ function loop(ts){
     case 'mgRhythm':updateRhythm(dt);if(scene==='mgRhythm')drawRhythmMG();break;
     case 'mgSimon':updateSimon(dt);if(scene==='mgSimon')drawSimonMG();break;
     case 'mgMecz':updateMecz(dt);if(scene==='mgMecz')drawMeczMG();break;
+    case 'mgStop':updateStop(dt);if(scene==='mgStop')drawStopMG();break;
+    case 'mgCharge':updateCharge(dt);if(scene==='mgCharge')drawChargeMG();break;
+    case 'mgRide':updateRide(dt);if(scene==='mgRide')drawRideMG();break;
   }
   requestAnimationFrame(loop);
 }
