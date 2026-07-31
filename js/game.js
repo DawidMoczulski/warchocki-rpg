@@ -69,6 +69,45 @@ function loadSave(){
 }
 function save(){store.set('wrpg',JSON.stringify(S));}
 loadSave();
+/* ---------------- SKRÓTY TESTOWE (?test=…) ----------------
+   Ustawiają zapis w wybranym momencie gry, żeby dało się sprawdzić konkretny
+   fragment bez przechodzenia wszystkiego od zera. Odpalane WYŁĄCZNIE z adresu:
+     ?test=seria    — start serii SIEMA ODJAZD (Dych w ekipie, przystanek na trasie)
+     ?test=stop     — przed łapaniem stopa (graty spakowane)
+     ?test=policja  — pod bramkami, finałowa obława gotowa do odpalenia
+     ?test=pole     — wszystko zrobione, jesteś na polu festiwalowym
+     ?test=reset    — kasuje zapis                                                */
+const TEST_SETUPS={
+  seria:{q:{dych:2},reg:'trasa',at:[3,27]},
+  stop:{q:{dych:2,graty:2},reg:'trasa',at:[11,27]},
+  bateria:{q:{dych:2,graty:2,stop1:2},reg:'trasa',at:[18,31]},
+  przyczepa:{q:{dych:2,graty:2,stop1:2,bateria:2,stop2:2},reg:'trasa',at:[47,27]},
+  policja:{q:{dych:2,graty:2,stop1:2,bateria:2,stop2:2,przyczepa:2},reg:'trasa',at:[38,29]},
+  pole:{q:{dych:2,graty:2,stop1:2,bateria:2,stop2:2,przyczepa:2,policja:2},reg:'trasa',at:[38,36]},
+};
+(function applyTestSetup(){
+  let m=null;
+  try{m=/[?&]test=([a-z]+)/i.exec(location.search||'');}catch(e){}
+  if(!m)return;
+  const key=m[1].toLowerCase();
+  if(key==='reset'){try{localStorage.removeItem('wrpg');}catch(e){}
+    setTimeout(()=>alert('🧹 Zapis skasowany. Zaczynasz od zera.'),50);return;}
+  const t=TEST_SETUPS[key];
+  if(!t)return;
+  if(!S)S=JSON.parse(JSON.stringify(DEFAULT_SAVE));
+  S.dych=1;
+  if(!S.chars.dych)S.chars.dych={lvl:1,st:0};
+  if(!S.party.includes('dych'))S.party.push('dych');
+  for(const id of S.party){const c=S.chars[id];if(c&&c.lvl<25)c.lvl=25;}   // uczciwa walka
+  S.quests=Object.assign({},S.quests,t.q);
+  S.visited.trasa=1;S.introDone=true;
+  S.region=t.reg;S.px=t.at[0]*16+8;S.py=t.at[1]*16+8;
+  S.dia=Math.max(S.dia||0,500);
+  save();
+  setTimeout(()=>{const el=$('testNote');
+    if(el){el.textContent='🧪 TRYB TESTOWY: '+key.toUpperCase()+' — kliknij KONTYNUUJ';
+      el.classList.remove('hidden');}},60);
+})();
 
 /* ---------------- AUDIO: klipy z YT + piosenki ---------------- */
 /* audio jako pliki w assets/audio/ (fetch przy initAudio; muzyka bitewna leniwie) */
