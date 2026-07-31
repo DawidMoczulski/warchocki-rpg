@@ -621,21 +621,27 @@ function buildTrasa(){
   rect(16,26,22,30,5);                               // STACJA ŁADOWANIA
   rect(28,23,38,26,1);                               // ZATOCZKA — dobre miejsce na stopa
   rect(42,23,52,29,1);                               // parking kamperów
-  rect(30,27,31,33,23);                              // droga polna na pole
-  rect(24,33,34,36,5);                               // SCENA POLAND ROCK
-  set(22,34,33);set(36,34,33);set(22,36,33);set(36,36,33);  // wieże głośnikowe
+  rect(38,27,39,31,23);                              // droga polna do bramy pola
+  rect(24,34,34,37,5);                               // SCENA POLAND ROCK
+  set(22,35,33);set(36,35,33);set(22,37,33);set(36,37,33);  // wieże głośnikowe
   rect(13,40,15,41,6);                               // food truck (bar festiwalowy)
+  /* OGRODZENIE POLA FESTIWALOWEGO — jedyne wejście to BRAMA (38–39, 32).
+     Brama otwiera się dopiero, gdy ekipa dojedzie tu przyczepą (quest „przyczepa"). */
+  for(let x=5;x<=53;x++){set(x,32,34);set(x,50,34);}
+  for(let y=32;y<=50;y++){set(5,y,34);set(53,y,34);}
+  set(38,32,0);set(39,32,0);                         // światło bramy
+  if(!(typeof S!=='undefined'&&S&&qs('przyczepa')===2)){set(38,32,34);set(39,32,34);}
   const tents=[[8,39],[12,44],[17,38],[20,43],[24,40],[28,44],[33,40],[37,43],[41,39],[45,43],
     [7,46],[16,47],[26,47],[36,47],[46,47],[49,39],[10,42],[31,38],[44,36],[19,35]];
   for(const[t0,t1]of tents)set(t0,t1,32);
   set(21,45,27);set(39,45,27);set(11,37,27);         // ogniska na polu
   const trees=[[3,10],[8,8],[14,11],[19,7],[25,10],[31,8],[38,11],[44,7],[50,10],[54,13],
-    [2,31],[5,33],[54,33],[52,36],[3,44],[2,49],[54,45],[26,30],[36,30]];
+    [2,31],[3,35],[55,33],[56,36],[3,44],[2,49],[55,45],[26,30],[33,30]];
   for(const[t0,t1]of trees)set(t0,t1,4);
   for(let x=4;x<=54;x+=12)if(at(x,24)===0)set(x,24,11);   // latarnie przy trasie
   set(33,24,11);set(45,22,10);set(20,24,12);
   set(24,29,14);                                     // billboard Edka przy trasie
-  set(40,33,29);                                     // drogowskaz na pole
+  set(35,29,29);                                     // drogowskaz „POLE →" przy zjeździe na pole
   for(let x=6;x<=13;x++)if(at(x,29)===0)set(x,29,13); // płotek przy złym zjeździe
   for(let x=0;x<MW;x+=2)if(at(x,0)===0)set(x,0,4);
   for(let y=0;y<MH;y+=2)if(at(0,y)===0)set(0,y,4);
@@ -725,8 +731,8 @@ const DOORS=[
   {r:'tatry',x:14,y:3,n:'Giewont',act:'giewont'},
   {r:'trasa',x:3,y:26,n:'PKS',act:'pks'},
   {r:'trasa',x:19,y:31,n:'Stacja ładowania',act:'stacja'},
-  {r:'trasa',x:29,y:37,n:'SCENA POLAND ROCK',act:'scena'},
-  {r:'trasa',x:14,y:42,n:'Food truck',act:'foodtruck'},
+  {r:'trasa',x:29,y:38,n:'SCENA POLAND ROCK',act:'scena',gated:'przyczepa'},
+  {r:'trasa',x:14,y:42,n:'Food truck',act:'foodtruck',gated:'przyczepa'},
 ];
 const NPCS=[
   {r:'wawa',id:'pani_park',n:'Pani Grażynka',x:11*16,y:19*16,c:'#c86fa8',hair:'#d8d4e8'},
@@ -757,6 +763,7 @@ const NPCS=[
   {r:'trasa',id:'pani_stacja',n:'Pani Jola ze stacji',x:17*16,y:31*16,c:'#c8384a',hair:'#f0d060'},
   {r:'trasa',id:'stopowiczka',n:'Autostopowiczka Ola',x:33*16,y:25*16,c:'#3a7a5a',hair:'#8a5a2a'},
   {r:'trasa',id:'kamperowiec',n:'Pan Mirek z kamperem',x:47*16,y:26*16,c:'#4a6a9a',hair:'#aaa'},
+  {r:'trasa',id:'ochroniarz_bramy',n:'Ochroniarz z bramy',x:36*16,y:31*16,c:'#2a2a3a',hair:'#111'},
 ];
 
 /* ---------------- STAN ---------------- */
@@ -802,6 +809,9 @@ function protectedPts(cfg){
 }
 function insideArena(cfg,tx,ty){const A=cfg.arena;if(!A)return false;
   return tx>=A.ai[0]-4&&tx<=A.ai[2]+4&&ty>=A.ai[1]-4&&ty<=A.ai[3]+4;}
+/* ogrodzone pole festiwalowe na TRASIE: żadnych proceduralnych drzew/stawów w środku
+   ani na płocie — inaczej generator zarasta pole i wycina dziury w ogrodzeniu */
+function insideFest(tx,ty){return REG==='trasa'&&tx>=4&&tx<=54&&ty>=31&&ty<=51;}
 const hash3=(tx,ty,s)=>{let x=(((tx+7)*73856093)^((ty+13)*19349663)^(s*83492791))>>>0;return((x^(x>>>13))>>>0)/4294967296;};
 function wildFill(cfg){
   const base=baseTile(),prot=protectedPts(cfg);
@@ -811,7 +821,7 @@ function wildFill(cfg){
   const dens=REG==='morze'?.14:REG==='tatry'?.26:.30;
   for(let ty=1;ty<MH-1;ty++)for(let tx=1;tx<MW-1;tx++){
     if(at(tx,ty)!==base)continue;
-    if(insideArena(cfg,tx,ty)||near(tx,ty,3)||adjSpecial(tx,ty))continue;
+    if(insideArena(cfg,tx,ty)||insideFest(tx,ty)||near(tx,ty,3)||adjSpecial(tx,ty))continue;
     const r=hash3(tx,ty,1);
     if(r<dens)set(tx,ty,chooseAsset(hash3(tx,ty,2)));
     else if(r<dens+.10){const q=hash3(tx,ty,3);set(tx,ty,q<.4?28:q<.7?31:21);}
@@ -821,20 +831,23 @@ function wildFill(cfg){
 /* punkty widokowe (altanki, ogniska, stawy, łąki, głazowiska, drogowskazy) w dzikim terenie */
 function wildPOI(cfg){
   const base=baseTile();
+  const keep=v=>v===1||v===2||v===5||v===6||v===9||v===32||v===33||v===34;   // drogi, budynki, ogrodzenia, namioty
   const clear=(tx,ty,r)=>{for(let y=ty-r;y<=ty+r;y++)for(let x=tx-r;x<=tx+r;x++)
-    if(x>1&&y>1&&x<MW-1&&y<MH-1&&at(x,y)!==1&&at(x,y)!==2&&at(x,y)!==5&&at(x,y)!==6&&at(x,y)!==9)set(x,y,base);};
+    if(x>1&&y>1&&x<MW-1&&y<MH-1&&!keep(at(x,y))&&!insideFest(x,y))set(x,y,base);};
   const put=(fx,fy,r,tile)=>{const tx=(MW*fx)|0,ty=(MH*fy)|0;
-    if(at(tx,ty)===5||at(tx,ty)===6||insideArena(cfg,tx,ty))return null;
+    if(keep(at(tx,ty))||insideArena(cfg,tx,ty)||insideFest(tx,ty))return null;
     clear(tx,ty,r);set(tx,ty,tile);return[tx,ty];};
   put(.55,.34,2,22);            // altanka
   put(.72,.6,1,27);            // ognisko
   put(.82,.28,2,20);           // głazowisko (+ kamienie wokół)
   const gl=put(.8,.28,0,20);if(gl){set(gl[0]+2,gl[1]+1,20);set(gl[0]-2,gl[1]+1,21);set(gl[0]+1,gl[1]-2,20);}
   const pond=put(.34,.7,3,24);  // staw + trzciny
-  if(pond)for(const[dx,dy]of[[-3,0],[3,0],[0,-3],[0,3],[-2,2],[2,-2]])set(pond[0]+dx,pond[1]+dy,25);
+  if(pond)for(const[dx,dy]of[[-3,0],[3,0],[0,-3],[0,3],[-2,2],[2,-2]]){
+    const rx=pond[0]+dx,ry=pond[1]+dy;
+    if(!keep(at(rx,ry))&&!insideFest(rx,ry))set(rx,ry,25);}
   const mead=((MW*.6)|0);const mty=((MH*.8)|0);  // łąka kwietna 4×3
   if(!insideArena(cfg,mead,mty))for(let y=mty;y<mty+3;y++)for(let x=mead;x<mead+4;x++)
-    if(at(x,y)===base||SOLID(at(x,y))===false)set(x,y,28);
+    if((at(x,y)===base||SOLID(at(x,y))===false)&&!insideFest(x,y))set(x,y,28);
   put(.5,.5,1,29);             // drogowskaz w centrum dzikiego terenu
   put(.28,.42,1,27);           // drugie ognisko
   put(.66,.72,2,22);           // druga altanka
@@ -861,7 +874,10 @@ function carvePath(x0,y0,x1,y1,w,tile){
   tile=tile||23;const hw=(w-1)>>1;let x=x0,y=y0,g=0;
   const stamp=(cx2,cy2)=>{for(let dy=-hw;dy<=hw;dy++)for(let dx=-hw;dx<=hw;dx++){
     const tx=cx2+dx,ty=cy2+dy;if(tx<1||ty<1||tx>=MW-1||ty>=MH-1)continue;
-    const v=at(tx,ty);if(v===1||v===2||v===5||v===6)continue;if(v!==tile)set(tx,ty,tile);}};
+    /* nie przekopujemy dróg/budynków ANI ogrodzeń i namiotów (34/32/33) —
+       inaczej siatka bezpieczeństwa zrobiłaby dziurę w bramie pola festiwalowego */
+    const v=at(tx,ty);if(v===1||v===2||v===5||v===6||v===32||v===33||v===34)continue;
+    if(v!==tile)set(tx,ty,tile);}};
   while((x!==x1||y!==y1)&&g++<2000){stamp(x,y);
     if(Math.abs(x1-x)>=Math.abs(y1-y))x+=Math.sign(x1-x);else y+=Math.sign(y1-y);}
   stamp(x1,y1);
@@ -874,7 +890,8 @@ function ensureConnectivity(cfg){
     carvePath(stx,sty,mx,my,3,23);}
   /* siatka bezpieczeństwa: dodatkowo dokop do niedostępnych drzwi/domen (3 szerokości) */
   const targets=[];
-  for(const d of DOORS)if(d.r===REG)targets.push([d.x,d.y]);
+  /* drzwi za zamkniętą bramą (gated) pomijamy — tam wchodzi się dopiero po questach */
+  for(const d of DOORS)if(d.r===REG&&!(d.gated&&qs(d.gated)!==2))targets.push([d.x,d.y]);
   for(const dm of Object.values(DOMAINS))if(dm.r===REG)targets.push([dm.x,dm.y]);
   let seen=reachMask(stx,sty);
   for(const t of targets){const nw=nearestWalkableTile(t[0]|0,t[1]|0);
@@ -3578,6 +3595,16 @@ function talkTo(n){
       else if(qs('stop2')===1)say([L(n.n,'Kamper prędzej czy później nadjedzie. Rozkręć szansę na stopa i łap go!')],()=>startStop(2));
       else say([L(n.n,'Widziałam, jak wam stanął kamper. Nawet ja tak szybko nie łapię!'),
         L('Edek','No i elegancko, stary! Mamy dach nad głową na rocka!','c_dachnadglowa')]);
+      break;
+    case 'ochroniarz_bramy':
+      if(qs('przyczepa')!==2)say([
+        L(n.n,'Stop. Brama pola. Opaski nie widzę, a bez opaski nie wchodzisz — regulamin festiwalu.'),
+        L('Edek','Panie, ja jestem Warchocki Edward, byku. Mam namiot, karimatę i plecak większy niż ja!'),
+        L(n.n,'Sprzęt sprzętem, ale opaskę dostają tylko ci, co dojadą z ekipą. Łapcie stopa i wjedźcie tu jak ludzie — wtedy otwieram.'),
+        L('Edek','Plan jest prosty: łapiemy stopa i lecimy na miejsce, żeby rozkręcić imprezę. Jedziemy z tym koksem!','c_planprosty'),
+      ]);
+      else say([L(n.n,'Opaska na ręce, panie Edwardzie — brama stoi otworem! Scena po prawej, food truck przy namiotach.'),
+        L('Edek','Ale jazda! I widzicie ludziska — udało się. Kierunek Poland Rock Festival!','c_alejazda')]);
       break;
     case 'kamperowiec':
       if(qs('stop2')!==2)say([L(n.n,'Kamper zatankowany, przyczepa spięta. Jak was zobaczę na trasie, to pomyślę.')]);
@@ -6697,31 +6724,36 @@ function drawStopMG(){
    MINIGRA: ŁADOWANIE BATERII NA STACJI
    ===================================================================== */
 const MCH={};
+/* tempo wskaźnika: wolny start, delikatne przyspieszenie tylko za TRAFIENIA, twardy sufit */
+const CHARGE_SPD0=.5,CHARGE_SPD2=.62,CHARGE_SPDMAX=.8,CHARGE_GRACE=.04;
 function startCharge(){
   scene='mgCharge';
-  MCH.round=1;MCH.pct=0;MCH.pos=0;MCH.dir=1;MCH.spd=.85;MCH.time=45;
-  MCH.zone=.3;MCH.zw=.2;MCH.spark=0;MCH.judge='';MCH.judgeT=0;MCH.ended=false;
+  MCH.round=1;MCH.pct=0;MCH.pos=0;MCH.dir=1;MCH.spd=CHARGE_SPD0;MCH.time=50;
+  MCH.zone=.3;MCH.zw=.34;MCH.spark=0;MCH.judge='';MCH.judgeT=0;MCH.ended=false;
   vsay('c_naladowac');
   toast('🔌 Wciśnij [SPACJA/👊], gdy wskaźnik jest w ZIELONYM!',4200);
 }
 function chargeZone(){
-  MCH.zw=Math.max(.09,.2-MCH.pct*.0009-(MCH.round-1)*.03);
+  /* strefa zwęża się bardzo łagodnie i nigdy nie schodzi poniżej 1/5 paska */
+  MCH.zw=Math.max(.22,.34-MCH.pct*.0011-(MCH.round-1)*.02);
   MCH.zone=.06+Math.random()*(.88-MCH.zw);
 }
 function chargeTap(){
   if(scene!=='mgCharge'||MCH.ended)return;
   const p=MCH.pos,z=MCH.zone,w=MCH.zw;
-  const inz=p>=z&&p<=z+w;
+  const inz=p>=z-CHARGE_GRACE&&p<=z+w+CHARGE_GRACE;   // margines na opóźnienie dotyku
   const perfect=inz&&Math.abs(p-(z+w/2))<w*.3;
-  if(perfect){MCH.pct+=20;MCH.judge='PERFEKCYJNY PRĄD!';SFX.note('P');MCH.spark=.4;}
-  else if(inz){MCH.pct+=11;MCH.judge='ŁADUJE, ŁADUJE';SFX.note('G');MCH.spark=.25;}
-  else{MCH.pct=Math.max(0,MCH.pct-9);MCH.judge='PUDŁO! ISKRZY!';SFX.no();MCH.spark=.6;worldFlash=.2;}
-  MCH.judgeT=.55;MCH.spd+=.06;
+  if(perfect){MCH.pct+=26;MCH.judge='PERFEKCYJNY PRĄD!';SFX.note('P');MCH.spark=.4;
+    MCH.spd=Math.min(CHARGE_SPDMAX,MCH.spd+.025);}
+  else if(inz){MCH.pct+=18;MCH.judge='ŁADUJE, ŁADUJE';SFX.note('G');MCH.spark=.25;
+    MCH.spd=Math.min(CHARGE_SPDMAX,MCH.spd+.025);}
+  else{MCH.pct=Math.max(0,MCH.pct-6);MCH.judge='PUDŁO! ISKRZY!';SFX.no();MCH.spark=.6;worldFlash=.2;}
+  MCH.judgeT=.55;
   chargeZone();
   if(MCH.pct>=100){
     MCH.pct=100;SFX.dia();
     if(MCH.round===1){
-      MCH.round=2;MCH.pct=0;MCH.spd=1.1;MCH.time+=18;chargeZone();
+      MCH.round=2;MCH.pct=0;MCH.spd=CHARGE_SPD2;MCH.time+=25;chargeZone();
       toast('🔋 Edek naładowany! Teraz bateria Dycha!',3000);
       if(!curVoice)vsay('c_eleganckorock');
     }else{
@@ -6768,10 +6800,13 @@ function drawChargeMG(){
   }
   // pasek trafień
   const px=40,pw=W-80,py=H-30;
-  R(cx,px,py,pw,14,'#2a2440');
-  R(cx,px+pw*MCH.zone,py,pw*MCH.zw,14,'#2e6236');
-  R(cx,px+pw*(MCH.zone+MCH.zw*.35),py,pw*MCH.zw*.3,14,'#7bc950');
-  R(cx,px+pw*MCH.pos-1.5,py-4,3,22,'#f5c542');
+  R(cx,px,py,pw,16,'#2a2440');
+  R(cx,px+pw*MCH.zone,py,pw*MCH.zw,16,'#2e6236');                         // strefa trafienia
+  R(cx,px+pw*(MCH.zone+MCH.zw*.2),py,pw*MCH.zw*.6,16,'#7bc950');          // środek = PERFEKT
+  R(cx,px+pw*MCH.zone,py,1.5,16,'#8fe870');R(cx,px+pw*(MCH.zone+MCH.zw)-1.5,py,1.5,16,'#8fe870');
+  const nx=px+pw*MCH.pos;                                                  // wskaźnik
+  R(cx,nx-2,py-5,4,26,'#f5c542');
+  cx.fillStyle='#fff7d6';cx.beginPath();cx.moveTo(nx,py-8);cx.lineTo(nx-5,py-14);cx.lineTo(nx+5,py-14);cx.fill();
   // pasek naładowania
   R(cx,px,py-26,pw,10,'#2a2440');
   R(cx,px+2,py-24,(pw-4)*Math.min(1,MCH.pct/100),6,MCH.pct>66?'#7bc950':MCH.pct>33?'#f5c542':'#e04848');
@@ -6790,6 +6825,16 @@ function drawChargeMG(){
    MINIGRA: JAZDA PRZYCZEPĄ NA POLE (finał serii)
    ===================================================================== */
 const MRI={};
+/* przyczepa dowiozła ekipę ZA BRAMĘ: przebuduj trasę (brama już otwarta) i postaw gracza na polu */
+function arriveAtField(){
+  if(REG!=='trasa')return;
+  setRegion('trasa');
+  const spot=nearestWalkableTile(30,41)||[30,41];
+  P.x=spot[0]*16+8;P.y=spot[1]*16+8;resetFollowers();
+  camX=Math.max(0,Math.min(MW*16-W,P.x-W/2));camY=Math.max(0,Math.min(MH*16-H,P.y-H/2));
+  hurtT=1.5;
+  toast('🎫 Opaska założona — jesteście NA POLU!<br>Scena [E] i food truck czekają.',4200);
+}
 function startRide(){
   scene='mgRide';
   MRI.x=W/2;MRI.dist=0;MRI.need=100;MRI.grip=3;MRI.obs=[];MRI.pick=[];MRI.t=.6;MRI.pt=1.4;
@@ -6843,7 +6888,8 @@ function updateRide(dt){
          {who:'Edek',t:'Jedziemy w tej oto wspaniałej przyczepie kempingowej, którą gościnnie udostępnił nam ten przemiły pan kierowca. Wielkie dzięki dla niego!',v:'c_przyczepa'},
          {who:'Dych Dziki',t:'DZIKO! Pole namiotowe, scena, tłum — i dwa roboty na scenie. Wbijamy, brachu!'},
          {who:'Edek',t:'Trzymajcie za nas kciuki, żebyśmy bezpiecznie dotarli na pole i do zobaczenia wkrótce!',v:'c_kciuki'}],
-      ()=>mgWin('przyczepa','🎸 JESTEŚCIE NA POLU!<br>Poland Rock z Dychem — no i elegancko!<br>💎 zebrane po drodze: '+MRI.gems));
+      ()=>{mgWin('przyczepa','🎸 JESTEŚCIE NA POLU!<br>Poland Rock z Dychem — no i elegancko!<br>💎 zebrane po drodze: '+MRI.gems);
+        arriveAtField();});
   }
 }
 function drawRideMG(){
@@ -7013,6 +7059,11 @@ $('btnCont').addEventListener('click',()=>{
   P.x=S.px||456;P.y=S.py||368;P.slow=(S.trip===1);
   applyChar();initPartyHP(true);resetFollowers();
   if(SOLID(at(Math.floor(P.x/16),Math.floor(P.y/16)))){const sp=REGIONS[REG].spawn;P.x=sp[0];P.y=sp[1];}
+  /* stary zapis mógł zostawić gracza NA POLU, zanim postawiliśmy bramę — wypuść go na trasę */
+  if(REG==='trasa'&&qs('przyczepa')!==2&&insideFest(Math.floor(P.x/16),Math.floor(P.y/16))){
+    const sp=REGIONS.trasa.spawn;P.x=sp[0];P.y=sp[1];resetFollowers();
+    toast('🎫 Brama pola jest zamknięta — najpierw złap stopa i wjedź tu z ekipą!',4200);
+  }
   initAudio().then(()=>bootWorld());
 });
 if(S)$('btnCont').classList.remove('hidden');
