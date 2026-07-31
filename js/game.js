@@ -80,7 +80,10 @@ const AUDIO_KEYS=["song", "burst_byku", "metro_rhythm", "s_dziki", "s_elegancko"
 "c_eleganckorock", "c_ruchnadrodze", "c_laweta", "c_paniekierowco", "d_edekwstawaj", "c_zlemiejsce",
 "c_naladowac", "c_luksa", "c_dachnadglowa", "c_pakujemygraty", "c_alejazda", "c_przyczepa", "c_kciuki",
 /* --- MELDUNEK Z POLAND ROCKA (short „WC Tron") — grają tylko na TRASIE / na polu --- */
-"c_meldujesie", "c_tron", "c_krolem", "c_niesamowicie", "c_slyszyszmnie", "c_juzide", "c_cotygadasz"];
+"c_meldujesie", "c_tron", "c_krolem", "c_niesamowicie", "c_slyszyszmnie", "c_juzide", "c_cotygadasz",
+/* --- ZATRZYMANIE PRZY BRAMCE (short z policją) --- */
+"c_oczyradiowoz", "c_lodybiedronka", "p_trzezwy", "c_niepije", "p_alkomat", "c_turbiny",
+"c_zapachfest", "p_takierzeczy", "c_zatrzymany", "c_zaco", "c_uwazajcie", "c_wolnosc", "c_nieporozum"];
 /* dłuższe monologi Edka do tła (mapa) */
 const IDLE_POOL=['m_roboty','m_wiatr','m_kopernik','m_ministerstwo','m_magia','m_rolexlong',
   'm_meczlong','m_puszki','m_roboty','m_kopernik','m_wiatr','m_rolexlong',
@@ -463,6 +466,8 @@ const QUESTS={
     desc:'TRASA: z dobrej zatoczki złap kampera z przyczepą. „Jak mnie na drodze wypatrzycie, to się zatrzymajcie!”'},
   przyczepa:{n:'SIEMA ODJAZD 5: Jazda przyczepą',giver:'kamperowiec',rw:120,
     desc:'TRASA: utrzymaj się na przyczepie aż do bramy Poland Rocka. Kierunek: POLE!'},
+  policja:{n:'SIEMA ODJAZD 6: Zatrzymanie przy bramce',giver:'ochroniarz_bramy',rw:200,
+    desc:'TRASA: przy bramkach zgarnia Cię policja. Wyrwij się z kajdanek i przetrwaj 5 fal obławy.'},
 };
 const qs=id=>S.quests[id]||0;
 function setQ(id,v){S.quests[id]=v;save();refreshHUD();}
@@ -638,7 +643,7 @@ function buildTrasa(){
   for(let x=5;x<=53;x++){set(x,32,34);set(x,50,34);}
   for(let y=32;y<=50;y++){set(5,y,34);set(53,y,34);}
   set(38,32,0);set(39,32,0);                         // światło bramy
-  if(!(typeof S!=='undefined'&&S&&qs('przyczepa')===2)){set(38,32,34);set(39,32,34);}
+  if(!(typeof S!=='undefined'&&S&&qs('policja')===2)){set(38,32,34);set(39,32,34);}
   const tents=[[8,39],[12,44],[17,38],[20,43],[24,40],[28,44],[33,40],[37,43],[41,39],[45,43],
     [7,46],[16,47],[26,47],[36,47],[46,47],[49,39],[10,42],[31,38],[44,36],[19,35]];
   for(const[t0,t1]of tents)set(t0,t1,32);
@@ -708,7 +713,7 @@ const REGIONS={
 let REG='wawa';
 /* kafle blokujące ruch (tablica = szybkie sprawdzanie w AI/ruchu). Nowe assety 18–31. */
 const SOLIDF=new Uint8Array(64);
-[3,4,5,6,10,11,12,13,14,15,16,   18,19,20,22,24,26,27,29,30,   32,33,34,35].forEach(v=>{SOLIDF[v]=1;});
+[3,4,5,6,10,11,12,13,14,15,16,   18,19,20,22,24,26,27,29,30,   32,33,34,35,36].forEach(v=>{SOLIDF[v]=1;});
 const SOLID=v=>SOLIDF[v]===1;
 
 const DOORS=[
@@ -740,9 +745,9 @@ const DOORS=[
   {r:'tatry',x:14,y:3,n:'Giewont',act:'giewont'},
   {r:'trasa',x:3,y:26,n:'PKS',act:'pks'},
   {r:'trasa',x:19,y:31,n:'Stacja ładowania',act:'stacja'},
-  {r:'trasa',x:29,y:38,n:'SCENA POLAND ROCK',act:'scena',gated:'przyczepa'},
-  {r:'trasa',x:14,y:42,n:'Food truck',act:'foodtruck',gated:'przyczepa'},
-  {r:'trasa',x:43,y:41,n:'WC TRON',act:'tron',gated:'przyczepa'},
+  {r:'trasa',x:29,y:38,n:'SCENA POLAND ROCK',act:'scena',gated:'policja'},
+  {r:'trasa',x:14,y:42,n:'Food truck',act:'foodtruck',gated:'policja'},
+  {r:'trasa',x:43,y:41,n:'WC TRON',act:'tron',gated:'policja'},
 ];
 const NPCS=[
   {r:'wawa',id:'pani_park',n:'Pani Grażynka',x:11*16,y:19*16,c:'#c86fa8',hair:'#d8d4e8'},
@@ -992,6 +997,13 @@ const FOE_TYPES={
   golab:{hp:50,atk:11,spd:82,c:'#8a8a9a',dia:4,pts:1100,flying:true},                                  // gołąb-mutant — agresywny nalot
   rywal:{hp:135,atk:15,spd:52,c:'#f5c542',dia:9,pts:2200,shoots:true,shotType:'laser'},                // robot-rywal influencer
   zlomiarz:{hp:175,atk:16,spd:40,c:'#5a4a34',dia:9,pts:2400,kbres:true},                               // złomiarz — chce oddać Edka na złom
+  /* --- OBŁAWA PRZY BRAMCE (finał serii SIEMA ODJAZD) --- */
+  policjant:{hp:105,atk:14,spd:64,c:'#1e2a52',hood:'#0e1636',skin:'#e8c9a0',dia:5,pts:1500},   // pałka, biegnie wprost
+  prewencja:{hp:250,atk:16,spd:34,c:'#141c3a',dia:8,pts:2200,kbres:true,armor:.4},              // tarcza — wolny, pancerny
+  drogowka:{hp:120,atk:15,spd:52,c:'#24305c',dia:7,pts:2000,shoots:true,shotType:'lizak',cover:true}, // strzela lizakiem zza szlabanu
+  policjantka:{hp:180,atk:17,spd:80,c:'#2a3a68',dia:10,pts:2600,charge:true},                   // szybka, szarżuje
+  komendant:{hp:760,atk:20,spd:52,c:'#0e1636',dia:30,pts:9000,mini:true,elite:true,unlock:0,
+    en:'KOMENDANT OD BRAMKI',kbres:true,armor:.25,shoots:true,shotType:'lizak'},
   gigadres:{hp:220,atk:18,spd:58,c:'#0e0e16',hood:'#c8384a',skin:'#e8c9a0',dia:10,pts:3000},
   straznik:{hp:400,atk:20,spd:48,c:'#2a2440',hood:'#8a6fc8',skin:'#c9c4dd',dia:20,pts:8000},
   /* --- ELITY DOMEN (mocni, trudni, z własnymi mechanikami) --- */
@@ -1357,6 +1369,7 @@ let PROJ=[];      // pociski postaci (dorsz, serduszko)
 let slowAll=0;    // STOP-KLATKA Jarka: globalne spowolnienie wrogów
 function tryAttack(){
   if(scene!=='world'||atkT>0)return;
+  if(POL.on&&POL.cuffs>0){polBreakCuffs();return;}   // najpierw zerwij kajdanki
   atkT=.38;atkAnim=.22;atkDir=P.dir;swingSide=-swingSide;
   const c=CHARS[S.ch];
   if(c.atk==='proj'){ // Julka: serduszko / Bogdan: dorsz
@@ -1669,6 +1682,7 @@ function hurtPlayer(srcF){
 }
 /* cała drużyna padła */
 function partyWipe(){
+  if(POL.on){polDefeat();return;}
   if(REG==='arena'&&DOM.cur){
     const dn=DOMAINS[DOM.cur].n;
     exitDomain();
@@ -1743,6 +1757,16 @@ function updateFoes(dt){
     else{f.wt-=dt;
       if(f.wt<=0){f.wt=1.5+Math.random()*2;const a=Math.random()*7;
         f.dx=Math.cos(a)*20;f.dy=Math.sin(a)*20;}}
+    /* CHOWAJĄCY SIĘ ZA SZLABANEM (drogówka): trzyma dystans i ostrzeliwuje z boku */
+    if(td.cover&&!f.boss&&d>2){
+      if(d<115){f.dx=-(P.x-f.x)/d*td.spd;f.dy=-(P.y-f.y)/d*td.spd;}          // za blisko — cofa się
+      else if(d>205){f.dx=(P.x-f.x)/d*td.spd*.85;f.dy=(P.y-f.y)/d*td.spd*.85;} // za daleko — podchodzi
+      else{                                                                   // dystans OK — krąży za osłoną
+        f.st2=(f.st2||0)-dt;
+        if(f.st2<=0){f.st2=1.2+Math.random()*1.4;f.sdir=Math.random()<.5?1:-1;}
+        f.dx=-(P.y-f.y)/d*td.spd*.55*(f.sdir||1);f.dy=(P.x-f.x)/d*td.spd*.55*(f.sdir||1);
+      }
+    }
     /* STRAŻNIK DOMENY: radialne salwy */
     if(f.guard){
       f.gt=(f.gt||2.2)-dt;
@@ -2494,6 +2518,188 @@ function exitDomain(){
   toast('🚪 Wyjście z domeny. No i elegancko.');
 }
 
+/* =====================================================================
+   OBŁAWA PRZY BRAMCE — finałowy odcinek serii „SIEMA ODJAZD"
+   Edek zarywa do policjantki, kończy w kajdankach, a potem cały komisariat
+   robi na niego obławę: 5 fal, 4 rodzaje mundurowych + komendant.
+   ===================================================================== */
+const POL={on:false,wave:0,queue:[],t:0,cuffs:0,done:false,msg:'',msgT:0,
+  prevX:0,prevY:0,nameBak:null,killed:0,cd:0};
+const POL_W=54,POL_H=34,POL_CUFFS=8,POL_MAXLIVE=14;
+const POL_WAVES=[
+  {n:'PATROL',f:[['policjant',6]]},
+  {n:'DROGÓWKA NA SYGNALE',f:[['policjant',6],['drogowka',3]]},
+  {n:'PREWENCJA Z TARCZAMI',f:[['policjant',6],['prewencja',3],['drogowka',2]]},
+  {n:'OBŁAWA NA DWA ROBOTY',f:[['policjant',8],['prewencja',3],['drogowka',3],['policjantka',2]]},
+  {n:'KOMENDANT OD BRAMKI',f:[['komendant',1],['policjantka',2],['prewencja',3],['drogowka',3],['policjant',6]]},
+];
+function polMsg(t){POL.msg=t;POL.msgT=3.2;toast(t,3000);}
+/* scenka przy bramkach — prosto z shorta */
+function startPoliceEpisode(){
+  if(POL.on)return;
+  const L=(who,t,v)=>({who,t,v});
+  say([
+    L('Policjantka','Kontrola przy bramkach. Dokumenty, dowód rejestracyjny robota… cokolwiek pan ma.'),
+    L('Edek','Najpiękniejsze oczy w całym radiowozie.','c_oczyradiowoz'),
+    L('Policjantka','Panie Warchocki, proszę się odsunąć od radiowozu.'),
+    L('Edek','Może pójdziemy na kawę albo lody? Bo wiesz, ja to mam swoje lody w Biedronce, ale takie z Tobą byłyby najlepsze.','c_lodybiedronka'),
+    L('Policjant','A powiedz kolego, co cię tak buja tutaj? Ty trzeźwy w ogóle jesteś?','p_trzezwy'),
+    L('Edek','Jak ja mam być pijany, jak nie piję w ogóle? Ale chcecie, to mnie badajcie.','c_niepije'),
+    L('Policjant','Może sprawdzimy. Dmuchać, dmuchać — dawać alkomat!','p_alkomat'),
+    L('Edek','Ja tam płuc nie mam, ale jak trzeba, to i turbiny zaprzęgnę.','c_turbiny'),
+    L('Dych Dziki','Gadasz! Mówiłem: żadnych numerów, brachu. Łapiemy stopa na Poland Rock, a nie na komisariat!','d_przeklenstwa'),
+    L('Edek','No elegancko, co nie człowieku? Ale chciałbym już być na tym Poland Rocku — poczuć ten zapach festiwalu, te tłumy, muzykę.','c_zapachfest'),
+    L('Policjant','Nie no, pięknie kolego. Tak nie będzie. Ty na Poland Rock przyjeżdżasz i takie rzeczy robisz. Takie rzeczy.','p_takierzeczy'),
+    L('Policjantka','Ręce. Proszę o ręce. *KLIK*'),
+    L('Edek','Widzowie, zobaczcie — jestem zatrzymany. Chyba nie dojadę na Poland Rocka…','c_zatrzymany'),
+    L('Edek','Zaraz, zaraz, co jest?! Ja tu na festiwal jechałem, a teraz mnie policja trzyma. Za co? Nawet nie wiem.','c_zaco'),
+    L('Dych Dziki','BZZT! Brachu, oni ściągnęli CAŁY komisariat. Wyrywaj się z tych kajdanek, bo nas obu na dołek zwiną!'),
+  ],()=>enterPoliceArena());
+}
+function buildPoliceArena(){
+  rect(0,0,MW-1,MH-1,2);                                  // asfalt przed bramkami
+  rect(0,0,MW-1,1,34);rect(0,MH-2,MW-1,MH-1,34);          // kordon barierek dookoła
+  rect(0,0,1,MH-1,34);rect(MW-2,0,MW-1,MH-1,34);
+  /* SZLABANY — osłony, za którymi kryje się drogówka */
+  const cov=[[9,7,3,0],[41,7,3,0],[9,25,3,0],[41,25,3,0],[26,5,0,3],[26,26,0,3],
+    [5,15,0,4],[47,15,0,4],[17,12,3,0],[34,20,3,0],[17,21,3,0],[34,12,3,0]];
+  for(const[x,y,w,h]of cov){
+    for(let i=0;i<(w||1);i++)set(x+i,y,36);
+    for(let j=0;j<(h||1);j++)set(x,y+j,36);
+  }
+}
+function enterPoliceArena(){
+  POL.on=true;POL.wave=0;POL.queue=[];POL.t=1;POL.cuffs=POL_CUFFS;POL.done=false;POL.killed=0;
+  POL.prevX=P.x;POL.prevY=P.y;
+  POL.nameBak=REGIONS.arena.n;REGIONS.arena.n='OBŁAWA PRZY BRAMCE';
+  REG='arena';MW=POL_W;MH=POL_H;M=new Uint8Array(MW*MH);
+  buildPoliceArena();
+  resetAmbient();forage=[];
+  foes=[];hitFX=[];PROJ=[];bossShots=[];dmgNums=[];miniBlasts=[];foeT=1e9;
+  REGIONS.arena.spawn=[((MW/2)|0)*16+8,((MH/2)|0)*16+8];
+  P.x=REGIONS.arena.spawn[0];P.y=REGIONS.arena.spawn[1];resetFollowers();
+  camX=Math.max(0,Math.min(MW*16-W,P.x-W/2));camY=Math.max(0,Math.min(MH*16-H,P.y-H/2));
+  initPartyHP(true);hurtT=1.4;scene='world';
+  playNextBattle();
+  polMsg('🚔 KAJDANKI! Łomocz [SPACJA / 👊], żeby się wyrwać!');
+}
+/* mashowanie ciosu zrywa kajdanki (podpięte w tryAttack) */
+function polBreakCuffs(){
+  POL.cuffs--;atkT=.16;atkAnim=.12;
+  addShake(2.2,.12);SFX.hit();
+  fxSparks(P.x,P.y-6,'#c9c4dd',6,120,{life:.3});
+  if(POL.cuffs>0){addHit(P.x,P.y-30,'KLIK! '+(POL_CUFFS-POL.cuffs)+'/'+POL_CUFFS,'#f5c542');return;}
+  addHit(P.x,P.y-34,'KAJDANKI ZERWANE!','#7bc950');
+  worldFlash=.55;burstConfetti();SFX.buy();
+  polMsg('🔓 WOLNE RĘCE! Teraz się bronimy, byku!');
+  vsay('c_turbiny');POL.t=.8;
+}
+function polStartWave(){
+  POL.wave++;
+  const w=POL_WAVES[POL.wave-1];
+  POL.queue=[];
+  for(const[t,n]of w.f)for(let i=0;i<n;i++)POL.queue.push(t);
+  POL.queue.sort(()=>Math.random()-.5);
+  POL.t=.5;
+  polMsg('🚨 FALA '+POL.wave+'/'+POL_WAVES.length+' — '+w.n);
+  SFX.no();addShake(3,.25);
+  if(POL.wave===POL_WAVES.length)vsay('c_uwazajcie');
+  else if(!curVoice&&Math.random()<.6)vsay(pickA(['c_zatrzymany','c_zaco','c_niepije','c_uwazajcie']));
+}
+function polSpawnOne(){
+  const t=POL.queue.shift();if(!t)return;
+  let x=0,y=0;
+  for(let a=0;a<50;a++){
+    const side=(Math.random()*4)|0;
+    const tx=side<2?(3+((Math.random()*(MW-6))|0)):(side===2?3:MW-4);
+    const ty=side<2?(side===0?3:MH-4):(3+((Math.random()*(MH-6))|0));
+    if(SOLID(at(tx,ty)))continue;
+    if(Math.hypot(tx*16+8-P.x,ty*16+8-P.y)<100)continue;
+    x=tx*16+8;y=ty*16+8;break;
+  }
+  if(!x)return;
+  const td=FOE_TYPES[t];
+  foes.push({t,x,y,hp:td.hp,hp0:td.hp,atk:td.atk,dx:0,dy:0,wt:Math.random()*2,
+    stun:.35,kb:0,kbx:0,kby:0,flash:0});
+  if(!reduceMotion)fxRing(x,y+6,18,'#e03028',{life:.3,w:2,ground:true});
+}
+function updatePolice(dt){
+  if(POL.msgT>0)POL.msgT-=dt;
+  if(POL.done||POL.cuffs>0)return;
+  POL.t-=dt;
+  /* mundurowi nacierają STRUMIENIEM: w polu naraz max POL_MAXLIVE, reszta czeka w kolejce —
+     dzięki temu fala jest wielka, ale nie zamienia się w ścianę nie do przejścia */
+  if(POL.queue.length){
+    if(POL.t<=0&&foes.filter(f=>!f.dead).length<POL_MAXLIVE){POL.t=.32;polSpawnOne();}
+    else if(POL.t<=0)POL.t=.4;
+    return;
+  }
+  if(foes.some(f=>!f.dead))return;
+  if(POL.t>0)return;
+  if(POL.wave>=POL_WAVES.length){policeVictory();return;}
+  polStartWave();
+}
+function policeVictory(){
+  POL.done=true;stopBattleMusic();bossShots=[];
+  say([
+    {who:'Komendant od bramki',t:'Dobra, dobra… niech pan już jedzie. Papiery się zgadzają, robot legalny.'},
+    {who:'Edek',t:'No i proszę ludziska — właśnie wyszedłem na wolność! Widzowie kochani, już jestem wolny. Lecę na Poland Rocka!',v:'c_wolnosc'},
+    {who:'Edek',t:'Okazało się, że to wszystko było jedno wielkie nieporozumienie. Lecimy dalej. Yeah!',v:'c_nieporozum'},
+    {who:'Dych Dziki',t:'DZIKO! Mówiłem: łapiemy stopa na Poland Rock, a nie na komisariat, brachu!'},
+    {who:'Edek',t:'A wy tam na Poland Rocku, na Woodstocku — uważajcie na siebie i nie dajcie się złapać, bo skończycie jak ja!',v:'c_uwazajcie'},
+  ],()=>{completeQuest('policja');exitPoliceArena(true);});
+}
+function exitPoliceArena(win){
+  stopBattleMusic();
+  POL.on=false;POL.queue=[];POL.cuffs=0;
+  foes=[];hitFX=[];PROJ=[];bossShots=[];miniBlasts=[];
+  REGIONS.arena.n=POL.nameBak||'DOMENA';
+  setRegion('trasa');
+  const spot=nearestWalkableTile(38,win?34:29)||[38,29];
+  P.x=spot[0]*16+8;P.y=spot[1]*16+8;resetFollowers();
+  camX=Math.max(0,Math.min(MW*16-W,P.x-W/2));camY=Math.max(0,Math.min(MH*16-H,P.y-H/2));
+  hurtT=2;
+  if(win){worldFlash=.7;burstConfetti();
+    toast('🎫 WOLNY! Bramki otwarte — witaj na Poland Rocku!',4600);}
+}
+function polDefeat(){
+  const w=POL.wave;
+  exitPoliceArena(false);
+  POL.cd=3;   // chwila oddechu, żeby patrol nie zgarnął od razu drugi raz
+  for(const id of S.party)PHP[id]=Math.round(chHpMax(id)*.5);
+  S.dia=Math.max(0,S.dia-5);save();refreshHUD();
+  toast('🚔 Zwinęli Cię na dołek przy fali '+w+'/'+POL_WAVES.length+'…<br>Wróć pod bramki i próbuj jeszcze raz!',5000);
+  vsay(Math.random()<.5?'c_zatrzymany':'c_zaco');SFX.no();
+}
+function drawPoliceHUD(){
+  const total=POL_WAVES.length;
+  cx.font='7px "Press Start 2P"';cx.textAlign='center';
+  if(POL.cuffs>0){
+    const done=POL_CUFFS-POL.cuffs;
+    R(cx,W/2-70,34,140,10,'#2a2440');
+    R(cx,W/2-68,36,136*done/POL_CUFFS,6,'#f5c542');
+    cx.fillStyle='#000';cx.fillText('🔗 KAJDANKI — ŁOMOCZ! '+done+'/'+POL_CUFFS,W/2+1,31);
+    cx.fillStyle='#f5c542';cx.fillText('🔗 KAJDANKI — ŁOMOCZ! '+done+'/'+POL_CUFFS,W/2,30);
+  }else{
+    const left=foes.filter(f=>!f.dead).length+POL.queue.length;
+    cx.fillStyle='#000';cx.fillText('🚨 FALA '+Math.max(1,POL.wave)+'/'+total+'   MUNDUROWI: '+left,W/2+1,31);
+    cx.fillStyle=POL.wave>=total?'#e04848':'#f5c542';
+    cx.fillText('🚨 FALA '+Math.max(1,POL.wave)+'/'+total+'   MUNDUROWI: '+left,W/2,30);
+  }
+  if(POL.msgT>0){
+    cx.globalAlpha=Math.min(1,POL.msgT);
+    cx.font='8px "Press Start 2P"';cx.fillStyle='#000';cx.fillText(POL.msg,W/2+1,53);
+    cx.fillStyle='#ece9f4';cx.fillText(POL.msg,W/2,52);cx.globalAlpha=1;
+  }
+  /* migający kogut po bokach ekranu */
+  if(!reduceMotion){
+    const on=Math.floor(anim*4)%2===0;
+    cx.globalAlpha=.18;
+    R(cx,0,0,26,H,on?'#2a6ad8':'#e04848');R(cx,W-26,0,26,H,on?'#e04848':'#2a6ad8');
+    cx.globalAlpha=1;
+  }
+  cx.textAlign='left';
+}
 /* =====================================================================
    BOSSOWIE REGIONALNI
    ===================================================================== */
@@ -3256,7 +3462,7 @@ function findPrompt(){
       if(Math.hypot(P.x-(b.x*16+8),P.y-(b.y*16+8))<28){prompt={bossId:id,label:'⚔ WYZWIJ: '+b.n};break;}
     }
   }
-  if(!prompt&&REG==='arena'){
+  if(!prompt&&REG==='arena'&&!POL.on){
     if(DOM.chest&&!DOM.chest.open&&Math.hypot(P.x-DOM.chest.x,P.y-DOM.chest.y)<24)prompt={chest:1,label:'🎁 Skrzynia!'};
     else if(Math.hypot(P.x-REGIONS.arena.spawn[0],P.y-REGIONS.arena.spawn[1])<22)prompt={exit:1,label:'Wyjście z domeny'};
     else if(DOM.exit2&&Math.hypot(P.x-DOM.exit2.x,P.y-DOM.exit2.y)<22)prompt={exit:1,label:'Wyjście z domeny'};
@@ -3607,7 +3813,16 @@ function talkTo(n){
         L('Edek','No i elegancko, stary! Mamy dach nad głową na rocka!','c_dachnadglowa')]);
       break;
     case 'ochroniarz_bramy':
-      if(qs('przyczepa')!==2)say([
+      if(qs('przyczepa')===2&&qs('policja')!==2)say([
+        L(n.n,'Panie Edwardzie, ja bym pana wpuścił… ale przy bramkach stoi patrol i pyta o pana.'),
+        L('Edek','Chciałbym już być na tym Poland Rocku — poczuć ten zapach festiwalu, te tłumy, muzykę.','c_zapachfest'),
+        L(n.n,'To niech pan podejdzie do bramy i grzecznie z nimi pogada. GRZECZNIE, panie Edwardzie.'),
+      ],()=>{if(qs('policja')===0)setQ('policja',1);});
+      else if(qs('policja')===2)say([
+        L(n.n,'Cała bramka widziała, jak pan wyszedł z tej obławy. Legenda! Opaska i wchodzi pan.'),
+        L('Edek','Okazało się, że to wszystko było jedno wielkie nieporozumienie. Lecimy dalej. Yeah!','c_nieporozum'),
+      ]);
+      else if(qs('przyczepa')!==2)say([
         L(n.n,'Stop. Brama pola. Opaski nie widzę, a bez opaski nie wchodzisz — regulamin festiwalu.'),
         L('Edek','Panie, ja jestem Warchocki Edward, byku. Mam namiot, karimatę i plecak większy niż ja!'),
         L(n.n,'Sprzęt sprzętem, ale opaskę dostają tylko ci, co dojadą z ekipą. Łapcie stopa i wjedźcie tu jak ludzie — wtedy otwieram.'),
@@ -3747,6 +3962,7 @@ const FILM_TITLES={
   bateria:'ŁADUJEMY BATERIE NA STACJI (dwa roboty na 100%)',
   stop2:'EJ, WY TAM Z PRZYCZEPĄ! — ZŁAPALIŚMY STOPA 🚐',
   przyczepa:'SIEMA ODJAZD — JEDZIEMY NA POLAND ROCKA PRZYCZEPĄ! 🎸',
+  policja:'ZATRZYMAŁA MNIE POLICJA PRZY BRAMKACH!!! (całe zajście nagrane) 🚔',
 };
 function completeQuest(id){
   setQ(id,2);S.dia+=QUESTS[id].rw;save();refreshHUD();SFX.dia();
@@ -4609,6 +4825,93 @@ function drawFoeZlomiarz(f,sx,sy){
   R(cx,sx+13.5,sy+12+b,4,2.4,f.kb>0?'#e03028':'#c02020');
   R(cx,sx+13.5,sy+12+b,1.4,2.4,'#ece9f4');R(cx,sx+16,sy+12+b,1.4,2.4,'#ece9f4');
 }
+/* --- OBŁAWA PRZY BRAMCE: policja (granat + odblaski + biało-czerwone akcenty) --- */
+function polCap(sx,sy,b,col,band){   // czapka z daszkiem + otok
+  rr(cx,sx+3,sy-1+b,10,3.6,1.2,col);
+  R(cx,sx+2.4,sy+1.4+b,11.2,1.4,band||'#c9c4dd');
+  R(cx,sx+6.5,sy-2.6+b,3,1.8,'#f5c542');   // odznaka na czapce
+}
+function drawFoePolicjant(f,sx,sy,b){
+  R(cx,sx+4,sy+18,3,6,'#12162c');R(cx,sx+9,sy+18,3,6,'#12162c');
+  rr(cx,sx+3,sy+9+b,10,10,2,'#1e2a52');
+  R(cx,sx+3,sy+10.4+b,10,2.2,'#f5f0a0');                     // odblask na piersi
+  R(cx,sx+3.6,sy+9.4+b,1.4,8,'#0e1636');R(cx,sx+11,sy+9.4+b,1.4,8,'#0e1636');
+  rr(cx,sx+4,sy+1+b,8,8,2.4,'#e8c9a0');
+  polCap(sx,sy,b,'#0e1636');
+  R(cx,sx+5.6,sy+4.4+b,2,1.4,'#1a1a24');R(cx,sx+8.6,sy+4.4+b,2,1.4,'#1a1a24');
+  /* pałka w łapie — wymachuje */
+  const sw=Math.sin(anim*8+sx)*(reduceMotion?0:2);
+  cx.save();cx.translate(sx+13,sy+11+b);cx.rotate(-.5+sw*.12);
+  R(cx,0,-1,9,2.4,'#23233a');R(cx,7.4,-1.4,2.4,3.2,'#3a3a4e');cx.restore();
+}
+function drawFoePrewencja(f,sx,sy,b){
+  R(cx,sx+4,sy+18,3.4,6,'#0e1226');R(cx,sx+9,sy+18,3.4,6,'#0e1226');
+  rr(cx,sx+2,sy+8+b,12,11,2,'#141c3a');
+  rr(cx,sx+4,sy+.6+b,8,8.4,2.4,'#2a3050');                    // kask
+  R(cx,sx+4,sy+3.4+b,8,3,'#8fd0f4');                          // przyłbica
+  R(cx,sx+3.4,sy-.6+b,9.2,1.8,'#0e1636');
+  /* TARCZA od strony gracza */
+  const left=P.x<f.x;
+  const shx=left?sx-4:sx+11;
+  rr(cx,shx,sy+2+b,7,17,2,'#2f3a66');
+  R(cx,shx+.8,sy+3+b,5.4,15,'#43507f');
+  R(cx,shx+1.4,sy+8+b,4.2,1.6,'#f5f0a0');
+  cx.font='4px "Press Start 2P"';cx.fillStyle='#ece9f4';
+  cx.save();cx.translate(shx+3.4,sy+13+b);cx.rotate(-1.57);cx.textAlign='center';
+  cx.fillText('POLICJA',0,1.4);cx.restore();cx.textAlign='left';
+}
+function drawFoeDrogowka(f,sx,sy,b){
+  R(cx,sx+4,sy+18,3,6,'#12162c');R(cx,sx+9,sy+18,3,6,'#12162c');
+  rr(cx,sx+3,sy+9+b,10,10,2,'#24305c');
+  rr(cx,sx+2.6,sy+9.6+b,10.8,7,1.5,'#e8f56a');                // kamizelka odblaskowa
+  R(cx,sx+2.6,sy+12+b,10.8,1.6,'#c9c4dd');
+  rr(cx,sx+4,sy+1+b,8,8,2.4,'#e8c9a0');
+  polCap(sx,sy,b,'#0e1636','#e8f56a');
+  R(cx,sx+5.6,sy+4.4+b,2,1.4,'#1a1a24');R(cx,sx+8.6,sy+4.4+b,2,1.4,'#1a1a24');
+  /* LIZAK — świeci tuż przed strzałem */
+  const hot=f.chargeT>0;
+  const lx=P.x<f.x?sx-3:sx+14;
+  R(cx,lx+1,sy+4+b,1.6,10,'#c9c4dd');
+  cx.fillStyle=hot&&Math.floor(anim*20)%2?'#fff':'#e03028';
+  cx.beginPath();cx.arc(lx+1.8,sy+3+b,3.6,0,7);cx.fill();
+  cx.fillStyle='#fff7f2';cx.beginPath();cx.arc(lx+1.8,sy+3+b,1.6,0,7);cx.fill();
+  if(hot){cx.fillStyle='rgba(224,48,40,.25)';cx.beginPath();cx.arc(lx+1.8,sy+3+b,8,0,7);cx.fill();}
+}
+function drawFoePolicjantka(f,sx,sy,b){
+  R(cx,sx+4,sy+18,3,6,'#12162c');R(cx,sx+9,sy+18,3,6,'#12162c');
+  rr(cx,sx+3,sy+9+b,10,10,2,'#2a3a68');
+  R(cx,sx+3,sy+10.4+b,10,2,'#f5f0a0');
+  rr(cx,sx+4,sy+1+b,8,8,2.4,'#f0d0aa');
+  rr(cx,sx+11.4,sy+3+b,3,7,1.4,'#5a3a1e');                    // kucyk
+  polCap(sx,sy,b,'#16204a');
+  R(cx,sx+5.6,sy+4.4+b,2,1.4,'#1a1a24');R(cx,sx+8.6,sy+4.4+b,2,1.4,'#1a1a24');
+  R(cx,sx+6,sy+7+b,4,.9,'#c8384a');                           // uśmiech (to ona skuła Edka)
+  /* gwizdek */
+  const wh=Math.floor(anim*6)%2===0;
+  R(cx,sx+12.6,sy+8+b,3,2.2,wh?'#f5c542':'#c9c4dd');
+  if(f.kb>0&&!reduceMotion){cx.fillStyle='rgba(255,255,255,.5)';
+    cx.beginPath();cx.arc(sx+16,sy+9+b,3+Math.sin(anim*20),0,7);cx.fill();}
+}
+function drawFoeKomendant(f,sx,sy,b){
+  const cxr=sx+8;
+  R(cx,cxr-6,sy+17,4.4,8,'#0b0f22');R(cx,cxr+2,sy+17,4.4,8,'#0b0f22');
+  rr(cx,cxr-8,sy+3+b,16,15,3,'#0e1636');                      // korpus 2×
+  R(cx,cxr-8,sy+6+b,16,2.6,'#f5f0a0');
+  R(cx,cxr-7,sy+4+b,3.4,2.4,'#f5c542');R(cx,cxr+3.6,sy+4+b,3.4,2.4,'#f5c542');  // epolety
+  rr(cx,cxr-5,sy-7+b,10,10,2.6,'#e8c9a0');
+  rr(cx,cxr-6.5,sy-9.4+b,13,4,1.4,'#0b0f22');                 // czapka z otokiem
+  R(cx,cxr-7.5,sy-6.2+b,15,2,'#c9c4dd');
+  R(cx,cxr-2,sy-12+b,4,2.6,'#f5c542');
+  R(cx,cxr-3.4,sy-4+b,2.6,1.8,'#1a1a24');R(cx,cxr+.8,sy-4+b,2.6,1.8,'#1a1a24');
+  R(cx,cxr-3,sy-.6+b,6,1.2,'#8a5a3a');                        // wąs komendanta
+  /* megafon */
+  const left=P.x<f.x;
+  cx.save();cx.translate(cxr+(left?-11:11),sy+8+b);cx.scale(left?-1:1,1);
+  cx.fillStyle='#c8384a';cx.beginPath();cx.moveTo(0,-3);cx.lineTo(8,-6);cx.lineTo(8,6);cx.lineTo(0,3);cx.fill();
+  R(cx,-3,-2,3,4,'#8a2438');
+  if(Math.floor(anim*8)%2)for(let i=0;i<3;i++)R(cx,9+i*3,-3+i,1.6,1.6,'rgba(245,197,66,.8)');
+  cx.restore();
+}
 /* --- ELITY DOMEN: więksi, groźniejsi, z własnym look'iem --- */
 function drawFoeRycerz(f,sx,sy,b){ // KLAWIATUROWY RYCERZ — hejter w zbroi z klawiatur
   const cxr=sx+8;
@@ -4813,7 +5116,9 @@ const FOE_DRAW={pies:drawFoeDog,oburzona:drawFoeLady,zlyrobot:drawFoeRobot,
   rycerz:drawFoeRycerz,odyniec:drawFoeOdyniec,utopiec:drawFoeUtopiec,
   smoczatko:drawFoeSmoczatko,golem:drawFoeGolem,
   soltys:drawMbSoltys,paparazzo:drawMbPaparazzo,betoniarz:drawMbBetoniarz,dj:drawMbDj,
-  komornik:drawMbKomornik,smog:drawMbSmog,rolexiarz:drawMbRolexiarz};
+  komornik:drawMbKomornik,smog:drawMbSmog,rolexiarz:drawMbRolexiarz,
+  policjant:drawFoePolicjant,prewencja:drawFoePrewencja,drogowka:drawFoeDrogowka,
+  policjantka:drawFoePolicjantka,komendant:drawFoeKomendant};
 function drawNPC(c,n,sx,sy){
   if(n.robo){ // Dych jako NPC (zanim dołączy do ekipy)
     drawDychBody(c,sx,sy,0,Math.floor(anim*2)%2);
@@ -5157,6 +5462,11 @@ function updateWorld(dt){
   updateCity(dt);
   updateRadio(dt);
   updateForage(dt);
+  if(POL.cd>0)POL.cd-=dt;
+  if(POL.on)updatePolice(dt);
+  /* BRAMKI POLAND ROCKA: podejście pod bramę odpala finałowy odcinek z policją */
+  else if(REG==='trasa'&&scene==='world'&&POL.cd<=0&&qs('przyczepa')===2&&qs('policja')!==2
+    &&Math.hypot(P.x-632,P.y-524)<38)startPoliceEpisode();
   idleT-=dt;
   if(idleT<=0){
     if(scene==='world'&&REG!=='arena'&&!curVoice){
@@ -5183,7 +5493,7 @@ const MAPCOL={0:'#2f6b3a',1:'#b39a68',2:'#454552',3:'#2f6db0',4:'#173a20',5:'#9a
   7:'#3a7a46',8:'#dcc888',9:'#8a6a42',16:'#7a7a8c',17:'#e8eef8',
   18:'#3a7a44',30:'#1f4a24',19:'#2a5a2e',20:'#7a7a8c',21:'#4a7050',22:'#a02c44',23:'#8a6746',
   24:'#2f6db0',25:'#4a7a3a',26:'#5a4028',27:'#e0662a',28:'#4a9a52',29:'#c8a86a',31:'#357a3e',
-  32:'#e04848',33:'#1a1a24',34:'#b0b0be',35:'#3a7ad0'};
+  32:'#e04848',33:'#1a1a24',34:'#b0b0be',35:'#3a7ad0',36:'#d84848'};
 const mapColor=v=>MAPCOL[v]||(v>=10&&v<=15?'#6a6a80':'#2f6b3a');
 function drawMapOverlay(){
   cx.fillStyle='rgba(9,7,18,.93)';cx.fillRect(0,0,W,H);
@@ -5222,7 +5532,7 @@ function drawMapOverlay(){
 const TCOL={0:'#2e5a34',1:'#a08a5a',2:'#3a3a48',7:'#2e5a34',8:'#d8c084',9:'#8a6a42',16:'#7a7a8c',17:'#e8eef8',
   18:'#2e5a34',19:'#2e5a34',20:'#2e5a34',21:'#2e5a34',22:'#2e5a34',23:'#7a5636',24:'#2e5a34',25:'#2e5a34',
   26:'#2e5a34',27:'#2e5a34',28:'#2e5a34',29:'#2e5a34',30:'#2e5a34',31:'#2e5a34',
-  32:'#2e5a34',33:'#2e5a34',34:'#a08a5a',35:'#2e5a34'};
+  32:'#2e5a34',33:'#2e5a34',34:'#a08a5a',35:'#2e5a34',36:'#3a3a48'};
 /* podłoże pod asset (trawa/piasek/śnieg wg regionu) — spójne tło dekoracji */
 function baseTile(){return REG==='morze'?8:REG==='tatry'?17:0;}
 function baseCol(){return REG==='morze'?'#d8c084':REG==='tatry'?'#e8eef8':'#2e5a34';}
@@ -5460,6 +5770,13 @@ function drawWorld(){
       R(cx,sx+3,sy+8,2,6,'#6a6a78');R(cx,sx+11,sy+8,2,6,'#6a6a78');
       R(cx,sx,sy+5,16,4,'#b0b0be');R(cx,sx,sy+5,16,1.4,'#d8d8e4');R(cx,sx,sy+8,16,1,'#7c7c8a');
       if((tx+ty)%4===0)R(cx,sx+7,sy+5.6,2.4,2.8,'#e04848');}              // odblask
+    else if(v===36){ // SZLABAN — biało-czerwona zapora (osłona policji na obławie)
+      R(cx,sx,sy,16,16,TCOL[2]);
+      cx.fillStyle='rgba(0,0,0,.25)';R(cx,sx,sy+12,16,3,'rgba(0,0,0,.25)');
+      R(cx,sx+6,sy+6,4,9,'#8a8a98');R(cx,sx+5,sy+14,6,2,'#5c5c6e');        // podstawa
+      for(let i=0;i<4;i++)R(cx,sx+i*4,sy+3,4,4,i%2?'#ece9f4':'#d02828');   // ramię w pasy
+      R(cx,sx,sy+3,16,1,'#fff7f2');
+      if(!reduceMotion&&Math.floor(anim*4)%2===0)R(cx,sx+7,sy+.4,2.4,2.4,'#f5c542');}
     else if(v===35){ // KABINA TOI TOI — środkowa (43,40) to WC TRON Edka
       const tron=(tx===43&&ty===40);
       R(cx,sx,sy,16,16,baseCol());
@@ -5581,8 +5898,8 @@ function drawWorld(){
       }
     }
   }else{
-    // arena: wyjście + skrzynia + kryształy domeny
-    drawPortal(REGIONS.arena.spawn[0]-camX,REGIONS.arena.spawn[1]-camY,'#8f88b0','WYJŚCIE [E]');
+    // arena: wyjście + skrzynia + kryształy domeny (w obławie policji nie ma wyjścia!)
+    if(!POL.on)drawPortal(REGIONS.arena.spawn[0]-camX,REGIONS.arena.spawn[1]-camY,'#8f88b0','WYJŚCIE [E]');
     if(DOM.exit2)drawPortal(DOM.exit2.x-camX,DOM.exit2.y-camY,'#8f88b0','WYJŚCIE [E]');
     if(DOM.chest)drawChest(DOM.chest.x-camX,DOM.chest.y-camY,DOM.chest.open);
     for(const c of DOM.crystals){
@@ -5705,6 +6022,13 @@ function drawWorld(){
       cx.fillStyle='#e03028';cx.beginPath();cx.ellipse(sx,sy,6*el,2.8*el,ang,0,7);cx.fill();
       cx.fillStyle='#ff9a90';cx.beginPath();cx.ellipse(sx,sy,3*el,1.4*el,ang,0,7);cx.fill();
       cx.fillStyle='#fff7f2';cx.beginPath();cx.arc(sx-b.dx*.02,sy-b.dy*.02,1.1,0,7);cx.fill();
+    }else if(b.t==='lizak'){        // LIZAK drogówki — wiruje jak frisbee
+      cx.save();cx.translate(sx,sy);cx.rotate(anim*9);
+      R(cx,-1.2,0,2.4,7,'#c9c4dd');
+      cx.fillStyle='#e03028';cx.beginPath();cx.arc(0,0,4.6,0,7);cx.fill();
+      cx.fillStyle='#fff7f2';cx.beginPath();cx.arc(0,0,2.6,0,7);cx.fill();
+      cx.fillStyle='#e03028';R(cx,-1.6,-1.2,3.2,2.4,'#e03028');
+      cx.restore();
     }else if(b.t==='widly'){        // widły Sołtysa — lecą zębami do przodu
       cx.save();cx.translate(sx,sy);cx.rotate(Math.atan2(b.dy,b.dx));
       R(cx,-8,-1,10,2,'#8a5a2e');
@@ -5867,6 +6191,7 @@ function drawWorld(){
      R(cx,62,30,(W-124)*Math.max(0,bf.hp/bf.maxHp),5,bf.ph2?'#e04848':'#f5a032');
      cx.strokeStyle='#ece9f4';cx.lineWidth=1;cx.strokeRect(60,28,W-120,9);
    }}
+  if(POL.on)drawPoliceHUD();
   // licznik fal w domenie
   if(REG==='arena'&&DOM.cur){
     cx.font='7px "Press Start 2P"';cx.textAlign='center';
@@ -6867,11 +7192,11 @@ const MRI={};
 function arriveAtField(){
   if(REG!=='trasa')return;
   setRegion('trasa');
-  const spot=nearestWalkableTile(30,41)||[30,41];
+  const spot=nearestWalkableTile(38,29)||[38,29];
   P.x=spot[0]*16+8;P.y=spot[1]*16+8;resetFollowers();
   camX=Math.max(0,Math.min(MW*16-W,P.x-W/2));camY=Math.max(0,Math.min(MH*16-H,P.y-H/2));
   hurtT=1.5;
-  toast('🎫 Opaska założona — jesteście NA POLU!<br>Scena [E] i food truck czekają.',4200);
+  toast('🚐 Przyczepa dowiozła was pod BRAMKI Poland Rocka!<br>Podejdź do bramy — tylko grzecznie…',4600);
 }
 function startRide(){
   scene='mgRide';
@@ -7098,7 +7423,7 @@ $('btnCont').addEventListener('click',()=>{
   applyChar();initPartyHP(true);resetFollowers();
   if(SOLID(at(Math.floor(P.x/16),Math.floor(P.y/16)))){const sp=REGIONS[REG].spawn;P.x=sp[0];P.y=sp[1];}
   /* stary zapis mógł zostawić gracza NA POLU, zanim postawiliśmy bramę — wypuść go na trasę */
-  if(REG==='trasa'&&qs('przyczepa')!==2&&insideFest(Math.floor(P.x/16),Math.floor(P.y/16))){
+  if(REG==='trasa'&&qs('policja')!==2&&insideFest(Math.floor(P.x/16),Math.floor(P.y/16))){
     const sp=REGIONS.trasa.spawn;P.x=sp[0];P.y=sp[1];resetFollowers();
     toast('🎫 Brama pola jest zamknięta — najpierw złap stopa i wjedź tu z ekipą!',4200);
   }
