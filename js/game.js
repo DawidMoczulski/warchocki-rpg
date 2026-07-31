@@ -78,11 +78,19 @@ const AUDIO_KEYS=["song", "burst_byku", "metro_rhythm", "s_dziki", "s_elegancko"
 "c_polandrock", "c_festiwalowicze", "c_kojarze", "c_zerknijcie", "c_podwiezcie", "c_zmieszcze",
 "c_bratniduch", "c_namiot", "c_planprosty", "c_trzymajtempo", "d_przeklenstwa", "c_wypatrzycie",
 "c_eleganckorock", "c_ruchnadrodze", "c_laweta", "c_paniekierowco", "d_edekwstawaj", "c_zlemiejsce",
-"c_naladowac", "c_luksa", "c_dachnadglowa", "c_pakujemygraty", "c_alejazda", "c_przyczepa", "c_kciuki"];
+"c_naladowac", "c_luksa", "c_dachnadglowa", "c_pakujemygraty", "c_alejazda", "c_przyczepa", "c_kciuki",
+/* --- MELDUNEK Z POLAND ROCKA (short „WC Tron") — grają tylko na TRASIE / na polu --- */
+"c_meldujesie", "c_tron", "c_krolem", "c_niesamowicie", "c_slyszyszmnie", "c_juzide", "c_cotygadasz"];
 /* dłuższe monologi Edka do tła (mapa) */
 const IDLE_POOL=['m_roboty','m_wiatr','m_kopernik','m_ministerstwo','m_magia','m_rolexlong',
   'm_meczlong','m_puszki','m_roboty','m_kopernik','m_wiatr','m_rolexlong',
   'c_tygrysy','c_kawa','c_krolbalu','c_prokop','v_zycie','c_koniecswiata','c_spaceruje'];
+/* pule gadania dla TRASY: inna przy krajowej, inna już NA POLU festiwalu */
+const TRASA_POOL=IDLE_POOL.concat(['c_ruchnadrodze','c_kojarze','c_festiwalowicze','c_wypatrzycie',
+  'c_planprosty','c_polandrock','c_trzymajtempo','c_kciuki','c_zerknijcie','c_juzide','c_meldujesie']);
+const ROCK_POOL=['c_meldujesie','c_krolem','c_slyszyszmnie','c_niesamowicie','c_festiwalowicze',
+  'c_kojarze','c_alejazda','c_tron','c_cotygadasz','c_eleganckorock','c_dachnadglowa','c_kciuki',
+  'c_meldujesie','c_krolem','c_slyszyszmnie','c_juzide'];
 let AC=null,master=null,musicGain=null,voiceGain=null,chipGain=null,battleGain=null;
 let songSrc=null,songT0=0;
 const BUFS={};
@@ -635,6 +643,7 @@ function buildTrasa(){
     [7,46],[16,47],[26,47],[36,47],[46,47],[49,39],[10,42],[31,38],[44,36],[19,35]];
   for(const[t0,t1]of tents)set(t0,t1,32);
   set(21,45,27);set(39,45,27);set(11,37,27);         // ogniska na polu
+  set(42,40,35);set(43,40,35);set(44,40,35);         // kabiny — środkowa to WC TRON
   const trees=[[3,10],[8,8],[14,11],[19,7],[25,10],[31,8],[38,11],[44,7],[50,10],[54,13],
     [2,31],[3,35],[55,33],[56,36],[3,44],[2,49],[55,45],[26,30],[33,30]];
   for(const[t0,t1]of trees)set(t0,t1,4);
@@ -699,7 +708,7 @@ const REGIONS={
 let REG='wawa';
 /* kafle blokujące ruch (tablica = szybkie sprawdzanie w AI/ruchu). Nowe assety 18–31. */
 const SOLIDF=new Uint8Array(64);
-[3,4,5,6,10,11,12,13,14,15,16,   18,19,20,22,24,26,27,29,30,   32,33,34].forEach(v=>{SOLIDF[v]=1;});
+[3,4,5,6,10,11,12,13,14,15,16,   18,19,20,22,24,26,27,29,30,   32,33,34,35].forEach(v=>{SOLIDF[v]=1;});
 const SOLID=v=>SOLIDF[v]===1;
 
 const DOORS=[
@@ -733,6 +742,7 @@ const DOORS=[
   {r:'trasa',x:19,y:31,n:'Stacja ładowania',act:'stacja'},
   {r:'trasa',x:29,y:38,n:'SCENA POLAND ROCK',act:'scena',gated:'przyczepa'},
   {r:'trasa',x:14,y:42,n:'Food truck',act:'foodtruck',gated:'przyczepa'},
+  {r:'trasa',x:43,y:41,n:'WC TRON',act:'tron',gated:'przyczepa'},
 ];
 const NPCS=[
   {r:'wawa',id:'pani_park',n:'Pani Grażynka',x:11*16,y:19*16,c:'#c86fa8',hair:'#d8d4e8'},
@@ -3681,10 +3691,22 @@ function enterDoor(d){
           recordSpot('stacja','ŁADUJĘ SIĘ NA STACJI JAK AUTO ELEKTRYCZNE',12);});
       break;
     case 'scena':say([{who:'Edek',t:'SCENA POLAND ROCKA. Człowieku, stąd widać całe pole i wszystkie namioty!'},
+      {who:'Edek',t:'Edward Warchocki melduje się prosto z Poland Rocka!',v:'c_meldujesie'},
+      {who:'Edek',t:'Słyszysz mnie? Yeah! Król jestem dzisiaj!',v:'c_krolem'},
       {who:'Edek',t:'Witajcie, witajcie moi drodzy festiwalowicze! Kojarzę was, ludziska!',v:'c_festiwalowicze'},
       {who:'Edek',t:'Ale jazda! I widzicie ludziska — udało się. Kierunek: Poland Rock Festival!',v:'c_alejazda'}],
       ()=>{burstConfetti();worldFlash=.6;
         recordSpot('scena','WSZEDŁEM NA SCENĘ POLAND ROCKA (tłum oszalał!)',30);});
+      break;
+    case 'tron':say([
+      {who:'Edek',t:'Edward Warchocki melduje się prosto z Poland Rocka!',v:'c_meldujesie'},
+      {who:'Edek',t:'Tutaj zasiadam na tronie. Ale nie byle jakim — bo to nie jakiś tam zwykły toi toj, tylko prawdziwe WC TRON!',v:'c_tron'},
+      {who:'Edek',t:'Król jestem dzisiaj!',v:'c_krolem'},
+      {who:'Edek',t:'Czuję się… nie no, przepraszam — NIESAMOWICIE!',v:'c_niesamowicie'},
+      {who:'Dych Dziki',t:'Gadasz! Żadnych przekleństw, brachu — dobrze, że się poprawiłeś.',v:'d_przeklenstwa'},
+      {who:'Edek',t:'Słyszysz mnie? Yeah!',v:'c_slyszyszmnie'},
+    ],()=>{worldFlash=.5;burstConfetti();
+      recordSpot('tron','ZASIADŁEM NA WC TRONIE NA POLAND ROCKU 👑',22);});
       break;
     case 'foodtruck':say([{who:'Sprzedawca z food trucka',t:'Zapiekanka, frytki belgijskie, oscypek z żurawiną! Dla robota… olej z gofrownicy?'},
       {who:'Edek',t:'No dawaj, dawaj człowieku! Ekipa je za wszystkie czasy.',v:'c_gofry'}],
@@ -5143,8 +5165,8 @@ function updateWorld(dt){
       const want=roll<.3?1:roll<.75?2:3;
       const ch=[];
       const pool=REG==='morze'?IDLE_POOL.concat(['c_zyciemorze','c_mielno','c_czapka','c_morzejazda','c_zyciemorze','c_mielno'])
-        :REG==='trasa'?IDLE_POOL.concat(['c_ruchnadrodze','c_kojarze','c_festiwalowicze','c_wypatrzycie',
-            'c_planprosty','c_polandrock','c_trzymajtempo','c_kciuki','c_ruchnadrodze','c_zerknijcie']):IDLE_POOL;
+        /* na samym POLU festiwalu Edek melduje się z Poland Rocka, poza polem gada o trasie */
+        :REG==='trasa'?(insideFest(Math.floor(P.x/16),Math.floor(P.y/16))?ROCK_POOL:TRASA_POOL):IDLE_POOL;
       while(ch.length<want){const c=pickA(pool);if(!ch.includes(c))ch.push(c);}
       vsayChain(ch);
       idleT=chainDur(ch)+3+Math.random()*6;  // przerwa dopiero PO całym bloku
@@ -5161,7 +5183,7 @@ const MAPCOL={0:'#2f6b3a',1:'#b39a68',2:'#454552',3:'#2f6db0',4:'#173a20',5:'#9a
   7:'#3a7a46',8:'#dcc888',9:'#8a6a42',16:'#7a7a8c',17:'#e8eef8',
   18:'#3a7a44',30:'#1f4a24',19:'#2a5a2e',20:'#7a7a8c',21:'#4a7050',22:'#a02c44',23:'#8a6746',
   24:'#2f6db0',25:'#4a7a3a',26:'#5a4028',27:'#e0662a',28:'#4a9a52',29:'#c8a86a',31:'#357a3e',
-  32:'#e04848',33:'#1a1a24',34:'#b0b0be'};
+  32:'#e04848',33:'#1a1a24',34:'#b0b0be',35:'#3a7ad0'};
 const mapColor=v=>MAPCOL[v]||(v>=10&&v<=15?'#6a6a80':'#2f6b3a');
 function drawMapOverlay(){
   cx.fillStyle='rgba(9,7,18,.93)';cx.fillRect(0,0,W,H);
@@ -5200,7 +5222,7 @@ function drawMapOverlay(){
 const TCOL={0:'#2e5a34',1:'#a08a5a',2:'#3a3a48',7:'#2e5a34',8:'#d8c084',9:'#8a6a42',16:'#7a7a8c',17:'#e8eef8',
   18:'#2e5a34',19:'#2e5a34',20:'#2e5a34',21:'#2e5a34',22:'#2e5a34',23:'#7a5636',24:'#2e5a34',25:'#2e5a34',
   26:'#2e5a34',27:'#2e5a34',28:'#2e5a34',29:'#2e5a34',30:'#2e5a34',31:'#2e5a34',
-  32:'#2e5a34',33:'#2e5a34',34:'#a08a5a'};
+  32:'#2e5a34',33:'#2e5a34',34:'#a08a5a',35:'#2e5a34'};
 /* podłoże pod asset (trawa/piasek/śnieg wg regionu) — spójne tło dekoracji */
 function baseTile(){return REG==='morze'?8:REG==='tatry'?17:0;}
 function baseCol(){return REG==='morze'?'#d8c084':REG==='tatry'?'#e8eef8':'#2e5a34';}
@@ -5438,6 +5460,22 @@ function drawWorld(){
       R(cx,sx+3,sy+8,2,6,'#6a6a78');R(cx,sx+11,sy+8,2,6,'#6a6a78');
       R(cx,sx,sy+5,16,4,'#b0b0be');R(cx,sx,sy+5,16,1.4,'#d8d8e4');R(cx,sx,sy+8,16,1,'#7c7c8a');
       if((tx+ty)%4===0)R(cx,sx+7,sy+5.6,2.4,2.8,'#e04848');}              // odblask
+    else if(v===35){ // KABINA TOI TOI — środkowa (43,40) to WC TRON Edka
+      const tron=(tx===43&&ty===40);
+      R(cx,sx,sy,16,16,baseCol());
+      cx.fillStyle='rgba(0,0,0,.25)';cx.beginPath();cx.ellipse(sx+8,sy+14,6,2.2,0,0,7);cx.fill();
+      rr(cx,sx+2,sy-3,12,17,1.5,tron?'#2f66c0':'#3a7ad0');
+      R(cx,sx+2,sy-3,12,2.4,tron?'#7bc950':'#2a5a9a');              // dach
+      rr(cx,sx+4,sy+1,8,12,1,tron?'#2450a0':'#2f66c0');             // drzwi
+      R(cx,sx+4.6,sy+2,6.8,3.4,'#8fd0f4');                          // okienko
+      R(cx,sx+11,sy+7,1.4,1.4,'#c9c4dd');                           // klamka
+      if(tron){                                                     // korona + napis
+        R(cx,sx+5,sy-6,6,3,'#f5c542');
+        for(let i=0;i<3;i++)R(cx,sx+5+i*2.4,sy-8,1.6,2.4,'#f5c542');
+        cx.font='4px "Press Start 2P"';cx.fillStyle='#fff7d6';cx.textAlign='center';
+        cx.fillText('WC TRON',sx+8,sy+11);cx.textAlign='left';
+        if(!reduceMotion&&Math.floor(anim*3)%2===0)R(cx,sx+13,sy-5,2,2,'#fff7d6');
+      }}
     else if(v===31){ // PAPROĆ (deptalna)
       R(cx,sx,sy,16,16,baseCol());
       cx.strokeStyle='#3a7a3e';cx.lineWidth=1.2;
