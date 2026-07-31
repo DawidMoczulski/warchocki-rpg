@@ -1042,7 +1042,8 @@ const FOE_TYPES={
   drogowka:{hp:120,atk:15,spd:52,c:'#24305c',dia:7,pts:2000,shoots:true,shotType:'lizak',cover:true}, // strzela lizakiem zza szlabanu
   policjantka:{hp:180,atk:17,spd:80,c:'#2a3a68',dia:10,pts:2600,charge:true},                   // szybka, szarżuje
   komendant:{hp:760,atk:20,spd:52,c:'#0e1636',dia:30,pts:9000,mini:true,elite:true,unlock:0,
-    en:'KOMENDANT OD BRAMKI',kbres:true,armor:.25,shoots:true,shotType:'lizak'},
+    en:'KOMENDANT OD BRAMKI',kbres:true,armor:.25,shoots:true,shotType:'lizak',
+    moves:['lizak3','slamfala','summon','mur'],minion:'policjant'},
   gigadres:{hp:220,atk:18,spd:58,c:'#0e0e16',hood:'#c8384a',skin:'#e8c9a0',dia:10,pts:3000},
   straznik:{hp:400,atk:20,spd:48,c:'#2a2440',hood:'#8a6fc8',skin:'#c9c4dd',dia:20,pts:8000},
   /* --- ELITY DOMEN (mocni, trudni, z własnymi mechanikami) --- */
@@ -1114,6 +1115,7 @@ const MB_MOVES={
   kettle1:f=>{mbShoot(f,'kettle',1,130);},
   flesz3: f=>{mbShoot(f,'flash',3,150);},
   laser3: f=>{mbShoot(f,'laser',3,160);},
+  lizak3: f=>{mbShoot(f,'lizak',3,150);addHit(f.x,f.y-30,'DO KONTROLI!','#e03028');},
   rolex3: f=>{mbShoot(f,'rolex',3,150);addHit(f.x,f.y-30,'ORYGINAŁ, BYKU!','#f5c542');},
   smog3:  f=>{mbShoot(f,'smogp',3,120);},
   summon: f=>{ // przyzwanie 2 pomagierów (limit na arenie)
@@ -1905,7 +1907,7 @@ function updateFoes(dt){
       if(f.atk===undefined)f.atk=td.atk;
       if(f.shield>0)f.shield-=dt;
       f.mvT=(f.mvT===undefined?1.6:f.mvT)-dt;
-      if(f.mvT<=0&&d<240&&f.warnT===undefined){
+      if(f.mvT<=0&&d<240&&f.warnT===undefined&&td.moves&&td.moves.length){
         f.mvT=2.3+Math.random()*1.3;
         const mv=pickA(td.moves);
         if(MB_MOVES[mv])MB_MOVES[mv](f);
@@ -7493,7 +7495,19 @@ function typewriter(dt){
   $('dlgText').textContent=dlgLine.t.slice(0,Math.floor(dlgChars));
   $('dlgMore').style.visibility=dlgChars>=dlgLine.t.length?'visible':'hidden';
 }
+/* SIATKA BEZPIECZEŃSTWA: wyjątek w jednej klatce nie może zabić requestAnimationFrame
+   (kiedyś mini-boss bez listy ruchów potrafił tak ZAWIESIĆ całą grę). Łapiemy, logujemy,
+   raz ostrzegamy gracza i lecimy dalej. */
+let frameErrs=0;
 function loop(ts){
+  try{frame(ts);}catch(e){
+    frameErrs++;
+    console.error('Błąd klatki:',e);
+    if(frameErrs===1)toast('⚠️ Coś się posypało w tej klatce, ale gramy dalej.<br>Zgłoś to Dawidowi!',4000);
+    if(frameErrs<400)requestAnimationFrame(loop);
+  }
+}
+function frame(ts){
   const dt=Math.min(.05,(ts-last)/1000)||0;last=ts;anim+=dt;
   cx.setTransform(RES,0,0,RES,0,0);
   if(paused){
