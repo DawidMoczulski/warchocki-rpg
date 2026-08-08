@@ -261,3 +261,16 @@ h1.px{margin:0;font-size:clamp(20px,4.6vw,36px);color:var(--gold);
 .kbkey:hover{border-color:var(--gold)}
 .kbkey.wait{color:var(--red);border-color:var(--red);animation:blink 1s steps(2) infinite}
 footer{margin-top:16px;font-size:13px;color:var(--mut);text-align:center;max-width:70ch;line-height:1.7}
+
+/* ---------- MYSZ JAKO STEROWANIE ----------
+   Gdy któraś akcja (np. CIOS) siedzi na przycisku myszy, kursor w grze tylko
+   przeszkadza i kusi do klikania ikon zamiast walki. Chowamy go i wyłączamy
+   ikony HUD-u; przytrzymanie CTRL przywraca jedno i drugie. */
+body.nocursor #stage,
+body.nocursor #game{cursor:none}
+body.nocursor #hud .hudbtn{pointer-events:none;opacity:.45}
+body.nocursor #hud::after{
+  content:'CTRL = mysz';
+  position:absolute;right:10px;top:44px;
+  font-family:'Press Start 2P',monospace;font-size:8px;
+  color:rgba(245,197,66,.75);text-shadow:1px 1px 0 #000;pointer-events:none}

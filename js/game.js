@@ -32,7 +32,15 @@ if(!KEYMAP.sprint)KEYMAP.sprint='ShiftLeft';   // sprint dołożony później
 function saveKeys(){store.set('wrpg_keys',JSON.stringify(KEYMAP));}
 const keyName=code=>({Space:'SPACJA',Enter:'ENTER',Escape:'ESC',ArrowUp:'↑',ArrowDown:'↓',
   ArrowLeft:'←',ArrowRight:'→',ShiftLeft:'SHIFT',ShiftRight:'SHIFT',ControlLeft:'CTRL',
-  ControlRight:'CTRL',Tab:'TAB',Backquote:'`'}[code]||(code||'').replace('Key','').replace('Digit',''));
+  ControlRight:'CTRL',Tab:'TAB',Backquote:'`',
+  Mouse0:'🖱 LPM',Mouse1:'🖱 ŚPM',Mouse2:'🖱 PPM'}[code]||(code||'').replace('Key','').replace('Digit',''));
+/* przypisania myszy zapisujemy jako Mouse0 (lewy) / Mouse1 (środkowy) / Mouse2 (prawy) */
+const isMouseBind=code=>/^Mouse[0-2]$/.test(code||'');
+const mouseAction=btn=>{
+  const code='Mouse'+btn;
+  for(const a of Object.keys(KEYMAP))if(KEYMAP[a]===code)return a;
+  return null;
+};
 let rebindAction=null;   // trwa przypisywanie klawisza do tej akcji
 
 /* ---------------- ZAPIS ---------------- */
@@ -87,6 +95,10 @@ const TEST_SETUPS={
   policja:{q:{dych:2,graty:2,stop1:2,bateria:2,stop2:2,przyczepa:2},reg:'trasa',at:[38,29]},
   pole:{q:{dych:2,graty:2,stop1:2,bateria:2,stop2:2,przyczepa:2,policja:2},reg:'trasa',at:[38,36]},
   klaunica:{q:{dych:2},reg:'morze',at:[67,21]},   // tuż przed bramą STREFY IMPREZY
+  jezioro:{q:{dych:2},reg:'chodziez',at:[15,12]},  // start serii — przy Sąsiedzie Mietku
+  plaza:{q:{dych:2,pletwy:2,gdzieplaza:2},reg:'chodziez',at:[30,50]},   // od razu na plaży
+  torpeda:{q:{dych:2,pletwy:2,gdzieplaza:2,sprawdzwode:2,multiwitamina:2},
+    reg:'chodziez',at:[33,49]},                    // przy ratowniku, minigra gotowa
 };
 (function applyTestSetup(){
   let m=null;
@@ -128,7 +140,15 @@ const AUDIO_KEYS=["song", "burst_byku", "metro_rhythm", "s_dziki", "s_elegancko"
 "c_zapachfest", "p_takierzeczy", "c_zatrzymany", "c_zaco", "c_uwazajcie", "c_wolnosc", "c_nieporozum",
 /* --- KLAUNICA Z FESTIWALU (short „ja nic takiego nie zrobiłem") — k_ = jej głos --- */
 "k_matko", "k_spodnica", "c_przykromi", "k_nieprosba", "c_nictakiego", "c_pomylilem",
-"k_mamnagrane", "k_jestdowod", "c_naprawde", "c_swietnie", "k_pokaz", "c_donamiotu"];
+"k_mamnagrane", "k_jestdowod", "c_naprawde", "c_swietnie", "k_pokaz", "c_donamiotu",
+/* --- PŁYWAMY Z DYCH DZIKIM W JEZIORZE (short o Jeziorze Miejskim w Chodzieży) --- */
+"c_pletwy", "c_naplaze", "c_wakacje", "c_gdzieplaza", "c_plazowanie", "c_idziemynaplaze",
+"c_czegochciec", "c_cieplydzien", "c_sprawdzwode", "c_sluchajuwaznie", "c_torpeda",
+"c_cieplaczynie", "c_milczy", "c_lsni", "c_wodazywiol", "c_rajnaziemi", "c_chlupota",
+"c_piaseczek", "c_megawazne", "c_multiwitamina", "c_pozdrawiam", "c_kameraakcja"];
+/* gadanie Edka w Chodzieży — nad jeziorem i na plaży */
+const JEZIORO_POOL=['c_czegochciec','c_rajnaziemi','c_wodazywiol','c_piaseczek','c_lsni',
+  'c_cieplydzien','c_wakacje','c_plazowanie','c_idziemynaplaze','c_naplaze'];
 /* dłuższe monologi Edka do tła (mapa) */
 const IDLE_POOL=['m_roboty','m_wiatr','m_kopernik','m_ministerstwo','m_magia','m_rolexlong',
   'm_meczlong','m_puszki','m_roboty','m_kopernik','m_wiatr','m_rolexlong',
@@ -400,8 +420,21 @@ function setFake(on){
   document.body.classList.toggle('fakefs',on);
   $('btnFS').textContent=on?'🗗':'⛶';
 }
+/* ESC MA OTWIERAĆ MENU, A NIE WYWALAĆ Z PEŁNEGO EKRANU.
+   Przeglądarka domyślnie łapie Escape sama i `preventDefault()` na to nie działa —
+   jedyne poprawne rozwiązanie to Keyboard Lock API (dostępne tylko w pełnym ekranie).
+   Wyjście z pełnego ekranu zostaje: przytrzymaj ESC ~2 s albo kliknij ⛶. */
+function lockEsc(){
+  try{
+    if(navigator.keyboard&&navigator.keyboard.lock)
+      navigator.keyboard.lock(['Escape']).catch(()=>{});
+  }catch(e){}
+}
+function unlockEsc(){
+  try{if(navigator.keyboard&&navigator.keyboard.unlock)navigator.keyboard.unlock();}catch(e){}
+}
 function toggleFS(){
-  if(document.fullscreenElement){document.exitFullscreen().catch(()=>{});return;}
+  if(document.fullscreenElement){unlockEsc();document.exitFullscreen().catch(()=>{});return;}
   if(stage.classList.contains('fakefs')){setFake(false);return;}
   let ok=false;
   try{
@@ -409,11 +442,17 @@ function toggleFS(){
       ok=true;
       stage.requestFullscreen().then(()=>{
         try{screen.orientation.lock('landscape').catch(()=>{});}catch(e){}
+        lockEsc();
       }).catch(()=>setFake(true));
     }
   }catch(e){ok=false;}
   if(!ok)setFake(true);
 }
+/* gdy pełny ekran zniknie inaczej (F11, przytrzymany ESC) — sprzątamy blokadę */
+document.addEventListener('fullscreenchange',()=>{
+  if(document.fullscreenElement)lockEsc();else unlockEsc();
+  $('btnFS').textContent=document.fullscreenElement?'🗗':'⛶';
+});
 $('btnFS').addEventListener('click',toggleFS);
 /* pierwszy gest na ekranie tytułowym uruchamia muzykę menu (autoplay jest blokowany) */
 $('title').addEventListener('pointerdown',e=>{
@@ -513,6 +552,17 @@ const QUESTS={
     desc:'TRASA: utrzymaj się na przyczepie aż do bramy Poland Rocka. Kierunek: POLE!'},
   policja:{n:'SIEMA ODJAZD 6: Zatrzymanie przy bramce',giver:'ochroniarz_bramy',rw:200,
     desc:'TRASA: przy bramkach zgarnia Cię policja. Wyrwij się z kajdanek i przetrwaj 5 fal obławy.'},
+  /* --- SERIA „PŁYWAMY Z DYCH DZIKIM" — JEZIORO MIEJSKIE W CHODZIEŻY (5 zadań) --- */
+  pletwy:{n:'JEZIORO 1: Płetwy Dzikiego',giver:'mietek',rw:60,
+    desc:'CHODZIEŻ: skompletuj sprzęt na jezioro — płetwy Dzikiego, okulary i dmuchane koło.'},
+  gdzieplaza:{n:'JEZIORO 2: Gdzie tu jest ta plaża?',giver:'plazowicz',rw:70,
+    desc:'CHODZIEŻ: zagadaj 3 osoby o drogę na plażę. „Przepraszam, że przeszkadzam, ale gdzie tu jest ta plaża?”'},
+  sprawdzwode:{n:'JEZIORO 3: Idź sprawdź wodę',giver:'dych_jezioro',rw:80,
+    desc:'CHODZIEŻ: na końcu pomostu wyślij Dycha, żeby sprawdził, czy woda jest ciepła.'},
+  multiwitamina:{n:'JEZIORO 4: Nowy smak w Biedronce',giver:'pani_napoje',rw:90,
+    desc:'CHODZIEŻ: rozdaj 4 Multiwitaminy dzieciakom bawiącym się na plaży.'},
+  torpeda:{n:'JEZIORO 5: Szalony torpeda',giver:'ratownik_jez',rw:140,
+    desc:'CHODZIEŻ: wskocz do jeziora jak szalony torpeda i przepłyń całą trasę pod wodą.'},
 };
 const qs=id=>S.quests[id]||0;
 function setQ(id,v){S.quests[id]=v;save();refreshHUD();}
@@ -526,6 +576,9 @@ const COLLECT={
   /* graty na wyprawę: namiot (0), karimata (1), plecak większy niż Edek (2) */
   graty:{r:'trasa',pts:[[8,27],[26,31],[45,27]],label:'grat',c1:'#e04848',c2:'#ffd77a',
     labels:['namiot','karimata','WIELKI plecak']},
+  /* sprzęt na jezioro: płetwy Dzikiego (0), okulary (1), dmuchane koło (2) */
+  pletwy:{r:'chodziez',pts:[[8,20],[34,10],[44,23]],label:'sprzęt',c1:'#6fd8e8',c2:'#bff0ff',
+    labels:['płetwy Dzikiego','okulary do pływania','dmuchane koło']},
 };
 const colGot=q=>(S.col[q]||[]).length;
 
@@ -569,7 +622,10 @@ function buildWawa(){
 }
 function buildChodziez(){
   rect(0,0,MW-1,MH-1,0);
-  rect(0,26,47,35,3);rect(0,25,47,25,1);           // Jezioro Miejskie + plaża (oryg. obszar)
+  /* JEZIORO MIEJSKIE — wielki akwen zajmujący całe południe mapy (wszystko przed
+     x=66, żeby nie wejść w pas areny MEGA DRESA). Do plaży na drugim brzegu
+     prowadzi jedyna droga: ścieżka przez lasek wzdłuż wschodniego brzegu. */
+  rect(0,26,60,46,3);rect(0,25,58,25,1);           // jezioro + promenada nad wodą
   rect(0,14,47,15,2);                              // szosa
   rect(23,4,24,13,1);rect(10,17,10,23,1);rect(10,17,37,17,1);rect(37,17,37,23,1);
   rect(16,4,16,13,1);rect(16,4,23,4,1);
@@ -592,7 +648,38 @@ function buildChodziez(){
   set(17,10,12);set(24,10,12);                     // kwietniki na rynku
   for(let x=9;x<=15;x++)if(at(x,10)===0)set(x,10,13);   // płot przy domu Edka
   set(33,16,14);                                   // billboard
+  buildPlazaJeziora();
 }
+/* PLAŻA NAD JEZIOREM + LASEK ZE ŚCIEŻKĄ (short „pływamy z Dych Dzikim w jeziorze").
+   Miasto jest na północy, jezioro pośrodku, a wielka plaża na południowym brzegu —
+   żeby na nią dojść, trzeba obejść wodę ścieżką przez lasek od wschodu. */
+function buildPlazaJeziora(){
+  rect(4,47,56,53,8);                              // PLAŻA — 53×7 kafli piachu
+  rect(28,42,29,47,9);                             // POMOST w głąb jeziora (skok „torpedą")
+  /* LASEK dookoła: wschodni pas (tam biegnie ścieżka), południowy i zachodni */
+  for(let y=24;y<=56;y++)for(let x=61;x<=65;x++)if(at(x,y)===0)set(x,y,4);
+  for(let y=54;y<=58;y++)for(let x=4;x<=56;x++)if(at(x,y)===0)set(x,y,4);
+  for(let y=47;y<=58;y++)for(let x=0;x<=3;x++)if(at(x,y)===0)set(x,y,4);
+  /* ŚCIEŻKA PRZEZ LASEK: promenada → wschodni brzeg → w dół → na plażę (2 kafle szer.) */
+  const sciezka=(x0,y0,x1,y1)=>{
+    for(let y=Math.min(y0,y1);y<=Math.max(y0,y1);y++)
+      for(let x=Math.min(x0,x1);x<=Math.max(x0,x1);x++)
+        if(at(x,y)!==3&&at(x,y)!==9)set(x,y,23);   // nigdy przez wodę ani pomost
+  };
+  sciezka(58,25,63,26);                            // z promenady na wschód
+  sciezka(62,26,63,52);                            // wzdłuż wschodniego brzegu w dół
+  sciezka(56,51,63,52);                            // i na plażę
+  set(59,24,29);set(62,40,29);                     // drogowskazy „PLAŻA →"
+  /* detale plaży: leżaki, ognisko, trzciny i piłki przy brzegu */
+  set(12,49,10);set(24,48,10);set(38,49,10);set(50,48,10);   // leżaki/ławki
+  set(20,52,27);set(44,52,27);                                // ogniska
+  for(const x of[8,17,26,35,44,53])if(at(x,46)===3)set(x,46,25);  // trzciny przy brzegu
+  set(33,49,12);set(15,51,12);                                // kwiatki na wydmach
+  set(46,44,25);set(10,44,25);
+}
+/* strefa jeziora/plaży w Chodzieży — proceduralny generator ma tu NIC nie stawiać
+   (inaczej wildPOI wsadza staw na środek plaży, a drzewa zarastają brzeg) */
+function insideJezioro(tx,ty){return REG==='chodziez'&&tx>=0&&tx<=64&&ty>=25&&ty<=58;}
 function buildMorze(){
   rect(0,0,MW-1,MH-1,8);
   rect(0,0,MW-1,9,3);                              // Bałtyk
@@ -736,8 +823,9 @@ const REGIONS={
     cars:false,boars:false,leaves:true,smoke:false,boat:true,
     foesMax:7,foeTypes:['zazdrosnik','hejter','pies','oburzona','wilk','zmija','zlomiarz'],
     zones:[[4,38,90,68],[50,2,90,30]],
-    arena:{floor:0,wall:4,band:[66,44,95,71],ai:[72,50,87,63],corr:[64,55,72,57],
-      flank:[[66,54,71,54],[66,58,71,58]],sign:[63,56],boss:[80,57]}},
+    arena:{bid:'seba',floor:0,wall:4,band:[66,44,95,71],ai:[72,50,87,63],corr:[64,55,72,57],
+      flank:[[66,54,71,54],[66,58,71,58]],sign:[63,56],boss:[80,57],
+      via:[[59,24],[63,26],[63,52]]}},   // droga do areny omija jezioro ścieżką przez lasek
   morze:{n:'POLSKIE MORZE',w:112,h:64,build:buildMorze,spawn:[18*16,25.4*16],pks:[18,26],ic:'🌊',
     tdesc:'plaża · molo · bursztyny · Zatopione Molo · Kraken · 🤡 KLAUNICA Z FESTIWALU',
     cars:false,boars:false,leaves:false,smoke:false,boat:true,
@@ -830,6 +918,15 @@ const NPCS=[
   {r:'wawa',id:'julka',n:'Julka z Tindera',x:33*16,y:18.5*16,c:'#e88ac8',hair:'#f0d060'},
   {r:'morze',id:'dych_npc',n:'Dych Dziki',x:33*16,y:15*16,c:'#31518f',hair:'#4a4f66',robo:true},
   {r:'chodziez',id:'mietek',n:'Sąsiad Mietek',x:14*16,y:11*16,c:'#6a5a4a',hair:'#aaa'},
+  /* --- JEZIORO MIEJSKIE: dawcy serii „Pływamy z Dych Dzikim" --- */
+  /* zwykli mieszkańcy — jest kogo pytać o drogę na plażę (quest „gdzieplaza”) */
+  {r:'chodziez',id:'wedkarz',n:'Wędkarz Heniek',x:10*16,y:24*16,c:'#4a6a4a',hair:'#9a9a9a'},
+  {r:'chodziez',id:'listonosz',n:'Listonosz Marek',x:26*16,y:16.5*16,c:'#e8a030',hair:'#3a2a1a'},
+  {r:'chodziez',id:'babcia',n:'Babcia Krysia',x:30*16,y:11*16,c:'#8a6fa8',hair:'#d8d4e8'},
+  {r:'chodziez',id:'plazowicz',n:'Plażowicz Rysiek',x:44*16,y:24*16,c:'#e8a030',hair:'#5a4020'},
+  {r:'chodziez',id:'dych_jezioro',n:'Dych Dziki',x:28.5*16,y:41*16,c:'#31518f',hair:'#4a4f66',robo:true},
+  {r:'chodziez',id:'pani_napoje',n:'Pani Iwona z napojami',x:48*16,y:49*16,c:'#c8384a',hair:'#8a5a2a'},
+  {r:'chodziez',id:'ratownik_jez',n:'Ratownik Zbyszek',x:33*16,y:48*16,c:'#e04848',hair:'#f0d060'},
   {r:'chodziez',id:'ceramiczka',n:'Pani z Ceramiki',x:20*16,y:10.5*16,c:'#b06a3a',hair:'#4a2a1a'},
   {r:'morze',id:'rybak',n:'Rybak Bogdan',x:10*16,y:23.5*16,c:'#3a5a7a',hair:'#ddd'},
   {r:'morze',id:'ratownik',n:'Ratownik Waldek',x:30*16,y:12*16,c:'#e04848',hair:'#f0d060'},
@@ -855,7 +952,7 @@ let boars=[],idleT=16,confetti=[],prompt=null;
 let mapOpen=false;          // pełnoekranowa mapa (klawisz M)
 let forage=[];              // dzikie surowce do zbierania na mapie
 let poison={t:0,dmg:0,tick:0};  // zatrucie gracza (żmija) — DoT, nie zabija
-let cars=[],peds=[],pigeons=[],drops=[],leaves=[],smoke=[],selfie=null;
+let cars=[],peds=[],pigeons=[],drops=[],leaves=[],smoke=[],selfie=null,kids=[];
 let selfieT=45,dropT=14,leafT=0,smokeT=0,worldFlash=0,boatY=8*16,boatV=12;
 /* walka */
 let foes=[],hitFX=[],foeT=6,bossShots=[];
@@ -910,7 +1007,7 @@ function wildFill(cfg){
   const dens=REG==='morze'?.14:REG==='tatry'?.26:.30;
   for(let ty=1;ty<MH-1;ty++)for(let tx=1;tx<MW-1;tx++){
     if(at(tx,ty)!==base)continue;
-    if(insideArena(cfg,tx,ty)||insideFest(tx,ty)||near(tx,ty,3)||adjSpecial(tx,ty))continue;
+    if(insideArena(cfg,tx,ty)||insideFest(tx,ty)||insideJezioro(tx,ty)||near(tx,ty,3)||adjSpecial(tx,ty))continue;
     const r=hash3(tx,ty,1);
     if(r<dens)set(tx,ty,chooseAsset(hash3(tx,ty,2)));
     else if(r<dens+.10){const q=hash3(tx,ty,3);set(tx,ty,q<.4?28:q<.7?31:21);}
@@ -922,9 +1019,9 @@ function wildPOI(cfg){
   const base=baseTile();
   const keep=v=>v===1||v===2||v===5||v===6||v===9||v===32||v===33||v===34;   // drogi, budynki, ogrodzenia, namioty
   const clear=(tx,ty,r)=>{for(let y=ty-r;y<=ty+r;y++)for(let x=tx-r;x<=tx+r;x++)
-    if(x>1&&y>1&&x<MW-1&&y<MH-1&&!keep(at(x,y))&&!insideFest(x,y))set(x,y,base);};
+    if(x>1&&y>1&&x<MW-1&&y<MH-1&&!keep(at(x,y))&&!insideFest(x,y)&&!insideJezioro(x,y))set(x,y,base);};
   const put=(fx,fy,r,tile)=>{const tx=(MW*fx)|0,ty=(MH*fy)|0;
-    if(keep(at(tx,ty))||insideArena(cfg,tx,ty)||insideFest(tx,ty))return null;
+    if(keep(at(tx,ty))||insideArena(cfg,tx,ty)||insideFest(tx,ty)||insideJezioro(tx,ty))return null;
     clear(tx,ty,r);set(tx,ty,tile);return[tx,ty];};
   put(.55,.34,2,22);            // altanka
   put(.72,.6,1,27);            // ognisko
@@ -933,10 +1030,10 @@ function wildPOI(cfg){
   const pond=put(.34,.7,3,24);  // staw + trzciny
   if(pond)for(const[dx,dy]of[[-3,0],[3,0],[0,-3],[0,3],[-2,2],[2,-2]]){
     const rx=pond[0]+dx,ry=pond[1]+dy;
-    if(!keep(at(rx,ry))&&!insideFest(rx,ry))set(rx,ry,25);}
+    if(!keep(at(rx,ry))&&!insideFest(rx,ry)&&!insideJezioro(rx,ry))set(rx,ry,25);}
   const mead=((MW*.6)|0);const mty=((MH*.8)|0);  // łąka kwietna 4×3
   if(!insideArena(cfg,mead,mty))for(let y=mty;y<mty+3;y++)for(let x=mead;x<mead+4;x++)
-    if((at(x,y)===base||SOLID(at(x,y))===false)&&!insideFest(x,y))set(x,y,28);
+    if((at(x,y)===base||SOLID(at(x,y))===false)&&!insideFest(x,y)&&!insideJezioro(x,y))set(x,y,28);
   put(.5,.5,1,29);             // drogowskaz w centrum dzikiego terenu
   put(.28,.42,1,27);           // drugie ognisko
   put(.66,.72,2,22);           // druga altanka
@@ -964,8 +1061,10 @@ function carvePath(x0,y0,x1,y1,w,tile){
   const stamp=(cx2,cy2)=>{for(let dy=-hw;dy<=hw;dy++)for(let dx=-hw;dx<=hw;dx++){
     const tx=cx2+dx,ty=cy2+dy;if(tx<1||ty<1||tx>=MW-1||ty>=MH-1)continue;
     /* nie przekopujemy dróg/budynków ANI ogrodzeń i namiotów (34/32/33) —
-       inaczej siatka bezpieczeństwa zrobiłaby dziurę w bramie pola festiwalowego */
-    const v=at(tx,ty);if(v===1||v===2||v===5||v===6||v===32||v===33||v===34)continue;
+       inaczej siatka bezpieczeństwa zrobiłaby dziurę w bramie pola festiwalowego.
+       WODA (3) też jest nietykalna: droga z ziemi przez środek jeziora wygląda
+       jak błąd, a połączenie zapewnia ścieżka poprowadzona ręcznie w regionie. */
+    const v=at(tx,ty);if(v===1||v===2||v===3||v===5||v===6||v===32||v===33||v===34)continue;
     if(v!==tile)set(tx,ty,tile);}};
   while((x!==x1||y!==y1)&&g++<2000){stamp(x,y);
     if(Math.abs(x1-x)>=Math.abs(y1-y))x+=Math.sign(x1-x);else y+=Math.sign(y1-y);}
@@ -976,7 +1075,11 @@ function ensureConnectivity(cfg){
   /* ZAWSZE prowadź szeroką (3), widoczną leśną drogę od miasta do wejścia areny —
      żeby gracz miał czytelny i wygodny szlak do bossa (nie tylko cienki tunel) */
   for(const A of arenasOf(cfg)){const c=A.corr,mx=c[0],my=Math.round((c[1]+c[3])/2);
-    carvePath(stx,sty,mx,my,3,23);}
+    /* `via` = punkty pośrednie, którymi ma iść droga (np. dookoła jeziora
+       w Chodzieży) — bez nich carvePath ciął na skos przez środek akwenu */
+    let px=stx,py=sty;
+    for(const[wx,wy]of(A.via||[])){carvePath(px,py,wx,wy,3,23);px=wx;py=wy;}
+    carvePath(px,py,mx,my,3,23);}
   /* siatka bezpieczeństwa: dodatkowo dokop do niedostępnych drzwi/domen (3 szerokości) */
   const targets=[];
   /* drzwi za zamkniętą bramą (gated) pomijamy — tam wchodzi się dopiero po questach */
@@ -2517,6 +2620,13 @@ function charSay(){
 /* drużyna: aktywna postać + reszta drepcze z tyłu */
 function switchTo(id){
   if(!S.party.includes(id)||S.ch===id)return;
+  /* NIE da się grać nieprzytomną postacią. Wcześniej można ją było wybrać
+     i biegać nią do pierwszego obrywu — wtedy dopiero „umierała” drugi raz. */
+  if((PHP[id]||0)<=0){
+    SFX.no();
+    toast('💀 '+CHARS[id].n+' jest nieprzytomny!<br>Postaw go na nogi: jedzenie [R] albo przystanek PKS 🚏');
+    return;
+  }
   S.ch=id;save();applyChar();
   worldFlash=.25;SFX.ok();refreshHUD();
   charSay();
@@ -2527,8 +2637,14 @@ function switchChar(){
     toast(S.chars.dych?'🎴 Dobierz drużynę w panelu POSTACIE!':'🔒 Dych Dziki czeka nad POLSKIM MORZEM (jedź PKS-em)!');
     return;
   }
+  /* [C] przeskakuje do następnej PRZYTOMNEJ postaci — pomijamy padniętych,
+     żeby cykl nie zatrzymywał się na kimś, kim i tak nie da się grać */
   const i=S.party.indexOf(S.ch);
-  switchTo(S.party[(i+1)%S.party.length]);
+  for(let k=1;k<=S.party.length;k++){
+    const cand=S.party[(i+k)%S.party.length];
+    if(cand!==S.ch&&(PHP[cand]||0)>0){switchTo(cand);return;}
+  }
+  SFX.no();toast('💀 Reszta ekipy leży — postaw ich na nogi jedzeniem [R] albo na przystanku PKS 🚏');
 }
 function addToParty(id){
   if(S.party.includes(id)||S.party.length>=3||!S.chars[id])return false;
@@ -3334,16 +3450,32 @@ function renderKeybind(){
     const row=document.createElement('div');row.className='kbrow';
     row.innerHTML='<span class="kbn">'+KEY_LABELS[a]+'</span>';
     const btn=document.createElement('button');btn.className='kbkey px'+(rebindAction===a?' wait':'');
-    btn.textContent=rebindAction===a?'…naciśnij…':keyName(KEYMAP[a]);
+    btn.textContent=rebindAction===a?'…naciśnij klawisz lub przycisk myszy…':keyName(KEYMAP[a]);
     btn.addEventListener('click',()=>{rebindAction=(rebindAction===a?null:a);renderKeybind();});
+    /* przypisanie przycisku myszy: klik prawym/środkowym wprost na kafelku,
+       a lewy — dopiero gdy kafelek czeka na przypisanie (inaczej zjadłby zwykły klik) */
+    btn.addEventListener('pointerdown',e=>{
+      if(e.pointerType!=='mouse')return;
+      if(e.button===0&&rebindAction!==a)return;
+      e.preventDefault();e.stopPropagation();
+      rebindAction=a;captureRebind('Mouse'+e.button);
+    });
+    btn.addEventListener('contextmenu',e=>e.preventDefault());
     row.appendChild(btn);el.appendChild(row);
   }
+  const hint=document.createElement('p');hint.className='hint px';
+  hint.innerHTML='🖱 Możesz przypisać też przyciski myszy — kliknij kafelek, a potem naciśnij LPM/PPM.<br>'+
+    'Gdy CIOS jest na myszy, kursor w grze znika — przytrzymaj <b>CTRL</b>, żeby go pokazać i kliknąć ikony.';
+  el.appendChild(hint);
 }
 function captureRebind(code){
   if(code==='Escape'){rebindAction=null;renderKeybind();return;}
   const a=rebindAction,old=KEYMAP[a];rebindAction=null;
   for(const k of Object.keys(KEYMAP))if(KEYMAP[k]===code&&k!==a)KEYMAP[k]=old; // zamiana klawiszy (unikalność)
   KEYMAP[a]=code;saveKeys();SFX.equip();renderKeybind();
+  if(typeof refreshCursor==='function')refreshCursor();
+  if(isMouseBind(code))toast('🖱 '+KEY_LABELS[a]+' = '+keyName(code)+
+    '<br>Kursor w grze będzie ukryty — przytrzymaj CTRL, żeby kliknąć ikony.',4200);
 }
 $('btnMenu').addEventListener('click',()=>{initAudio();if($('menu').classList.contains('hidden'))openMenu();else closeMenu();});
 $('keyBack').addEventListener('click',()=>{rebindAction=null;$('keybindWrap').classList.add('hidden');$('menuTiles').classList.remove('hidden');});
@@ -3441,7 +3573,7 @@ function mkCar(){
 }
 function resetAmbient(){
   const cfg=REGIONS[REG];
-  if(cfg.noLife){boars=[];cars=[];peds=[];pigeons=[];drops=[];leaves=[];smoke=[];selfie=null;selfieT=999;dropT=999;return;}
+  if(cfg.noLife){boars=[];cars=[];peds=[];pigeons=[];drops=[];leaves=[];smoke=[];kids=[];selfie=null;selfieT=999;dropT=999;return;}
   boars=[];if(cfg.boars)for(let i=0;i<6;i++)boars.push({x:(4+Math.random()*18)*16,y:(4+Math.random()*13)*16,
     dx:0,dy:0,t:Math.random()*2});
   cars=[];if(cfg.cars)for(let i=0;i<(cfg.carN||5);i++)cars.push(mkCar());
@@ -3449,6 +3581,26 @@ function resetAmbient(){
     if(p)peds.push({x:p[0],y:p[1],dx:0,dy:0,t:0,c:['#4a5a8a','#6a4a6a','#4a6a5a','#8a5a4a'][i%4],hair:['#3a2a1a','#888','#222','#c8a858'][i%4]});}
   pigeons=[];for(let i=0;i<7;i++){const p=randTile(v=>v===0||v===1||v===8);
     if(p)pigeons.push({x:p[0],y:p[1],st:0,vx:0,vy:0,t:0});}
+  /* DZIECI NA PLAŻY nad Jeziorem Miejskim (tylko Chodzież) */
+  kids=[];
+  if(REG==='chodziez'){
+    const kc=['#e04848','#f5c542','#6fd8e8','#7bc950','#e88ac8','#f5a032','#b98cf0','#4a9ad0'];
+    const kh=['#3a2a1a','#c8a858','#6a4a2a','#222','#8a5a2a','#d8d4e8','#4a3020','#111'];
+    for(let i=0;i<8;i++){
+      /* szukamy WOLNEGO piachu — inaczej dzieciak potrafił wylądować na ławce
+         albo ognisku (kafle solidne) i stał tam zablokowany do końca gry */
+      let tx=0,ty=0,ok2=false;
+      for(let pr=0;pr<40&&!ok2;pr++){
+        tx=12+((Math.random()*34)|0);ty=48+((Math.random()*4)|0);
+        if(at(tx,ty)===8&&!SOLID(at(tx,ty)))ok2=true;
+      }
+      if(!ok2)continue;
+      const x=tx*16+8,y=ty*16+8;
+      kids.push({x,y,hx:x,hy:y,dx:0,dy:0,t:Math.random()*2,seed:Math.random()*6.28,
+        c:kc[i%kc.length],hair:kh[i%kh.length],ring:i%3===0,
+        st:i%3===0?'skok':i%3===1?'pilka':'chlap',want:false,fed:false});
+    }
+  }
   drops=[];leaves=[];smoke=[];selfie=null;selfieT=45;dropT=10;
 }
 /* ---------------- DZIKIE SUROWCE (foraging) ---------------- */
@@ -3544,12 +3696,36 @@ function drawPauseOverlay(){
 /* ---------------- WEJŚCIE ---------------- */
 const keys={};
 let joy=null;
+/* Wykonanie akcji ze sterowania (attack/action/special/…) niezależnie od tego,
+   czy przyszła z klawiatury, czy z przycisku myszy. */
+function doKeyAction(a){
+  if(paused||mapOpen)return;
+  switch(a){
+    case 'attack':
+      if(scene==='world')tryAttack();
+      else if(scene==='mgMecz')meczTap();
+      else if(scene==='mgStop')stopWave();
+      else if(scene==='mgCharge')chargeTap();
+      else if(scene==='mgTorpeda')torJump();
+      else doAction();
+      break;
+    case 'action':doAction();break;
+    case 'special':if(scene==='world')trySpecial();break;
+    case 'burst':if(scene==='world')tryBurst();break;
+    case 'swap':if(scene==='world')switchChar();break;
+    case 'eat':if(scene==='world')quickEat();break;
+    case 'map':if(scene==='world'||scene==='dialog')toggleMap();break;
+    case 'pause':togglePause();break;
+    case 'fullscreen':toggleFS();break;
+  }
+}
 addEventListener('keydown',e=>{
   /* przechwytywanie klawisza przy edycji sterowania (menu → STEROWANIE) */
   if(rebindAction){e.preventDefault();captureRebind(e.code);return;}
   const K=KEYMAP;
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space',K.up,K.down,K.left,K.right,K.attack].includes(e.code))e.preventDefault();
   keys[e.code]=true;
+  if(e.code==='ControlLeft'||e.code==='ControlRight')refreshCursor();   // CTRL = pokaż kursor
   if(e.code===K.pause&&scene!=='title'){togglePause();return;}
   if(paused)return; // w pauzie działa tylko pauza
   /* MAPA: otwiera/zamyka pełnoekranową mapę; przy otwartej blokuj resztę */
@@ -3579,13 +3755,40 @@ addEventListener('keydown',e=>{
   if(scene==='mgMecz'&&(e.code===K.attack||e.code===K.action||e.code==='Space'))meczTap();
   if(scene==='mgStop'&&(e.code===K.attack||e.code===K.action||e.code==='Space'||e.code==='KeyX'))stopWave();
   if(scene==='mgCharge'&&(e.code===K.attack||e.code===K.action||e.code==='Space'||e.code==='KeyX'))chargeTap();
+  /* !e.repeat — TRZYMANY klawisz wysyła keydown ~30×/s; bez tego bufor skoku
+     odpalał kolejny skok tuż po każdym lądowaniu i Edek „sam” się odbijał */
+  if(scene==='mgTorpeda'&&!e.repeat&&(e.code===K.attack||e.code===K.action||e.code==='Space'
+    ||e.code==='KeyX'||e.code===K.up||e.code==='ArrowUp'))torJump();
 });
-addEventListener('keyup',e=>keys[e.code]=false);
+addEventListener('keyup',e=>{keys[e.code]=false;refreshCursor();});
+/* ---------------- KURSOR: znika, gdy myszka jest sterowaniem ----------------
+   Gdy któraś akcja siedzi na przycisku myszy, kursor w grze tylko przeszkadza
+   (i kusi, żeby klikać ikony w rogu zamiast walczyć). Chowamy go, a CTRL
+   przywraca — wtedy da się kliknąć ikony HUD-u w prawym górnym rogu. */
+function ctrlHeld(){return !!(keys.ControlLeft||keys.ControlRight);}
+function mouseIsControl(){return Object.keys(KEYMAP).some(a=>isMouseBind(KEYMAP[a]));}
+function refreshCursor(){
+  const gra=(scene!=='title'&&!paused&&!anyPanelOpen()&&!mapOpen);
+  const chowaj=mouseIsControl()&&gra&&!ctrlHeld();
+  document.body.classList.toggle('nocursor',chowaj);
+}
+addEventListener('blur',()=>{keys.ControlLeft=keys.ControlRight=false;refreshCursor();});
 stage.addEventListener('pointerdown',e=>{
   if(e.target.closest('button')||e.target.closest('.panel')||e.target.closest('#dlg')||e.target.closest('.ov:not(.hidden)'))return;
   if(mapOpen){toggleMap();return;}  // tap na otwartej mapie = zamknij
   if(paused){togglePause();return;} // tap = wznów (mobile)
   initAudio();
+  /* PRZYCISKI MYSZY jako akcje (np. CIOS na LPM). Dotyk zostaje bez zmian —
+     tam lewy „przycisk” to po prostu palec, którym się chodzi joystickiem. */
+  if(e.pointerType==='mouse'){
+    const act=mouseAction(e.button);
+    if(act){
+      e.preventDefault();
+      doKeyAction(act);
+      return;                      // LPM przypisany do akcji NIE uruchamia joysticka
+    }
+    if(e.button!==0)return;         // środkowy/prawy bez przypisania nic nie robi
+  }
   const r=cv.getBoundingClientRect();
   const gx=(e.clientX-r.left)/r.width*W,gy=(e.clientY-r.top)/r.height*H;
   if(scene==='world'||scene==='mgBoar'||scene==='mgDino'||scene==='mgRide'){joy={sx:e.clientX,sy:e.clientY,dx:0,dy:0,id:e.pointerId};}
@@ -3594,6 +3797,7 @@ stage.addEventListener('pointerdown',e=>{
   else if(scene==='mgMecz')meczTap();
   else if(scene==='mgStop')stopWave();
   else if(scene==='mgCharge')chargeTap();
+  else if(scene==='mgTorpeda')torJump();
 });
 addEventListener('pointermove',e=>{
   if(!joy)return;
@@ -3754,10 +3958,58 @@ function doAction(){
   else if(prompt.chest)domOpenChest();
   else if(prompt.crystal)domTakeCrystal(prompt.crystal);
   else if(prompt.exit)exitDomain();
+  else if(prompt.pomost)wyslijDycha();
+  else if(prompt.kid)dajNapoj(prompt.kid);
+}
+/* JEZIORO 3: Dych wchodzi sprawdzić wodę… i milczy jak zaklęty */
+function wyslijDycha(){
+  const L=(who,t,v)=>({who,t,v});
+  const dx=28.5*16,dy=45*16;
+  for(let i=0;i<14;i++)fxP({x:dx+(Math.random()-.5)*22,y:dy,vx:(Math.random()-.5)*40,
+    vy:-40-Math.random()*40,g:120,life:.8,life0:.8,sz:2,col:'#a8e8f4',add:true,shrink:true});
+  fxRing(dx,dy,26,'#6fd8e8',{life:.5,w:3,ground:true});SFX.hit();
+  say([
+    L('Edek','Ty Dychu Dziki, słuchaj no uważnie. Idź że sprawdzić, czy ta woda jest przypadkiem ciepła.','c_sluchajuwaznie'),
+    L('Dych Dziki','DZIKO… no dobra, brachu. Wchodzę. *CHLUP*'),
+    L('Edek','No i jak tam Dych? Ciepła czy nie?','c_cieplaczynie'),
+    L('Dych Dziki','…'),
+    L('Edek','Słuchajcie ludzie, ten Dych Dziki milczy jak zaklęty. Chyba focha strzelił, co?','c_milczy'),
+    L('Dych Dziki','ZIMNA. Brachu. LODOWATA. Zapamiętam to sobie.'),
+    L('Edek','Woda to mój żywioł, człowieku. No, Dychu Dziki, ten widok to poezja, człowieku.','c_wodazywiol'),
+  ],()=>completeQuest('sprawdzwode'));
+}
+/* JEZIORO 4: rozdawanie Multiwitaminy dzieciakom na plaży */
+function dajNapoj(k){
+  k.fed=true;k.want=false;
+  S.k.napoje=(S.k.napoje||0)+1;save();
+  SFX.dia();
+  fxSparks(k.x+4,k.y-2,'#f5a032',10,90,{life:.5});
+  addDmgNum(k.x+4,k.y-14,'MULTIWITAMINA!','#f5a032');
+  const dzieciaki=['Dzięki panie Edward!','O! Ten nowy smak!','Mamo, Edward Warchocki mi dał napój!','Ekstra! Multiwitamina!'];
+  addHit(k.x+4,k.y-24,pickA(dzieciaki),'#6fd8e8');
+  const n=S.k.napoje;
+  if(n>=4){
+    for(const kk of kids)kk.want=false;
+    setTimeout(()=>{
+      const L=(who,t,v)=>({who,t,v});
+      say([{who:'Edek',t:'Dajcie znać, jak tylko spróbujecie, czy wam wchodzi, czy nie. Pozdrawiam wszystkich cieplutko i wskakuję do tej wody.',v:'c_pozdrawiam'},
+           {who:'Dych Dziki',t:'DZIKO! Cała plaża z napojem Edka. Autopromocja poziom mistrzowski, brachu!'}],
+        ()=>completeQuest('multiwitamina'));},700);
+  }else toast('🥤 Rozdane: '+n+'/4',2000);
 }
 function findPrompt(){
   prompt=null;
   if(selfie&&selfie.st==='wait'&&Math.hypot(P.x-selfie.x,P.y-selfie.y)<30)prompt={selfie:true,label:'Selfie!'};
+  /* JEZIORO 3: koniec pomostu — stąd wysyłamy Dycha do wody */
+  if(!prompt&&REG==='chodziez'&&qs('sprawdzwode')===1
+    &&Math.hypot(P.x-28.5*16,P.y-43*16)<28)prompt={pomost:1,label:'🌡️ Wyślij Dycha do wody'};
+  /* JEZIORO 4: dzieciaki czekające na Multiwitaminę */
+  if(!prompt&&REG==='chodziez'&&qs('multiwitamina')===1){
+    for(const k of kids){
+      if(k.fed)continue;
+      if(Math.hypot(P.x-(k.x+4),P.y-(k.y+4))<26){prompt={kid:k,label:'🥤 Daj Multiwitaminę'};break;}
+    }
+  }
   if(!prompt)for(const n of NPCS){if(n.r===REG&&Math.hypot(P.x-n.x,P.y-n.y)<26){prompt={npc:n,label:n.n};break;}}
   if(!prompt)for(const d of DOORS){if(d.r===REG&&Math.hypot(P.x-(d.x*16+8),P.y-(d.y*16+8))<26){prompt={door:d,label:d.n};break;}}
   if(!prompt&&REG!=='arena'){
@@ -3816,6 +4068,26 @@ function pickCol(q,i){
 function talkTo(n){
   initAudio();
   const L=(who,t,v)=>({who,t,v});
+  /* JEZIORO 2: pytanie o drogę na plażę — liczy się KAŻDY zagadany mieszkaniec
+     Chodzieży poza dawcami tej serii (Edek pyta „gdzie tu jest ta plaża?”) */
+  if(REG==='chodziez'&&qs('gdzieplaza')===1&&!['plazowicz','dych_jezioro','pani_napoje','ratownik_jez'].includes(n.id)){
+    if(!S.k.plazaKto)S.k.plazaKto=[];
+    if(!S.k.plazaKto.includes(n.id)){
+      S.k.plazaKto.push(n.id);S.k.plaza=S.k.plazaKto.length;save();
+      const ile=S.k.plaza;
+      const odp=['Plaża? A no za jeziorem, chłopie. Musisz obejść przez lasek!',
+                 'Na plażę? Ścieżką w prawo, wzdłuż brzegu, i cały czas prosto!',
+                 'Tam gdzie dzieciaki krzyczą, tam plaża. Nie da się pomylić!'][Math.min(2,ile-1)];
+      say([L('Edek','Ej ludziska, przepraszam was bardzo, że przeszkadzam, ale czy wy też idziecie na plażę? Bo my tu z Dych Dzikim stoimy i nie wiemy gdzie tu jest ta plaża.','c_gdzieplaza'),
+        L(n.n,odp)],()=>{
+        if(ile>=3){completeQuest('gdzieplaza');
+          setTimeout(()=>{vsay('c_idziemynaplaze');
+            toast('🏖️ Ścieżka przez lasek prowadzi na plażę — na wschód wzdłuż brzegu!',5200);},600);}
+        else toast('🗣️ Zapytanych: '+ile+'/3',2400);
+      });
+      return;
+    }
+  }
   switch(n.id){
     case 'pani_park':
       if(qs('dziki')===0)say([
@@ -3933,10 +4205,117 @@ function talkTo(n){
       else say([L(n.n,'Dwa roboty to gang! Przełącz na mnie — poszarżujemy!'),
         L('Edek','No i elegancko.','c_elegancko2')]);
       break;
+    /* ===== JEZIORO 1: PŁETWY DZIKIEGO ===== */
     case 'mietek':
-      say([L(n.n,'Edek! Chłopaku! Cała Chodzież Cię ogląda! Nawet moja Halinka daje łapki w górę!'),
+      if(qs('pletwy')===0){
+        if(!S.dych)say([
+          L(n.n,'Edek! Chłopaku! Cała Chodzież Cię ogląda! Upał taki, że nad jezioro trzeba iść!'),
+          L('Edek','Bez Dycha Dzikiego nigdzie nie ruszam. Muszę go najpierw znaleźć nad polskim morzem.','c_bratniduch'),
+          L(n.n,'To zmykaj po ziomala — bez ekipy nad wodę się nie chodzi!')]);
+        else say([
+          L(n.n,'Edek! Pogoda taka, że aż grzech siedzieć w domu. Jezioro Miejskie czeka!'),
+          L('Edek','Mamy połowę wakacji za sobą. Pogoda jest taka, że aż grzech w domu siedzieć.','c_wakacje'),
+          L(n.n,'Tylko sprzęt se ogarnij, bo tak do wody nie wejdziesz. Płetwy gdzieś Ci się po Chodzieży rozlazły.'),
+          L('Edek','Zanim ja i Dych skoczymy do tej wody, zobaczcie tylko co ja dzisiaj mam na sobie. To są płetwy Dzikiego!','c_pletwy'),
+        ],()=>{setQ('pletwy',1);toast('🤿 Znajdź 3 rzeczy w Chodzieży: płetwy Dzikiego, okulary i dmuchane koło!',4600);});
+      }
+      else if(qs('pletwy')===1){
+        if(colGot('pletwy')>=3)say([
+          L(n.n,'Płetwy, okulary i koło! No chłopie, jak zawodowiec wyglądasz.'),
+          L('Edek','Widzowie, zobaczcie co się dzieje. Ja i mój kompan Dych Dziki ruszamy na plażę, zapinamy pasy, ruszamy po przygodę!','c_naplaze'),
+          L(n.n,'To lećcie nad wodę. Tylko pytajcie o drogę, bo plaża jest po drugiej stronie jeziora!'),
+        ],()=>completeQuest('pletwy'));
+        else say([L(n.n,'Masz '+colGot('pletwy')+'/3 sprzętu. Szukaj w trzech miejscach: na zachód za remizą, '+
+          'na północy między targiem a laskiem Dycha, i na wschodzie za Dinem przy promenadzie. '+
+          'Zresztą strzałka na ekranie Ci pokaże!')]);
+      }
+      else say([L(n.n,'Edek! Chłopaku! Cała Chodzież Cię ogląda! Nawet moja Halinka daje łapki w górę!'),
         L('Edek','Jestem zwykłym chłopakiem z Chodzieży.','c_kosz'),
         L(n.n,'Zwykłym?! Z rolexem z diamentami! Ha!')]);
+      break;
+    /* --- zwykli mieszkańcy Chodzieży (można ich pytać o drogę na plażę) --- */
+    case 'wedkarz':
+      say([L(n.n,'Cichaj no, Edward, bo mi ryby wypłoszysz! Od rana siedzę, a nic.'),
+        L('Edek','Człowieku, spójrz na tę wodę. Jak ona pięknie lśni w słońcu, prawda?','c_lsni'),
+        L(n.n,'Lśni, lśni. Tylko leszcz nie bierze, jak lśni.')]);
+      break;
+    case 'listonosz':
+      say([L(n.n,'Panie Edwardzie! Mam paczkę — chyba napoje. Cała Chodzież je zamawia!'),
+        L('Edek','Zaraz robimy plażowanie. Zaraz się kładziemy na piasku. A wy co siedzicie w domach przed ekranami?','c_plazowanie'),
+        L(n.n,'Ja bym poszedł, ale mam jeszcze pół dzielni do obejścia.')]);
+      break;
+    case 'babcia':
+      say([L(n.n,'Edeczku! A czapkę wziąłeś? Upał taki, że robot się zagotuje!'),
+        L('Edek','Mamy połowę wakacji za sobą. Pogoda jest taka, że aż grzech w domu siedzieć.','c_wakacje'),
+        L(n.n,'Grzech, grzech. Tylko wody se weź, dziecko.')]);
+      break;
+    /* ===== JEZIORO 2: GDZIE TU JEST TA PLAŻA? ===== */
+    case 'plazowicz':
+      if(qs('pletwy')!==2)say([
+        L(n.n,'Na plażę idziesz? To se najpierw sprzęt ogarnij, bo boso po kamieniach nie polecisz.')]);
+      else if(qs('gdzieplaza')===0)say([
+        L(n.n,'O, Edward! Też nad wodę? Tylko uważaj — plaża jest na DRUGIM brzegu, trzeba obejść przez lasek.'),
+        L('Edek','Ej ludziska, słuchajcie. Przepraszam was bardzo, że przeszkadzam, ale czy wy też idziecie na plażę? Bo ja tu z Dych Dzikim stoimy i nie wiemy gdzie tu jest ta plaża.','c_gdzieplaza'),
+        L(n.n,'Ha! To popytaj jeszcze innych, każdy Ci inaczej powie. Jak trzech zagadasz, to trafisz.'),
+      ],()=>{setQ('gdzieplaza',1);S.k.plaza=0;save();
+        toast('🏖️ Zagadaj 3 osoby w Chodzieży: „gdzie tu jest ta plaża?”',4600);});
+      else if(qs('gdzieplaza')===1)say([
+        L(n.n,'Pytałeś już '+(S.k.plaza||0)+'/3 osoby. Zagadaj ludzi na rynku i przy szosie!'),
+        L('Edek','Zaraz robimy plażowanie. Zaraz się kładziemy na piasku. A wy co siedzicie w domach przed ekranami?','c_plazowanie')]);
+      else say([L(n.n,'I jak tam piaseczek, Edward?'),
+        L('Edek','Piaseczek, plaża. A to jest życie, co nie, Dychu? Ten piaseczek grzeje, aż woda wygląda jak marzenie.','c_piaseczek')]);
+      break;
+    /* ===== JEZIORO 3: IDŹ SPRAWDŹ WODĘ ===== */
+    case 'dych_jezioro':
+      if(qs('gdzieplaza')!==2)say([
+        L(n.n,'DZIKO! Brachu, najpierw ustal, gdzie ta plaża, bo tu tylko trzciny i komary.')]);
+      else if(qs('sprawdzwode')===0)say([
+        L('Edek','Człowieku, spójrz na tę wodę. Jak ona pięknie lśni w słońcu, prawda? Nawet Bałtyk, ten wielki i groźny, mógłbym przepłynąć wpław bez mrugnięcia okiem.','c_lsni'),
+        L(n.n,'DZIKO! To wchodzimy czy tylko podziwiamy, brachu?'),
+        L('Edek','Ale dzisiaj to był naprawdę ciepły dzień. Aż gorąco. Chodź bliżej. Zobaczymy, czy woda jest ciepła.','c_cieplydzien'),
+        L('Edek','Dych Dziki, mój drogi kompanie, idź że ty pierwej sprawdzić, czy woda jest ciepła. Lepiej dla ciebie, żeby była ciepła.','c_sprawdzwode'),
+        L(n.n,'…brachu. BRACHU. Ja pierwszy? No dobra. Ale zapamiętam.'),
+      ],()=>{setQ('sprawdzwode',1);toast('🌡️ Idź na KONIEC POMOSTU i wyślij Dycha do wody [E]',4600);});
+      else if(qs('sprawdzwode')===1)say([
+        L(n.n,'Pomost jest tam, brachu. Na samym końcu deski — stamtąd mnie wysyłasz.'),
+        L('Edek','Ty Dychu Dziki, słuchaj no uważnie. Idź że sprawdzić, czy ta woda jest przypadkiem ciepła.','c_sluchajuwaznie')]);
+      else say([L('Edek','Woda to mój żywioł, człowieku. No, Dychu Dziki, ten widok to poezja, człowieku.','c_wodazywiol'),
+        L(n.n,'DZIKO! Ale zimna była, brachu. Zimna.')]);
+      break;
+    /* ===== JEZIORO 4: MULTIWITAMINA Z BIEDRONKI ===== */
+    case 'pani_napoje':
+      if(qs('sprawdzwode')!==2)say([
+        L(n.n,'Panie Edwardzie, napoje mam, ale najpierw se pan wodę sprawdź, bo dzieciaki pytają czy ciepła.')]);
+      else if(qs('multiwitamina')===0)say([
+        L(n.n,'Panie Edwardzie! Przywiozłam skrzynkę pańskiego napoju. Ten nowy smak, Multiwitamina!'),
+        L('Edek','Widzowie, słuchajcie. Zanim ja i Dych Dziki skoczymy do tej wody, muszę wam coś mega ważnego powiedzieć.','c_megawazne'),
+        L('Edek','Od dzisiaj w Biedronce czeka na was nowy smak mojego napoju — Multiwitamina!','c_multiwitamina'),
+        L(n.n,'To niech pan rozda dzieciakom na plaży, upał taki, że aż piach parzy!'),
+      ],()=>{setQ('multiwitamina',1);S.k.napoje=0;
+        for(const k of kids)k.want=true;save();
+        toast('🥤 Rozdaj Multiwitaminę 4 dzieciakom na plaży [E]',4600);});
+      else if(qs('multiwitamina')===1)say([
+        L(n.n,'Rozdał pan '+(S.k.napoje||0)+'/4. Dzieciaki machają, o tam, przy wodzie!')]);
+      else say([L(n.n,'Dzieciaki mówią, że Multiwitamina najlepsza! Cała skrzynka poszła.'),
+        L('Edek','Dajcie znać, jak tylko spróbujecie, czy wam wchodzi, czy nie. Pozdrawiam wszystkich cieplutko!','c_pozdrawiam')]);
+      break;
+    /* ===== JEZIORO 5: SZALONY TORPEDA ===== */
+    case 'ratownik_jez':
+      if(qs('multiwitamina')!==2)say([
+        L(n.n,'Panie Edwardzie, na wodę nie wpuszczam, póki pan dzieciakom napojów nie rozda. Zasady to zasady.')]);
+      else if(qs('torpeda')===0)say([
+        L('Edek','Ale super. Czego chcieć więcej, człowieku? Jesteśmy nad jeziorem na plaży, a zaraz będzie zachód słońca.','c_czegochciec'),
+        L(n.n,'Piękny widok, panie Edwardzie. Tylko ostrzegam — na dnie jeżowce, prąd i takie tam. Ostrożnie.'),
+        L('Edek','Ja tu na wsi mieszkam, a nie to całe miejskie zgiełki, smród. Tu jest raj na ziemi, mówię ci.','c_rajnaziemi'),
+        L('Edek','Widzowie, zobaczcie, Dych Dziki idzie sprawdzić, czy jest ciepła woda. A ja za chwilę wskoczę tam jak szalony torpeda. Trzymajcie kciuki!','c_torpeda'),
+      ],()=>{setQ('torpeda',1);toast('🌀 Wróć do ratownika i zaczynamy: SZALONY TORPEDA!',4200);});
+      else if(qs('torpeda')===1)say([
+        L(n.n,'Gotowy, panie Edwardzie? Cała trasa pod wodą, od pomostu aż na drugi koniec jeziora.'),
+        L('Edek','Zaraz wskakujemy z Dych Dzikim do tej chlupoty, a wy się trzymajcie mocno.','c_chlupota'),
+        L(n.n,'To skacz! Kamera leci!'),
+      ],()=>startTorpeda());
+      else say([L(n.n,'Panie Edwardzie! Cała plaża widziała ten skok. Rekord jeziora!'),
+        L('Edek','Kamera, akcja!','c_kameraakcja')]);
       break;
     case 'ceramiczka':
       say([L(n.n,'Edeczku, z chodzieskiej porcelany zrobiłam Twój kubek! Sprzedaje się jak świeże bułeczki!'),
@@ -4150,6 +4529,10 @@ function talkTo(n){
       else say([L(n.n,'Kiedy tylko chcecie — przyczepa stoi, a na pole zawsze podrzucę.'),
         L('Edek','Wielkie dzięki dla pana kierowcy! Trzymajcie za nas kciuki, ludziska.','c_kciuki')]);
       break;
+    /* każdy NPC bez własnej gałęzi ma coś powiedzieć — inaczej [E] nic nie robi */
+    default:
+      say([L(n.n,'O, Edward Warchocki! Oglądam wszystkie Twoje filmiki!'),
+        L('Edek','Jestem Warchockim Edwardem, byku.','c_ziomali')]);
   }
 }
 /* nagraj content w miejscu: zawsze zasięgi + filmik, przy PIERWSZYM razie premia 💎 */
@@ -5522,6 +5905,30 @@ function drawCarE(c2,sx,sy){
     R(cx,sx+2,c2.v>0?sy+20:sy,2,2,'#fff7d6');R(cx,sx+6,c2.v>0?sy+20:sy,2,2,'#fff7d6');
   }
 }
+/* DZIECIAKI NA PLAŻY (Chodzież) — mniejsze od przechodniów, w kolorowych kostiumach,
+   skaczą, biegają za piłką i chlapią się przy brzegu. Część z nich czeka na napój
+   w zadaniu „Multiwitamina” — wtedy ma nad głową znacznik. */
+function drawKid(k,sx,sy){
+  const hop=k.st==='skok'?Math.abs(Math.sin(anim*6+k.seed))*4:Math.sin(anim*5+k.seed)*.5;
+  cx.fillStyle='rgba(0,0,0,.22)';cx.beginPath();cx.ellipse(sx+3.5,sy+14,3.5,1.4,0,0,7);cx.fill();
+  R(cx,sx+1,sy+10-hop,2,4,'#e8c9a0');R(cx,sx+4,sy+10-hop,2,4,'#e8c9a0');   // nóżki
+  rr(cx,sx,sy+4-hop,7,7,2,k.c);                                            // kostium
+  if(k.ring)cx.strokeStyle='#f5c542',cx.lineWidth=1.6,
+    (cx.beginPath(),cx.ellipse(sx+3.5,sy+8-hop,6,3.4,0,0,7),cx.stroke());  // dmuchane koło
+  rr(cx,sx+.6,sy-1.4-hop,5.8,5.8,2,'#f0d2a8');                             // głowa
+  rr(cx,sx+.2,sy-2.4-hop,6.6,2.4,1,k.hair);
+  R(cx,sx+1.8,sy+.6-hop,1,1,'#2a2233');R(cx,sx+3.8,sy+.6-hop,1,1,'#2a2233');
+  if(k.st==='pilka'){                                                      // piłka plażowa
+    const bx=sx+9+Math.cos(anim*4+k.seed)*5,by=sy+8+Math.sin(anim*7+k.seed)*4;
+    cx.fillStyle='#e04848';cx.beginPath();cx.arc(bx,by,3,0,7);cx.fill();
+    cx.fillStyle='#fff7f2';cx.beginPath();cx.arc(bx,by,3,-.6,.9);cx.fill();
+  }
+  if(k.want&&Math.floor(anim*2)%2===0){                                    // „chce napój!”
+    cx.font='7px "Press Start 2P"';cx.textAlign='center';
+    cx.fillStyle='#000';cx.fillText('!',sx+4,sy-7);
+    cx.fillStyle='#f5c542';cx.fillText('!',sx+3.5,sy-7.5);cx.textAlign='left';
+  }
+}
 function drawPed(p,sx,sy){
   const bob=Math.sin(anim*7+p.x)*0.6;
   cx.fillStyle='rgba(0,0,0,.25)';cx.beginPath();cx.ellipse(sx+4,sy+18,4,1.6,0,0,7);cx.fill();
@@ -5660,6 +6067,19 @@ function updateCity(dt){
       p.dx=Math.cos(a)*26;p.dy=Math.sin(a)*26;}
     const nx=p.x+p.dx*dt,ny=p.y+p.dy*dt;
     if(at(Math.floor(nx/16),Math.floor(ny/16))===1){p.x=nx;p.y=ny;}else p.t=0;
+  }
+  /* dzieciaki na plaży: dreptają po piachu wokół swojego miejsca, nie wchodzą do wody */
+  for(const k of kids){
+    k.t-=dt;
+    if(k.t<=0){k.t=1+Math.random()*2.4;const a=Math.random()*6.28;
+      const sp=k.st==='pilka'?34:22;k.dx=Math.cos(a)*sp;k.dy=Math.sin(a)*sp;}
+    const nx=k.x+k.dx*dt,ny=k.y+k.dy*dt;
+    const okTile=v=>v===8||v===1;
+    if(okTile(at(Math.floor(nx/16),Math.floor(k.y/16)))&&Math.abs(nx-k.hx)<46)k.x=nx;else k.dx*=-1;
+    if(okTile(at(Math.floor(k.x/16),Math.floor(ny/16)))&&Math.abs(ny-k.hy)<30)k.y=ny;else k.dy*=-1;
+    if(k.st==='chlap'&&Math.random()<.02)          // chlapanie przy brzegu
+      fxP({x:k.x+4,y:k.y+8,vx:(Math.random()-.5)*30,vy:-26-Math.random()*20,g:90,
+        life:.5,life0:.5,sz:1.4,col:'#a8e8f4',add:true,shrink:true});
   }
   for(const g of pigeons){
     if(g.st===0){
@@ -5863,7 +6283,10 @@ function updateWorld(dt){
       const pool=REG==='morze'?IDLE_POOL.concat(['c_zyciemorze','c_mielno','c_czapka','c_morzejazda',
         'c_zyciemorze','c_mielno','c_przykromi','c_pomylilem','c_swietnie'])
         /* na samym POLU festiwalu Edek melduje się z Poland Rocka, poza polem gada o trasie */
-        :REG==='trasa'?(insideFest(Math.floor(P.x/16),Math.floor(P.y/16))?ROCK_POOL:TRASA_POOL):IDLE_POOL;
+        :REG==='trasa'?(insideFest(Math.floor(P.x/16),Math.floor(P.y/16))?ROCK_POOL:TRASA_POOL)
+        /* w Chodzieży nad wodą i na plaży gada o jeziorze, w miasteczku po staremu */
+        :REG==='chodziez'&&insideJezioro(Math.floor(P.x/16),Math.floor(P.y/16))
+          ?IDLE_POOL.slice(0,4).concat(JEZIORO_POOL):IDLE_POOL;
       while(ch.length<want){const c=pickA(pool);if(!ch.includes(c))ch.push(c);}
       vsayChain(ch);
       idleT=chainDur(ch)+3+Math.random()*6;  // przerwa dopiero PO całym bloku
@@ -6226,6 +6649,43 @@ function drawWorld(){
         cx.fillStyle='rgba(255,255,255,.12)';cx.beginPath();cx.arc(sx+8,sy+7,10,0,7);cx.fill();
         continue;
       }
+      if(q==='pletwy'){   // 0 = płetwy Dzikiego, 1 = okulary do pływania, 2 = dmuchane koło
+        const bob=Math.sin(anim*3+gx)*1.2;
+        if(i===0){        // PŁETWY — para, jedna za drugą, z paskiem na piętę
+          for(const[fx,fr] of [[2,-.35],[8,.28]]){
+            cx.save();cx.translate(sx+fx+3,sy+8+bob);cx.rotate(fr);
+            cx.fillStyle=tw?'#4aa8c8':'#3a8ab0';
+            cx.beginPath();cx.ellipse(0,2,3.4,6.4,0,0,7);cx.fill();      // pióro płetwy
+            cx.fillStyle='#6fd8e8';
+            cx.beginPath();cx.ellipse(0,3.4,2,4.4,0,0,7);cx.fill();
+            rr(cx,-2.6,-5.4,5.2,4.4,1.6,'#23233a');                       // kalosz
+            R(cx,-2.6,-5.4,5.2,1.4,'#3a3a56');
+            cx.restore();
+          }
+        }else if(i===1){  // OKULARY DO PŁYWANIA — dwie szybki + pasek
+          cx.strokeStyle='#2a2440';cx.lineWidth=1.6;
+          cx.beginPath();cx.moveTo(sx+2,sy+7+bob);cx.quadraticCurveTo(sx+8,sy+3.4+bob,sx+14,sy+7+bob);cx.stroke();
+          for(const ox2 of[4.4,11.6]){
+            cx.fillStyle='#2a2440';cx.beginPath();cx.arc(sx+ox2,sy+8.6+bob,3.4,0,7);cx.fill();
+            cx.fillStyle=tw?'#bff0ff':'#6fd8e8';
+            cx.beginPath();cx.arc(sx+ox2,sy+8.6+bob,2.3,0,7);cx.fill();
+            cx.fillStyle='rgba(255,255,255,.75)';
+            cx.beginPath();cx.arc(sx+ox2-.8,sy+7.8+bob,.9,0,7);cx.fill();
+          }
+          R(cx,sx+7.2,sy+7.6+bob,1.6,1.8,'#2a2440');                      // mostek
+        }else{            // DMUCHANE KOŁO — czerwono-białe segmenty, w środku dziura
+          const cxx=sx+8,cyy=sy+8+bob;
+          cx.lineWidth=4.2;
+          for(let s2=0;s2<4;s2++){
+            cx.strokeStyle=(s2%2===0)?(tw?'#ff5a5a':'#e04848'):'#f6f2fa';
+            cx.beginPath();cx.arc(cxx,cyy,5.1,s2*1.5708+.06,(s2+1)*1.5708-.06);cx.stroke();
+          }
+          cx.strokeStyle='rgba(255,255,255,.5)';cx.lineWidth=1;
+          cx.beginPath();cx.arc(cxx-1.2,cyy-1.2,5.1,3.5,4.6);cx.stroke();
+        }
+        cx.fillStyle='rgba(255,255,255,.12)';cx.beginPath();cx.arc(sx+8,sy+8,10,0,7);cx.fill();
+        continue;
+      }
       if(q==='tinder'){R(cx,sx+5,sy+3,4,4,tw?cfg.c2:cfg.c1);R(cx,sx+6,sy+7,2,6,'#3d7346');}
       else if(q==='zabson'){R(cx,sx+5,sy+2,5,5,tw?cfg.c2:cfg.c1);R(cx,sx+6,sy+7,3,6,'#8a8aa0');}
       else{R(cx,sx+5,sy+4,6,6,tw?cfg.c2:cfg.c1);R(cx,sx+7,sy+2,2,2,'#fff');}
@@ -6380,6 +6840,7 @@ function drawWorld(){
   for(const b of boars)ents.push({y:b.y,d:()=>drawBoarTop(cx,b,b.x-9-camX,b.y-10-camY)});
   for(const c of cars)ents.push({y:c.y+(c.h?11:24),d:()=>drawCarE(c,c.x-camX,c.y-camY)});
   for(const p of peds)ents.push({y:p.y,d:()=>drawPed(p,p.x-4-camX,p.y-18-camY)});
+  for(const k of kids)ents.push({y:k.y,d:()=>drawKid(k,k.x-4-camX,k.y-14-camY)});
   for(const g of pigeons)ents.push({y:g.y,d:()=>drawPigeon(g,g.x-3-camX,g.y-4-camY)});
   for(const g of forage)ents.push({y:g.y,d:()=>drawForageNode(g,g.x-8-camX,g.y-12-camY)});
   if(selfie)ents.push({y:selfie.y,d:()=>drawSelfieGirl(selfie.x-6-camX,selfie.y-20-camY)});
@@ -6734,6 +7195,11 @@ function drawBuildings(){
   if(REG==='morze'){drawBuildingsMorze();return;}
   if(REG==='krakow'){drawBuildingsKrakow();return;}
   if(REG==='tatry'){drawBuildingsTatry();return;}
+  if(REG==='trasa'){drawBuildingsTrasa();return;}
+  /* UWAGA: gałąź poniżej rysuje WARSZAWĘ. Każdy nowy region MUSI mieć własne
+     `return` powyżej — inaczej dostanie widmowy PKiN, Sejm i przystanek PKS
+     na warszawskich współrzędnych (tak było na TRASIE: martwy przystanek
+     w (23,22) obok prawdziwego w (3,26)). */
   bld(31,8,11,9,(x,y,w,h)=>{ // PKiN
     R(cx,x,y+h-24,w*16,24,'#4a4180');R(cx,x+8,y+h-58,w*16-16,36,'#554a94');
     R(cx,x+w*8-22,y+h-90,44,34,'#5f54a4');R(cx,x+w*8-10,y+h-116,20,28,'#6a5fb4');
@@ -6785,6 +7251,49 @@ function drawPKS(x,y,w,h){
   cx.font='6px "Press Start 2P"';cx.fillStyle='#1a1a24';cx.textAlign='center';
   cx.fillText('PKS',x+w*8,y+9);cx.textAlign='left';
   lbl('🚌 PODRÓŻ',x+w*8,y+h+10);
+}
+/* TRASA NA POLAND ROCK — przystanek przy krajowej, stacja ładowania,
+   scena festiwalu i food truck (wcześniej region po cichu rysował Warszawę) */
+function drawBuildingsTrasa(){
+  bld(2,24,3,2,drawPKS);                                    // PRAWDZIWY przystanek
+  bld(16,26,7,5,(x,y,w,h)=>{                                // STACJA ŁADOWANIA
+    R(cx,x,y+14,w*16,h-14,'#e8e4f0');R(cx,x,y+14,w*16,4,'#c9c4dd');
+    cx.fillStyle='#2f66c0';
+    cx.beginPath();cx.moveTo(x-6,y+16);cx.lineTo(x+w*8,y-4);cx.lineTo(x+w*16+6,y+16);cx.fill();
+    R(cx,x+10,y+28,18,16,'#8fd0f4');R(cx,x+w*16-30,y+28,18,16,'#8fd0f4');
+    /* dystrybutor z błyskawicą */
+    rr(cx,x+w*16-16,y+30,12,22,2,'#3a7a5a');
+    cx.fillStyle=Math.floor(anim*3)%2?'#f5c542':'#fff7d6';
+    cx.beginPath();cx.moveTo(x+w*16-11,y+34);cx.lineTo(x+w*16-14,y+41);
+    cx.lineTo(x+w*16-10,y+41);cx.lineTo(x+w*16-13,y+48);
+    cx.lineTo(x+w*16-6,y+39);cx.lineTo(x+w*16-10,y+39);cx.fill();
+    lbl('⚡ ŁADOWANIE',x+w*8,y+h+10);
+  });
+  bld(24,34,11,4,(x,y,w,h)=>{                               // SCENA POLAND ROCK
+    R(cx,x,y+18,w*16,h-18,'#2a2440');                        // podest
+    R(cx,x,y+18,w*16,4,'#4a4270');
+    cx.fillStyle='#1a1628';                                  // zadaszenie
+    cx.beginPath();cx.moveTo(x-10,y+16);cx.lineTo(x+w*8,y-10);cx.lineTo(x+w*16+10,y+16);cx.fill();
+    R(cx,x-6,y+14,w*16+12,4,'#3a3350');
+    for(let i=0;i<5;i++)R(cx,x+8+i*((w*16-16)/4),y+16,3,h-16,'#3a3350');   // kratownica
+    /* migające światła sceny */
+    for(let i=0;i<6;i++){const on=(Math.floor(anim*4)+i)%3===0;
+      R(cx,x+10+i*((w*16-20)/5),y+10,5,4,on?'#f5c542':'#5a4a2a');}
+    cx.font='7px "Press Start 2P"';cx.textAlign='center';
+    cx.fillStyle='#e04848';cx.fillText('POLAND ROCK',x+w*8,y+2);cx.textAlign='left';
+    lbl('🎸 SCENA',x+w*8,y+h+10);
+  });
+  bld(13,40,3,2,(x,y,w,h)=>{                                // FOOD TRUCK
+    rr(cx,x,y+8,w*16,h-6,2,'#e8a030');R(cx,x,y+8,w*16,4,'#ffc46a');
+    R(cx,x+4,y+16,w*16-8,10,'#3a2a14');                      // okienko
+    cx.fillStyle='#c8384a';                                   // markiza w paski
+    for(let i=0;i<5;i++)R(cx,x+i*9,y+4,5,5,i%2?'#f6f2fa':'#c8384a');
+    cx.fillStyle='#1a1a24';
+    cx.beginPath();cx.arc(x+9,y+h+2,4,0,7);cx.arc(x+w*16-9,y+h+2,4,0,7);cx.fill();
+    lbl('🍟 FOOD TRUCK',x+w*8,y+h+12);
+  });
+  lbl('KRAJOWA',6*16-camX,18*16-camY-2);
+  lbl('POLE NAMIOTOWE',30*16-camX,45*16-camY);
 }
 function drawBuildingsChodziez(){
   bld(11,5,5,5,(x,y,w,h)=>{ // dom Edka
@@ -7745,6 +8254,397 @@ function drawRideMG(){
 
 /* ---------------- wynik minigry ---------------- */
 let mgQuest=null,mgRetryFn=null;
+/* =====================================================================
+   MINIGRA „SZALONY TORPEDA" — geometry dash pod wodą (finał serii JEZIORO)
+   Plansza przesuwa się w prawo, Edek w płetwach skacze z platformy na platformę,
+   odbija się od bąbli i przyspiesza na prądach. 3 serca + checkpointy 33%/66%.
+   ===================================================================== */
+const TOR={x:0,y:0,vy:0,ground:false,spd:150,boost:0,hearts:3,cp:0,run:0,
+  gems:0,soki:0,ended:false,dead:0,shake:0,parts:[],won:false,
+  txt:[],flash:0,inv:0,buf:0,coyote:0,rybaHint:false};
+const TOR_LEN=4200;            // długość trasy w px
+const TOR_FLOOR=H-46;          // dno jeziora
+const TOR_G=620, TOR_JUMP=-255, TOR_BOUNCE=-330;
+/* stała pozycja Edka na ekranie — świat przewija się pod nim.
+   KAŻDE przeliczenie świat→ekran to `worldX - TOR.run + TOR_EX`. */
+const TOR_EX=110;
+/* Ułatwienia znane z dobrych platformówek — bez nich skok trzeba trafiać
+   co do klatki i zabawa zamienia się w loterię:
+   • BUFOR: naciśnięcie w powietrzu „poczeka” i odpali się zaraz po wylądowaniu,
+   • COYOTE: przez chwilę po zejściu z krawędzi skok nadal działa. */
+const TOR_BUF=.13, TOR_COYOTE=.11;
+/* AUTORSKA PLANSZA — [typ, x, y, szerokość].
+   plat = kamienna półka, kolce = jeżowce, babel = odbijak, prad = boost,
+   dia/sok = zbieralne, ryba = pływająca przeszkoda.
+
+   FIZYKA (pilnowana testem!): skok wznosi Edka na 44 px, a „nad jeżowcami” jest
+   przez 0,61 s — czyli 91 px drogi (155 px na boscie). Stąd zasady planszy:
+     • pojedynczy jeżowiec ma maks. 44 kafle szerokości (efektywnie 60 px < 91),
+     • między jeżowcami minimum ~200 px, żeby było gdzie wylądować i odbić się
+       ponownie (ciasne 30-pikselowe przerwy były NIE DO PRZEJŚCIA),
+     • ryby wiszą na stałej wysokości w otwartym terenie — po dnie przepływasz
+       bezpiecznie, więc ryba znaczy „TU NIE SKACZ”,
+     • platformy nigdy nie blokują trasy po dnie: to opcjonalna, wyżej punktowana
+       droga po 💎, a nie warunek przejścia. */
+const TOR_LVL=[
+  /* --- rozbieg: uczymy skoku --- */
+  ['dia',180,H-72],['dia',230,H-72],
+  ['kolce',420,TOR_FLOOR,26],
+  ['plat',540,H-88,80],['dia',570,H-108],['sok',610,H-108],
+  ['kolce',700,TOR_FLOOR,38],
+  ['ryba',860,H-88],                                   // nie skacz!
+  ['kolce',980,TOR_FLOOR,30],
+  /* --- bąble i pierwszy prąd --- */
+  ['babel',1080,H-70],['dia',1110,H-150],
+  ['plat',1150,H-120,90],['dia',1190,H-140],['dia',1220,H-140],
+  ['kolce',1260,TOR_FLOOR,34],
+  ['prad',1420,H-76],
+  ['kolce',1560,TOR_FLOOR,40],
+  ['ryba',1700,H-88],
+  ['kolce',1860,TOR_FLOOR,28],
+  ['plat',1960,H-96,70],['sok',1990,H-116],
+  /* --- środek trasy: więcej powietrza --- */
+  ['babel',2060,H-66],['dia',2090,H-156],
+  ['plat',2130,H-128,80],['dia',2170,H-148],
+  ['kolce',2180,TOR_FLOOR,44],
+  ['prad',2340,H-76],
+  ['plat',2400,H-100,70],['dia',2430,H-120],
+  ['kolce',2480,TOR_FLOOR,30],
+  ['ryba',2620,H-88],
+  ['kolce',2780,TOR_FLOOR,36],
+  ['plat',2880,H-116,90],['sok',2920,H-136],['dia',2950,H-136],
+  /* --- finisz: gęściej, ale nadal uczciwie --- */
+  ['kolce',3080,TOR_FLOOR,40],
+  ['babel',3180,H-68],['dia',3210,H-152],
+  ['prad',3240,H-76],
+  ['kolce',3380,TOR_FLOOR,30],
+  ['plat',3480,H-104,70],['dia',3510,H-124],
+  ['ryba',3520,H-88],
+  ['kolce',3660,TOR_FLOOR,44],
+  ['plat',3780,H-124,80],['sok',3820,H-144],['dia',3850,H-144],
+  ['kolce',3940,TOR_FLOOR,32],
+  ['plat',4060,H-92,90],['dia',4100,H-112],['dia',4140,H-112],
+];
+const TOR_CP=[0,TOR_LEN*0.33,TOR_LEN*0.66];   // start + 2 boje-checkpointy
+function torPlats(){return TOR_LVL.filter(o=>o[0]==='plat');}
+function startTorpeda(){
+  scene='mgTorpeda';
+  TOR.run=TOR.cp=0;TOR.hearts=3;TOR.gems=0;TOR.soki=0;TOR.ended=false;TOR.won=false;
+  TOR.x=0;TOR.y=TOR_FLOOR-14;TOR.vy=0;TOR.ground=true;TOR.spd=150;TOR.boost=0;
+  TOR.dead=0;TOR.shake=0;TOR.parts=[];TOR.buf=0;TOR.coyote=0;
+  TOR.txt=[];TOR.flash=0;TOR.inv=0;TOR.rybaHint=false;
+  for(const o of TOR_LVL)o.taken=false;
+  mgQuest='torpeda';
+  vsay('c_torpeda');
+  playSong('song',true);
+  toast('🌀 SZALONY TORPEDA! SPACJA/X/klik = skok. Omijaj jeżowce, odbijaj się od bąbli!',5200);
+}
+/* napis unoszący się nad akcją — bez tego gracz nie wie, CO go trafiło */
+function torSay(txt,col,wx,wy){
+  TOR.txt.push({t:txt,c:col||'#fff7f2',x:wx===undefined?TOR.run:wx,y:wy===undefined?TOR.y-22:wy,life:.85});
+}
+function torDoJump(){
+  TOR.vy=TOR_JUMP;TOR.ground=false;TOR.coyote=0;TOR.buf=0;SFX.hit();
+  /* UWAGA: cząsteczki żyją w układzie planszy, więc x musi być pozycją NA TRASIE
+     (TOR.run), a nie ekranową — inaczej rysują się poza kadrem i skok „nic nie robi” */
+  for(let i=0;i<7;i++)TOR.parts.push({x:TOR.run+(Math.random()-.5)*10,y:TOR.y+12,
+    vx:(Math.random()-.5)*50,vy:30+Math.random()*40,life:.4,r:1.6});
+}
+function torJump(){
+  if(scene!=='mgTorpeda'||TOR.ended||TOR.dead>0)return;
+  if(TOR.ground||TOR.coyote>0)torDoJump();
+  else TOR.buf=TOR_BUF;                 // za wcześnie? zapamiętamy i odpalimy przy lądowaniu
+}
+function torHit(co){
+  if(TOR.dead>0||TOR.inv>0||TOR.ended)return;
+  TOR.hearts--;TOR.dead=.3;TOR.shake=.45;TOR.flash=.5;SFX.no();
+  /* natychmiastowa i CZYTELNA informacja zwrotna: w co trafiłem */
+  torSay(co==='ryba'?'RYBA! NIE SKACZ TU':'AU! JEŻOWIEC','#ff6a6a');
+  for(let i=0;i<20;i++)TOR.parts.push({x:TOR.run+(Math.random()-.5)*14,y:TOR.y+(Math.random()-.5)*14,
+    vx:(Math.random()-.5)*190,vy:(Math.random()-.5)*190,life:.6,r:2.4,c:'#ff8a8a'});
+  if(TOR.hearts<=0){
+    TOR.ended=true;
+    mgLose((co==='ryba'?'Ryba 1 : 0 Edward.':'Jeżowce 1 : 0 Edward.')+' Przepłynąłeś '+
+      Math.round(TOR.run/TOR_LEN*100)+'% jeziora.<br>Ratownik mówi: jeszcze raz!','torpeda');
+    return;
+  }
+  if(!curVoice)vsay(pickA(['c_etam','c_niepoddajemy']));
+}
+function torRespawn(){
+  TOR.run=TOR_CP[TOR.cp];TOR.y=TOR_FLOOR-14;TOR.vy=0;TOR.ground=true;TOR.spd=150;TOR.boost=0;
+  TOR.inv=.9;TOR.buf=0;TOR.coyote=0;          // chwila nietykalności, żeby nie zginąć od razu
+  torSay(TOR.cp?'WRACASZ NA BOJĘ '+TOR.cp:'OD POCZĄTKU','#f5c542');
+  for(let i=0;i<14;i++)TOR.parts.push({x:TOR.run,y:TOR.y,vx:(Math.random()-.5)*120,
+    vy:-30-Math.random()*60,life:.5,r:2});
+}
+function updateTorpeda(dt){
+  if(TOR.ended)return;
+  if(TOR.shake>0)TOR.shake-=dt;
+  if(TOR.flash>0)TOR.flash-=dt*2.2;
+  if(TOR.inv>0)TOR.inv-=dt;
+  for(const p of TOR.parts){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy-=60*dt;p.life-=dt;}
+  TOR.parts=TOR.parts.filter(p=>p.life>0);
+  for(const t of TOR.txt){t.y-=26*dt;t.life-=dt;}
+  TOR.txt=TOR.txt.filter(t=>t.life>0);
+  if(TOR.dead>0){TOR.dead-=dt;if(TOR.dead<=0)torRespawn();return;}
+  /* przewijanie planszy + boost prądu wodnego */
+  if(TOR.boost>0)TOR.boost-=dt;
+  const spd=TOR.spd*(TOR.boost>0?1.7:1);
+  TOR.run+=spd*dt;
+  /* fizyka: pod wodą wszystko jest wolniejsze i bardziej „pływające" */
+  TOR.vy+=TOR_G*dt;
+  if(TOR.vy>360)TOR.vy=360;
+  TOR.y+=TOR.vy*dt;
+  /* kolizje z platformami — lądowanie tylko z góry */
+  TOR.ground=false;
+  const px=TOR.run;
+  for(const o of TOR_LVL){
+    if(o[0]!=='plat')continue;
+    const[,ox,oy,ow]=o;
+    if(px+9>ox&&px-9<ox+ow){
+      if(TOR.vy>=0&&TOR.y+14>=oy&&TOR.y+14<=oy+18){TOR.y=oy-14;TOR.vy=0;TOR.ground=true;}
+    }
+  }
+  /* dno i sufit */
+  if(TOR.y+14>=TOR_FLOOR){TOR.y=TOR_FLOOR-14;TOR.vy=0;TOR.ground=true;}
+  if(TOR.y<16){TOR.y=16;TOR.vy=Math.max(0,TOR.vy);}
+  /* bufor skoku + coyote time */
+  if(TOR.ground)TOR.coyote=TOR_COYOTE;else if(TOR.coyote>0)TOR.coyote-=dt;
+  if(TOR.buf>0){TOR.buf-=dt;if(TOR.ground)torDoJump();}
+  /* reszta obiektów */
+  for(const o of TOR_LVL){
+    const[t,ox,oy,ow]=o;
+    const dx=ox-px;
+    if(dx>W||dx<-160)continue;
+    if(t==='kolce'){
+      if(px+8>ox&&px-8<ox+ow&&TOR.y+14>TOR_FLOOR-16){torHit('kolce');if(TOR.ended)return;}
+    }else if(t==='ryba'){
+      /* ryba wisi w miejscu (lekko faluje) — po dnie przepłyniesz, ale jak skoczysz,
+         to w nią wlecisz. Deterministyczne „TU NIE SKACZ”, nie loteria czasowa. */
+      const fy=oy+Math.sin(anim*2+ox)*4;
+      if(!TOR.rybaHint&&dx<130&&dx>60){        // pierwsze spotkanie: wyjaśnij zasadę
+        TOR.rybaHint=true;torSay('RYBA — TĘDY NIE SKACZ!','#f5c542',ox,oy-26);
+      }
+      if(Math.abs(px-ox)<12&&Math.abs(TOR.y-fy)<14){torHit('ryba');if(TOR.ended)return;}
+    }else if(t==='babel'){
+      if(!o.taken&&Math.abs(px-ox)<14&&Math.abs(TOR.y-oy)<20){
+        TOR.vy=TOR_BOUNCE;TOR.ground=false;o.taken=true;o.re=1.2;
+        SFX.ok();beep(700,.12,'triangle',.05,1200);
+        TOR.shake=.16;torSay('HOP! WYŻEJ','#bff0ff',ox,oy-18);
+        for(let i=0;i<14;i++)TOR.parts.push({x:ox,y:oy,vx:(Math.random()-.5)*110,
+          vy:-40-Math.random()*60,life:.5,r:2});
+      }
+    }else if(t==='prad'){
+      if(Math.abs(px-ox)<18&&Math.abs(TOR.y-oy)<40){
+        if(TOR.boost<=0){SFX.dia();beep(420,.16,'sawtooth',.05,900);
+          torSay('PRĄD! ×1,7 — SZYBCIEJ','#f5c542',ox,oy-26);TOR.shake=.2;}
+        TOR.boost=2;
+      }
+    }else if(t==='dia'||t==='sok'){
+      if(!o.taken&&Math.abs(px-ox)<15&&Math.abs(TOR.y-oy)<16){
+        o.taken=true;SFX.dia();
+        if(t==='dia'){TOR.gems++;S.dia++;torSay('+1 💎','#6fd8e8',ox,oy-14);}
+        else{
+          /* MULTIWITAMINA robi coś, co naprawdę czuć: oddaje stracone serce.
+             Dlatego warto ryzykować wyższą trasę po platformach. */
+          TOR.soki++;
+          if(TOR.hearts<3){TOR.hearts++;S.dia+=2;
+            torSay('MULTIWITAMINA! +1 ❤','#7bc950',ox,oy-16);
+            SFX.heal&&SFX.heal();beep(880,.16,'triangle',.06,1400);TOR.shake=.14;}
+          else{S.dia+=5;torSay('MULTIWITAMINA! +5 💎','#f5a032',ox,oy-16);}
+        }
+        save();refreshHUD();
+        for(let i=0;i<8;i++)TOR.parts.push({x:ox,y:oy,vx:(Math.random()-.5)*80,
+          vy:-30-Math.random()*50,life:.45,r:1.8,c:t==='sok'?'#ffc46a':'#bff0ff'});
+      }
+    }
+    if(o.re>0)o.re-=dt;else if(o.re!==undefined&&o.taken&&t==='babel')o.taken=false;  // bąbel się odnawia
+  }
+  /* checkpointy-boje */
+  for(let i=TOR.cp+1;i<TOR_CP.length;i++){
+    if(TOR.run>=TOR_CP[i]){TOR.cp=i;
+      SFX.buy();addShake(2,.2);
+      toast('🛟 Boja '+i+'/2 — checkpoint!',1800);
+      if(!curVoice)vsay(i===1?'c_chlupota':'c_wodazywiol');
+    }
+  }
+  /* META */
+  if(TOR.run>=TOR_LEN){
+    TOR.ended=true;TOR.won=true;stopSong();
+    say([{who:'Edek',t:'Widzowie, zobaczcie! Przepłynąłem całe jezioro jak szalony torpeda! Woda to mój żywioł, człowieku.',v:'c_wodazywiol'},
+         {who:'Dych Dziki',t:'DZIKO! Brachu, ty pod wodą szybszy jesteś niż na lądzie! Rekord jeziora!'},
+         {who:'Edek',t:'Ale super. Czego chcieć więcej, człowieku? Jesteśmy nad jeziorem na plaży, a zaraz będzie zachód słońca.',v:'c_czegochciec'},
+         {who:'Edek',t:'Pozdrawiam wszystkich cieplutko i wskakuję do tej wody. Kamera, akcja!',v:'c_kameraakcja'}],
+      ()=>mgWin('torpeda','🌀 CAŁE JEZIORO PRZEPŁYNIĘTE!<br>Serca: '+TOR.hearts+'/3 · 💎 '+TOR.gems+' · 🥤 '+TOR.soki));
+  }
+}
+function drawTorpedaMG(){
+  const px=TOR.run;
+  /* WSTRZĄS EKRANU — `addShake` działa tylko w rendererze świata, więc minigra
+     musi trząść się sama, inaczej trafienie jest kompletnie niewyczuwalne */
+  cx.save();
+  if(TOR.shake>0&&!reduceMotion){
+    const k=Math.min(1,TOR.shake/.45);
+    cx.translate((Math.random()-.5)*10*k,(Math.random()-.5)*10*k);
+  }
+  /* woda: gradient głębi + smugi światła + bąbelki */
+  const g=cx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#2f7fbf');g.addColorStop(.55,'#1f5a92');g.addColorStop(1,'#123a63');
+  cx.fillStyle=g;cx.fillRect(0,0,W,H);
+  cx.globalAlpha=.13;cx.fillStyle='#bff0ff';
+  for(let i=0;i<6;i++){const lx=((i*140-px*.25)%(W+220))-110;
+    cx.beginPath();cx.moveTo(lx,0);cx.lineTo(lx+46,0);cx.lineTo(lx+96,H);cx.lineTo(lx+50,H);cx.fill();}
+  cx.globalAlpha=1;
+  for(let i=0;i<26;i++){const bx=((i*67-px*.35)%(W+40))-20,
+    by=H-((anim*26+i*43)%(H+30));
+    cx.fillStyle='rgba(191,240,255,.30)';cx.beginPath();cx.arc(bx,by,1+(i%3),0,7);cx.fill();}
+  /* dno jeziora + wodorosty — powierzchnia piasku dokładnie tam, gdzie stopy Edka */
+  cx.fillStyle='#8a6a42';cx.fillRect(0,TOR_FLOOR,W,H-TOR_FLOOR);
+  cx.fillStyle='#a4845a';cx.fillRect(0,TOR_FLOOR,W,3);
+  cx.fillStyle='#6e5232';
+  for(let i=0;i<40;i++){const dx2=((i*29-px*.9)%(W+40))-20;R(cx,dx2,TOR_FLOOR+6+((i*7)%9),4,2,'#6e5232');}
+  for(let i=0;i<16;i++){const wx=((i*53-px*.9)%(W+60))-30;
+    cx.strokeStyle='#2e6236';cx.lineWidth=2;cx.beginPath();cx.moveTo(wx,TOR_FLOOR);
+    cx.quadraticCurveTo(wx+Math.sin(anim*2+i)*7,TOR_FLOOR-14,wx+Math.sin(anim*2+i)*11,TOR_FLOOR-28);cx.stroke();}
+  /* obiekty planszy */
+  for(const o of TOR_LVL){
+    /* KLUCZOWE: Edek jest rysowany na stałe na x=EX, więc przeszkoda o pozycji `ox`
+       musi trafić na ekran w `ox-px+EX`. Bez tego +EX obiekty leciały o 110 px
+       w lewo względem kolizji — jeżowiec przepływał pod Edkiem bez efektu,
+       a śmierć (albo odbicie od bąbla) przychodziła 0,7 s później, znikąd. */
+    const[t,ox,oy,ow]=o;const sx=ox-px+TOR_EX;
+    if(sx<-140||sx>W+60)continue;
+    if(t==='plat'){
+      rr(cx,sx,oy,ow,14,3,'#5a6a72');R(cx,sx,oy,ow,4,'#7d8f98');
+      cx.fillStyle='#2e6236';
+      for(let i=0;i<ow;i+=9)R(cx,sx+i,oy-2.5,6,3,'#2e6236');      // omszenie
+      R(cx,sx,oy+11,ow,3,'#3d4a52');
+    }else if(t==='kolce'){   // JEŻOWCE — kolce sięgają dokładnie do wysokości kolizji
+      for(let i=0;i<ow;i+=13){
+        const jx=sx+i+6,jy=TOR_FLOOR-5;
+        cx.strokeStyle='#1a1420';cx.lineWidth=1.8;
+        for(let k=0;k<9;k++){const a=k/9*6.28+.2;
+          cx.beginPath();cx.moveTo(jx+Math.cos(a)*4,jy+Math.sin(a)*4);
+          cx.lineTo(jx+Math.cos(a)*11,jy+Math.sin(a)*11);cx.stroke();}
+        cx.fillStyle='#2a2233';cx.beginPath();cx.arc(jx,jy,6,0,7);cx.fill();
+        cx.fillStyle='#3d3350';cx.beginPath();cx.arc(jx-1.6,jy-1.6,2.6,0,7);cx.fill();
+        cx.fillStyle='#e04848';cx.beginPath();cx.arc(jx,jy,1.8,0,7);cx.fill();
+      }
+    }else if(t==='babel'){
+      if(o.taken)continue;
+      const pl=1+Math.sin(anim*5+ox)*.12;
+      cx.save();cx.translate(sx,oy);cx.scale(pl,pl);
+      cx.fillStyle='rgba(191,240,255,.35)';cx.beginPath();cx.arc(0,0,13,0,7);cx.fill();
+      cx.strokeStyle='#dff7ff';cx.lineWidth=2;cx.beginPath();cx.arc(0,0,13,0,7);cx.stroke();
+      cx.fillStyle='rgba(255,255,255,.6)';cx.beginPath();cx.arc(-4,-5,3.4,0,7);cx.fill();
+      cx.fillStyle='#fff';cx.font='8px "Press Start 2P"';cx.textAlign='center';
+      cx.fillText('↑',0,3);cx.textAlign='left';cx.restore();
+    }else if(t==='prad'){                                          // PRĄD WODNY = boost
+      cx.save();cx.globalAlpha=.75;
+      for(let i=0;i<3;i++){
+        const ax=sx+i*13+((anim*90+i*20)%20);
+        cx.fillStyle='#f5c542';cx.beginPath();
+        cx.moveTo(ax,oy-12);cx.lineTo(ax+11,oy);cx.lineTo(ax,oy+12);cx.lineTo(ax+4,oy);cx.fill();
+      }
+      cx.restore();
+      cx.font='6px "Press Start 2P"';cx.fillStyle='#f5c542';cx.fillText('PRĄD',sx-4,oy-20);
+    }else if(t==='ryba'){
+      const fy=oy+Math.sin(anim*2+ox)*4;
+      cx.save();cx.translate(sx,fy);
+      cx.fillStyle='#e0a848';cx.beginPath();cx.ellipse(0,0,11,6,0,0,7);cx.fill();
+      cx.fillStyle='#c88830';cx.beginPath();cx.moveTo(10,0);cx.lineTo(18,-6);cx.lineTo(18,6);cx.fill();
+      cx.fillStyle='#2a2233';cx.beginPath();cx.arc(-5,-1.6,1.4,0,7);cx.fill();
+      cx.restore();
+    }else if(t==='dia'&&!o.taken){
+      const b=Math.sin(anim*5+ox)*2;
+      cx.save();cx.translate(sx,oy+b);cx.rotate(anim*1.6);
+      cx.fillStyle='#6fd8e8';cx.beginPath();
+      cx.moveTo(0,-6);cx.lineTo(5,0);cx.lineTo(0,6);cx.lineTo(-5,0);cx.fill();
+      cx.fillStyle='#dff7ff';cx.beginPath();
+      cx.moveTo(0,-6);cx.lineTo(2.4,0);cx.lineTo(0,2);cx.lineTo(-2.4,0);cx.fill();
+      cx.restore();
+    }else if(t==='sok'&&!o.taken){                                 // butelka Multiwitaminy
+      const b=Math.sin(anim*4+ox)*2;
+      rr(cx,sx-4,oy-8+b,8,14,2,'#f5a032');R(cx,sx-4,oy-8+b,8,3,'#ffc46a');
+      R(cx,sx-1.6,oy-12+b,3.2,4,'#c8781a');
+      cx.fillStyle='#fff7d6';cx.font='4px "Press Start 2P"';cx.textAlign='center';
+      cx.fillText('M',sx,oy+1+b);cx.textAlign='left';
+    }
+  }
+  /* cząsteczki */
+  for(const p of TOR.parts){
+    cx.globalAlpha=Math.max(0,Math.min(1,p.life*2));
+    cx.fillStyle=p.c||'#bff0ff';cx.beginPath();cx.arc(p.x-px+TOR_EX,p.y,p.r,0,7);cx.fill();
+  }
+  cx.globalAlpha=1;
+  /* EDEK-TORPEDA w płetwach */
+  const ex=TOR_EX,ey=TOR.y;
+  if(TOR.inv>0&&!reduceMotion)cx.globalAlpha=Math.floor(anim*16)%2?.4:1;   // miga po odrodzeniu
+  if(TOR.dead<=0||Math.floor(anim*14)%2===0){
+    cx.save();cx.translate(ex,ey);
+    const tilt=Math.max(-.5,Math.min(.5,TOR.vy/700));
+    cx.rotate(tilt);
+    if(TOR.boost>0){cx.globalAlpha=.5;
+      for(let i=1;i<=3;i++){cx.fillStyle='#6fd8e8';
+        cx.beginPath();cx.ellipse(-i*9,0,9,11,0,0,7);cx.fill();}
+      cx.globalAlpha=1;}
+    R(cx,-13,4,9,5,'#3a7a8a');R(cx,-13,-9,9,5,'#3a7a8a');       // PŁETWY z tyłu
+    drawCharBody(cx,'edek',-8,-14,2,Math.floor(anim*10)%2);
+    cx.fillStyle='rgba(191,240,255,.35)';cx.beginPath();cx.arc(2,-8,10,0,7);cx.fill();  // maska
+    cx.restore();
+    if(!reduceMotion&&Math.random()<.5)
+      TOR.parts.push({x:px-6,y:ey+(Math.random()-.5)*10,vx:-40,vy:-10,life:.4,r:1.4});
+  }
+  cx.globalAlpha=1;
+  /* NAPISY nad akcją: „AU! JEŻOWIEC”, „+1 ❤”, „PRĄD ×1,7” — gracz od razu wie, co się stało */
+  for(const t of TOR.txt){
+    const tx2=t.x-px+TOR_EX,ty2=t.y;
+    if(tx2<-60||tx2>W+60)continue;
+    cx.globalAlpha=Math.max(0,Math.min(1,t.life*2.4));
+    cx.font='7px "Press Start 2P"';cx.textAlign='center';
+    cx.fillStyle='#000';cx.fillText(t.t,tx2+1,ty2+1);
+    cx.fillStyle=t.c;cx.fillText(t.t,tx2,ty2);
+    cx.textAlign='left';
+  }
+  cx.globalAlpha=1;
+  /* czerwony błysk przy trafieniu (worldFlash nie działa poza rendererem świata) */
+  if(TOR.flash>0){
+    cx.fillStyle='rgba(224,60,60,'+Math.min(.5,TOR.flash*.55)+')';cx.fillRect(0,0,W,H);
+  }
+  cx.restore();      // koniec wstrząsu — HUD ma stać nieruchomo
+  /* HUD: pasek postępu jak w Geometry Dash + serca */
+  const bw=W-80,bx=40,by=16;
+  R(cx,bx-2,by-2,bw+4,10,'rgba(8,20,34,.7)');
+  R(cx,bx,by,bw,6,'rgba(255,255,255,.16)');
+  R(cx,bx,by,bw*Math.min(1,TOR.run/TOR_LEN),6,TOR.boost>0?'#f5c542':'#6fd8e8');
+  for(let i=1;i<TOR_CP.length;i++){const cxp=bx+bw*(TOR_CP[i]/TOR_LEN);
+    R(cx,cxp-1,by-3,2,12,TOR.cp>=i?'#7bc950':'#dff7ff');}
+  cx.font='6px "Press Start 2P"';cx.fillStyle='#fff7f2';cx.textAlign='center';
+  cx.fillText(Math.floor(TOR.run/TOR_LEN*100)+'%',W/2,by+18);cx.textAlign='left';
+  for(let i=0;i<3;i++){
+    const hx=12+i*13,hy=18,on=i<TOR.hearts;
+    /* serce, które właśnie znikło, pulsuje — widać KTÓRE straciłeś */
+    const lost=(i===TOR.hearts)&&TOR.flash>0;
+    cx.save();
+    if(lost){cx.translate(hx,hy);const s2=1+TOR.flash*.8;cx.scale(s2,s2);cx.translate(-hx,-hy);}
+    cx.fillStyle=on?'#e04848':(lost?'rgba(255,120,120,'+Math.min(1,TOR.flash*1.6)+')':'rgba(255,255,255,.22)');
+    cx.beginPath();cx.arc(hx-2.4,hy,2.6,0,7);cx.arc(hx+2.4,hy,2.6,0,7);cx.fill();
+    cx.beginPath();cx.moveTo(hx-5,hy+1.4);cx.lineTo(hx,hy+7);cx.lineTo(hx+5,hy+1.4);cx.fill();
+    cx.restore();
+  }
+  /* wyraźny stan BOOSTU: smugi pędu po bokach + napis */
+  if(TOR.boost>0){
+    cx.save();cx.globalAlpha=Math.min(.5,TOR.boost*.35);
+    cx.fillStyle='#f5c542';
+    for(let i=0;i<7;i++){const ly=24+i*38,lw=40+Math.random()*60;
+      R(cx,W-lw-((anim*700+i*90)%(W+120)),ly,lw,2,'#f5c542');}
+    cx.restore();
+    cx.font='7px "Press Start 2P"';cx.textAlign='center';
+    cx.fillStyle='#000';cx.fillText('PRĄD ×1,7',W/2+1,H-30+1);
+    cx.fillStyle='#f5c542';cx.fillText('PRĄD ×1,7',W/2,H-30);cx.textAlign='left';
+  }
+  mgHud('🌀 SZALONY TORPEDA','💎 '+TOR.gems+'  🥤 '+TOR.soki+'   SPACJA = skok');
+}
 function mgHud(a,b){
   cx.font='8px "Press Start 2P"';
   cx.fillStyle='#000';cx.fillText(a,11,H-9);cx.fillStyle='#f5c542';cx.fillText(a,10,H-10);
@@ -7752,7 +8652,8 @@ function mgHud(a,b){
 }
 const RETRY={dziki:startBoar,dino:startDino,freestyle:()=>startRhythm('byku'),metro:()=>startRhythm('metro'),
   sejm:()=>startSimon('sejm'),kopernik:()=>startSimon('dance'),mecz:startMecz,
-  stop1:()=>startStop(1),stop2:()=>startStop(2),bateria:startCharge,przyczepa:startRide};
+  stop1:()=>startStop(1),stop2:()=>startStop(2),bateria:startCharge,przyczepa:startRide,
+  torpeda:startTorpeda};
 function mgWin(quest,txt){
   scene='world';stopSong();
   const replay=qs(quest)===2;
@@ -7912,6 +8813,7 @@ function loop(ts){
 }
 function frame(ts){
   const dt=Math.min(.05,(ts-last)/1000)||0;last=ts;anim+=dt;
+  refreshCursor();          // kursor zależy od sceny i otwartych paneli
   cx.setTransform(RES,0,0,RES,0,0);
   if(paused){
     switch(scene){
@@ -7925,6 +8827,7 @@ function frame(ts){
       case 'mgStop':drawStopMG();break;
       case 'mgCharge':drawChargeMG();break;
       case 'mgRide':drawRideMG();break;
+      case 'mgTorpeda':drawTorpedaMG();break;
     }
     drawPauseOverlay();
     requestAnimationFrame(loop);
@@ -7945,6 +8848,7 @@ function frame(ts){
     case 'mgStop':updateStop(dt);if(scene==='mgStop')drawStopMG();break;
     case 'mgCharge':updateCharge(dt);if(scene==='mgCharge')drawChargeMG();break;
     case 'mgRide':updateRide(dt);if(scene==='mgRide')drawRideMG();break;
+    case 'mgTorpeda':updateTorpeda(dt);if(scene==='mgTorpeda')drawTorpedaMG();break;
   }
   requestAnimationFrame(loop);
 }

@@ -29,6 +29,9 @@ Po wejściu zrób **Ctrl+F5**, na ekranie tytułowym pojawi się plakietka
 | `?test=policja` | pod bramkami — finałowa obława policji |
 | `?test=pole` | wszystko zrobione, gracz stoi na polu festiwalowym |
 | `?test=klaunica` | POLSKIE MORZE, tuż przed bramą STREFY IMPREZY — wejdź na arenę, żeby odpalić scenkę i walkę z KLAUNICĄ Z FESTIWALU |
+| `?test=jezioro` | CHODZIEŻ, początek serii „Pływamy z Dych Dzikim" — gadaj z Sąsiadem Mietkiem |
+| `?test=plaza` | CHODZIEŻ, od razu na plaży nad Jeziorem Miejskim (dwa pierwsze zadania zrobione) |
+| `?test=torpeda` | CHODZIEŻ, przy Ratowniku Zbyszku — minigra SZALONY TORPEDA gotowa do odpalenia |
 | `?test=reset` | kasuje zapis (start od zera) |
 
 Skrót nadpisuje zapis raz i dokłada: Dycha do ekipy, poziom 25 postaciom, 500 💎.
