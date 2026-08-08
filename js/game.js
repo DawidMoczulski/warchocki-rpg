@@ -18,15 +18,17 @@ const pickA=a=>a[(Math.random()*a.length)|0];
 
 /* ---------------- STEROWANIE: edytowalne przypisania klawiszy ---------------- */
 const DEFAULT_KEYS={action:'KeyE',attack:'Space',special:'KeyZ',burst:'KeyQ',swap:'KeyC',eat:'KeyR',
-  map:'KeyM',pause:'KeyP',fullscreen:'KeyF',up:'KeyW',down:'KeyS',left:'KeyA',right:'KeyD'};
+  sprint:'ShiftLeft',map:'KeyM',pause:'KeyP',fullscreen:'KeyF',up:'KeyW',down:'KeyS',left:'KeyA',right:'KeyD'};
 const KEY_LABELS={action:'✋ Akcja / [E]',attack:'👊 Cios',special:'⚡ Umiejętność',burst:'💥 SUPER-HIT',
-  swap:'🔄 Zmiana postaci',eat:'🍴 Jedzenie',map:'🗺️ Mapa',pause:'⏸ Pauza',fullscreen:'⛶ Pełny ekran',
+  swap:'🔄 Zmiana postaci',eat:'🍴 Jedzenie',sprint:'🏃 Sprint (trzymaj)',
+  map:'🗺️ Mapa',pause:'⏸ Pauza',fullscreen:'⛶ Pełny ekran',
   up:'⬆️ Góra',down:'⬇️ Dół',left:'⬅️ Lewo',right:'➡️ Prawo'};
 let KEYMAP=(()=>{try{return Object.assign({},DEFAULT_KEYS,JSON.parse(store.get('wrpg_keys')||'{}'));}
   catch(e){return Object.assign({},DEFAULT_KEYS);}})();
 /* migracja starych zapisów: jedzenie siedziało na Q, teraz Q = SUPER-HIT */
 if(!KEYMAP.burst)KEYMAP.burst='KeyQ';
 if(KEYMAP.eat===KEYMAP.burst)KEYMAP.eat='KeyR';
+if(!KEYMAP.sprint)KEYMAP.sprint='ShiftLeft';   // sprint dołożony później
 function saveKeys(){store.set('wrpg_keys',JSON.stringify(KEYMAP));}
 const keyName=code=>({Space:'SPACJA',Enter:'ENTER',Escape:'ESC',ArrowUp:'↑',ArrowDown:'↓',
   ArrowLeft:'←',ArrowRight:'→',ShiftLeft:'SHIFT',ShiftRight:'SHIFT',ControlLeft:'CTRL',
@@ -84,6 +86,7 @@ const TEST_SETUPS={
   przyczepa:{q:{dych:2,graty:2,stop1:2,bateria:2,stop2:2},reg:'trasa',at:[47,27]},
   policja:{q:{dych:2,graty:2,stop1:2,bateria:2,stop2:2,przyczepa:2},reg:'trasa',at:[38,29]},
   pole:{q:{dych:2,graty:2,stop1:2,bateria:2,stop2:2,przyczepa:2,policja:2},reg:'trasa',at:[38,36]},
+  klaunica:{q:{dych:2},reg:'morze',at:[67,21]},   // tuż przed bramą STREFY IMPREZY
 };
 (function applyTestSetup(){
   let m=null;
@@ -100,7 +103,7 @@ const TEST_SETUPS={
   if(!S.party.includes('dych'))S.party.push('dych');
   for(const id of S.party){const c=S.chars[id];if(c&&c.lvl<25)c.lvl=25;}   // uczciwa walka
   S.quests=Object.assign({},S.quests,t.q);
-  S.visited.trasa=1;S.introDone=true;
+  S.visited[t.reg]=1;S.introDone=true;
   S.region=t.reg;S.px=t.at[0]*16+8;S.py=t.at[1]*16+8;
   S.dia=Math.max(S.dia||0,500);
   save();
@@ -122,7 +125,10 @@ const AUDIO_KEYS=["song", "burst_byku", "metro_rhythm", "s_dziki", "s_elegancko"
 "c_meldujesie", "c_tron", "c_krolem", "c_niesamowicie", "c_slyszyszmnie", "c_juzide", "c_cotygadasz",
 /* --- ZATRZYMANIE PRZY BRAMCE (short z policją) --- */
 "c_oczyradiowoz", "c_lodybiedronka", "p_trzezwy", "c_niepije", "p_alkomat", "c_turbiny",
-"c_zapachfest", "p_takierzeczy", "c_zatrzymany", "c_zaco", "c_uwazajcie", "c_wolnosc", "c_nieporozum"];
+"c_zapachfest", "p_takierzeczy", "c_zatrzymany", "c_zaco", "c_uwazajcie", "c_wolnosc", "c_nieporozum",
+/* --- KLAUNICA Z FESTIWALU (short „ja nic takiego nie zrobiłem") — k_ = jej głos --- */
+"k_matko", "k_spodnica", "c_przykromi", "k_nieprosba", "c_nictakiego", "c_pomylilem",
+"k_mamnagrane", "k_jestdowod", "c_naprawde", "c_swietnie", "k_pokaz", "c_donamiotu"];
 /* dłuższe monologi Edka do tła (mapa) */
 const IDLE_POOL=['m_roboty','m_wiatr','m_kopernik','m_ministerstwo','m_magia','m_rolexlong',
   'm_meczlong','m_puszki','m_roboty','m_kopernik','m_wiatr','m_rolexlong',
@@ -606,6 +612,22 @@ function buildMorze(){
   for(let x=2;x<=54;x+=9)if(at(x,26)===0)set(x,26,11);
   set(33,27,12);set(13,27,12);
 }
+/* STREFA IMPREZY (arena Klaunicy) — wnętrze areny na wschodniej plaży.
+   Kawałek miasta wciśnięty w piach: betonowe chodniki, asfaltowa uliczka
+   z pasami dla pieszych, scena z wieżami głośnikowymi i namioty pod barierkami. */
+function buildStrefaImprezy(A){
+  const[x0,y0,x1,y1]=A.ai;
+  rect(x0+10,y0+1,x1-10,y1-1,37);                     // betonowy plac na środku
+  rect(x0,y0+4,x1,y0+4,37);rect(x0,y0+7,x1,y0+7,37);  // chodniki wzdłuż uliczki
+  rect(x0,y0+5,x1,y0+6,2);                            // ULICZKA ASFALTOWA przez całą arenę
+  for(const cxx of[x0+2,x0+4])for(let y=y0+5;y<=y0+6;y++)set(cxx,y,37); // pasy dla pieszych przy bramie
+  const spk=[[x0+2,y0+2],[x1-2,y0+2],[x0+2,y1-2],[x1-2,y1-2]];
+  for(const[sx,sy]of spk)set(sx,sy,33);               // wieże głośnikowe w rogach
+  const tents=[[x0+5,y0+1],[x1-5,y0+1],[x0+5,y1-1],[x1-5,y1-1]];
+  for(const[tx,ty]of tents)set(tx,ty,32);             // namioty pod barierkami
+  set(x0+8,y1-1,27);set(x1-8,y0+1,27);                // ogniska festiwalowe
+  set(x0+1,y0+3,11);set(x1-1,y0+8,11);                // latarnie przy chodniku
+}
 /* ---------------- KRAKÓW ---------------- */
 function buildKrakow(){
   rect(0,0,MW-1,MH-1,0);
@@ -717,13 +739,18 @@ const REGIONS={
     arena:{floor:0,wall:4,band:[66,44,95,71],ai:[72,50,87,63],corr:[64,55,72,57],
       flank:[[66,54,71,54],[66,58,71,58]],sign:[63,56],boss:[80,57]}},
   morze:{n:'POLSKIE MORZE',w:112,h:64,build:buildMorze,spawn:[18*16,25.4*16],pks:[18,26],ic:'🌊',
-    tdesc:'plaża · molo · bursztyny · Zatopione Molo · Kraken',
+    tdesc:'plaża · molo · bursztyny · Zatopione Molo · Kraken · 🤡 KLAUNICA Z FESTIWALU',
     cars:false,boars:false,leaves:false,smoke:false,boat:true,
     foesMax:7,foeTypes:['dres','hejter','zlyrobot','pies','mewa','krab'],
-    zones:[[4,28,108,58],[60,12,108,26]],
+    zones:[[4,28,108,58],[58,12,72,24]],
     /* arena Krakena: piaszczysta wyspa otoczona morzem (fosą), pomost jako brama */
-    arena:{floor:8,wall:3,band:[82,36,111,63],ai:[88,42,103,55],corr:[80,47,88,49],
-      flank:[],sign:[79,48],boss:[96,49]}},
+    arena:{bid:'kraken',label:'⚔ ARENA →',floor:8,wall:3,band:[82,36,111,63],ai:[88,42,103,55],
+      corr:[80,47,88,49],flank:[],sign:[79,48],boss:[96,49]},
+    /* arena Klaunicy: STREFA IMPREZY na wschodniej plaży — barierki festiwalowe,
+       betonowe chodniki i asfaltowa uliczka wjeżdżająca prosto przez bramę */
+    arena2:{bid:'klaunica',label:'🤡 STREFA IMPREZY →',floor:8,wall:34,band:[70,11,111,31],
+      ai:[76,15,105,27],corr:[70,20,76,22],corrTile:2,flank:[[70,19,75,19],[70,23,75,23]],
+      sign:[69,21],boss:[90,21],deco:buildStrefaImprezy}},
   krakow:{n:'KRAKÓW',w:120,h:80,build:buildKrakow,spawn:[51*16,29.5*16],pks:[51,28],ic:'🐉',
     tdesc:'Rynek · Sukiennice · Wawel · Smocza Jama · SMOK',
     cars:false,boars:false,leaves:true,smoke:false,boat:false,
@@ -858,11 +885,19 @@ function protectedPts(cfg){
   for(const b of Object.values(BOSSES))if(b.r===REG)add(b.x,b.y);
   for(const q in COLLECT)if(COLLECT[q].r===REG)for(const pt of COLLECT[q].pts)add(pt[0],pt[1]);
   add(cfg.spawn[0]/16,cfg.spawn[1]/16);
-  if(cfg.arena)add(cfg.arena.sign[0],cfg.arena.sign[1]);
+  for(const A of arenasOf(cfg))add(A.sign[0],A.sign[1]);
   return p;
 }
-function insideArena(cfg,tx,ty){const A=cfg.arena;if(!A)return false;
-  return tx>=A.ai[0]-4&&tx<=A.ai[2]+4&&ty>=A.ai[1]-4&&ty<=A.ai[3]+4;}
+/* region może mieć więcej niż jedną arenę bossa (morze: Kraken + Klaunica) */
+const arenasOf=cfg=>cfg?[cfg.arena,cfg.arena2].filter(Boolean):[];
+/* czy punkt (px) leży w NIECKI areny bossa — zwykli wrogowie mają tam nie wchodzić,
+   żeby walka z bossem była czysta (dotyczy też latających, które ignorują mury) */
+function inBossArena(x,y){
+  const tx=x/16,ty=y/16;
+  return arenasOf(REGIONS[REG]).some(A=>tx>=A.ai[0]-1&&tx<=A.ai[2]+2&&ty>=A.ai[1]-1&&ty<=A.ai[3]+2);
+}
+function insideArena(cfg,tx,ty){
+  return arenasOf(cfg).some(A=>tx>=A.ai[0]-4&&tx<=A.ai[2]+4&&ty>=A.ai[1]-4&&ty<=A.ai[3]+4);}
 /* ogrodzone pole festiwalowe na TRASIE: żadnych proceduralnych drzew/stawów w środku
    ani na płocie — inaczej generator zarasta pole i wycina dziury w ogrodzeniu */
 function insideFest(tx,ty){return REG==='trasa'&&tx>=4&&tx<=54&&ty>=31&&ty<=51;}
@@ -940,7 +975,7 @@ function ensureConnectivity(cfg){
   const stx=Math.floor(cfg.spawn[0]/16),sty=Math.floor(cfg.spawn[1]/16);
   /* ZAWSZE prowadź szeroką (3), widoczną leśną drogę od miasta do wejścia areny —
      żeby gracz miał czytelny i wygodny szlak do bossa (nie tylko cienki tunel) */
-  if(cfg.arena){const c=cfg.arena.corr,mx=c[0],my=Math.round((c[1]+c[3])/2);
+  for(const A of arenasOf(cfg)){const c=A.corr,mx=c[0],my=Math.round((c[1]+c[3])/2);
     carvePath(stx,sty,mx,my,3,23);}
   /* siatka bezpieczeństwa: dodatkowo dokop do niedostępnych drzwi/domen (3 szerokości) */
   const targets=[];
@@ -954,12 +989,14 @@ function ensureConnectivity(cfg){
 /* wielka, oddzielona arena bossa w dołożonej przestrzeni mapy:
    czysty pas podłoża → gruby mur naturalny (las/skała/woda) → wnętrze → korytarz-brama */
 function buildBossArena(cfg){
-  const A=cfg.arena;if(!A)return;
-  rect(A.band[0],A.band[1],A.band[2],A.band[3],A.floor);          // wyczyść dołożony pas do podłoża
-  rect(A.ai[0]-3,A.ai[1]-3,A.ai[2]+3,A.ai[3]+3,A.wall);           // gruby mur (3 kafle)
-  rect(A.ai[0],A.ai[1],A.ai[2],A.ai[3],A.floor);                 // otwarte wnętrze areny
-  for(const f of (A.flank||[]))rect(f[0],f[1],f[2],f[3],A.wall); // ściany wzdłuż korytarza
-  rect(A.corr[0],A.corr[1],A.corr[2],A.corr[3],1);               // korytarz/kładka — przebija mur = brama
+  for(const A of arenasOf(cfg)){
+    rect(A.band[0],A.band[1],A.band[2],A.band[3],A.floor);          // wyczyść dołożony pas do podłoża
+    rect(A.ai[0]-3,A.ai[1]-3,A.ai[2]+3,A.ai[3]+3,A.wall);           // gruby mur (3 kafle)
+    rect(A.ai[0],A.ai[1],A.ai[2],A.ai[3],A.floor);                 // otwarte wnętrze areny
+    for(const f of (A.flank||[]))rect(f[0],f[1],f[2],f[3],A.wall); // ściany wzdłuż korytarza
+    rect(A.corr[0],A.corr[1],A.corr[2],A.corr[3],A.corrTile||1);   // korytarz/kładka — przebija mur = brama
+    if(A.deco)A.deco(A);                                           // dekoracje wnętrza (beton, asfalt, scena…)
+  }
 }
 /* ---------------- REGIONY: przełączanie ---------------- */
 function setRegion(id){
@@ -1080,6 +1117,7 @@ const FOE_TYPES={
   smok:{hp:2400,atk:28,spd:40,c:'#3a7a4a',hood:'#c8384a',skin:'#7bc950',dia:0,pts:0},
   yeti:{hp:2000,atk:26,spd:70,c:'#ece9f4',hood:'#d8d4e8',skin:'#bfe8f4',dia:0,pts:0},
   laweciarz:{hp:1800,atk:25,spd:66,c:'#f5a032',hood:'#c8384a',skin:'#e8c9a0',dia:0,pts:0},
+  klaunica:{hp:1700,atk:26,spd:66,c:'#e03050',hood:'#1a1a24',skin:'#e8c9a0',dia:0,pts:0},
 };
 function spawnFoe(){
   const cfg=REGIONS[REG];
@@ -1172,6 +1210,78 @@ const MB_MOVES={
     fxSparks(f.x,f.y-12,'#f5c542',10,80,{life:.6,g:-40,up:20});
     addHit(f.x,f.y-34,'PATRZ NA ZEGAREK!','#f5c542');},
 };
+/* =====================================================================
+   BOSSOWIE Z WŁASNYM ZESTAWEM ATAKÓW (pole `moves` w BOSSES)
+   Każdy ruch jest telegrafowany (napis nad bossem + dźwięk), a w fazie szału
+   (`f.ph2`, poniżej 50% HP) mocniejszy. Stare bossy z `batk` działają bez zmian.
+   ===================================================================== */
+/* „COMMIT" W ATAK: na czas zamachu i chwilę po nim boss STOI w miejscu.
+   Bez tego boss wisi graczowi na plecach i atak jest nie do odczytania — z tym
+   każdy atak daje okno na unik i kontrę. `hold` zeruje ruch w pętli wrogów. */
+function bossHold(f,t){f.hold=Math.max(f.hold||0,t);f.dx=0;f.dy=0;}
+const BOSS_MOVES={
+  /* „MAM NAGRANE!" — wachlarz wirujących telefonów */
+  mamnagrane:f=>{
+    bossHold(f,f.ph2?.7:.95);
+    const n=f.ph2?5:3,a=Math.atan2(P.y-f.y,P.x-f.x);
+    for(let i=0;i<n;i++){const off=(i-(n-1)/2)*.26;
+      bossShots.push({x:f.x,y:f.y-10,dx:Math.cos(a+off)*170,dy:Math.sin(a+off)*170,
+        life:2.4,t:'fon',atk:Math.round(f.atk*.7)});}
+    fxSparks(f.x,f.y-12,'#6fd8e8',8,110,{life:.35});
+    addHit(f.x,f.y-32,'MAM NAGRANE!','#6fd8e8');
+    beep(880,.12,'square',.06,1300);bossVoice(f,'k_mamnagrane');},
+  /* „JEST DOWÓD!" — telegrafowane wybuchy: jeden pod graczem, reszta dookoła */
+  jestdowod:f=>{
+    bossHold(f,f.ph2?.9:1.15);
+    const n=f.ph2?6:4,rad=f.ph2?38:52,dmg=Math.round(f.atk*.8);
+    mbBlastAt(P.x,P.y,26,dmg);
+    for(let i=0;i<n-1;i++){const a=Math.random()*6.28;
+      mbBlastAt(P.x+Math.cos(a)*rad,P.y+Math.sin(a)*rad,26,dmg);}
+    addHit(f.x,f.y-32,'JEST DOWÓD!','#f5c542');
+    beep(300,.18,'square',.07,120);bossVoice(f,'k_jestdowod');},
+  /* „O MATKO JEDYNA!" — szarża na rogi; wjazd w barierkę ogłusza ją (okno na kontrę) */
+  narogi:f=>{
+    f.telT=f.ph2?.45:.6;f.telMv='narogi';
+    bossHold(f,f.telT);            // przykuca i STOI, zanim ruszy — to jest ten tell
+    fxRing(f.x,f.y+4,34,'#e03050',{life:.35,w:3,ground:true});
+    addHit(f.x,f.y-32,'O MATKO JEDYNA!','#e03050');
+    beep(140,.25,'sawtooth',.08,60);},
+  /* „NIECHCĄCY?!" — piruet: pełny okrąg konfetti + fala odpychająca */
+  niechcacy:f=>{
+    bossHold(f,f.ph2?1:1.3);
+    const n=f.ph2?14:10,rings=f.ph2?2:1,dmg=Math.round(f.atk*.6);
+    for(let r=0;r<rings;r++)for(let i=0;i<n;i++){
+      const a=i/n*6.28+r*(3.14/n)+anim;
+      bossShots.push({x:f.x,y:f.y-8,dx:Math.cos(a)*(120+r*34),dy:Math.sin(a)*(120+r*34),
+        life:2.2,t:'konfet',atk:dmg});}
+    fxRing(f.x,f.y-6,64,'#e88ac8',{life:.45,w:4});
+    fxRing(f.x,f.y+4,54,'#f5c542',{life:.35,w:2,ground:true});
+    addShake(3.4,.28);beep(520,.3,'triangle',.08,180);
+    addHit(f.x,f.y-32,'NIECHCĄCY?!','#e88ac8');
+    /* fala odpycha gracza, żeby nie dało się stać w zwarciu przez cały piruet */
+    const d=Math.max(1,Math.hypot(P.x-f.x,P.y-f.y));
+    if(d<74){const kx=P.x+(P.x-f.x)/d*30,ky=P.y+(P.y-f.y)/d*30;
+      if(canWalk(kx,P.y))P.x=kx;if(canWalk(P.x,ky))P.y=ky;}},
+};
+/* głos bossa przy ataku — rzadko, żeby nie zagłuszał muzyki bitewnej */
+function bossVoice(f,key){if(Math.random()<.28&&!curVoice)vsay(key);}
+/* telegraf → wykonanie (szarża na rogi). Wywoływane z pętli wrogów. */
+function updateBossTelegraph(f,dt){
+  f.telT-=dt;
+  if(!reduceMotion&&Math.floor(anim*20)%2===0)
+    fxP({x:f.x+(Math.random()-.5)*24,y:f.y+6,vx:0,vy:-30,g:-40,life:.3,life0:.3,
+      sz:1.8,col:'#e03050',add:true,shrink:true});
+  if(f.telT>0)return;
+  delete f.telT;
+  if(f.telMv==='narogi'){
+    const d=Math.max(1,Math.hypot(P.x-f.x,P.y-f.y)),sp=f.ph2?420:360;
+    f.kb=.55;f.kbx=(P.x-f.x)/d*sp;f.kby=(P.y-f.y)/d*sp;
+    f.charging=.55;f.chDust=.5;f.postHold=.6;   // po szarży sapie — okno na kontrę
+    fxDust(f.x,f.y+10,10);addShake(3.2,.3);
+    beep(90,.3,'sawtooth',.1,45);
+  }
+  delete f.telMv;
+}
 function updateMiniBlasts(dt){
   for(const b of miniBlasts){
     b.warn-=dt;
@@ -1773,9 +1883,28 @@ function updateFoes(dt){
           if(zab>0){S.dia-=zab;save();refreshHUD();
             addHit(P.x,P.y-34,'-'+zab+'💎 ZAJĘTE!','#e04848');}
         }}
+      /* SZARŻA NA ROGI (Klaunica): rani w locie, a wjazd w barierkę ją ogłusza */
+      if(f.charging>0){
+        f.charging-=dt;
+        if(Math.hypot(P.x-f.x,P.y-f.y)<24&&!(f.chHit>anim)){f.chHit=anim+.5;hurtPlayer(f);}
+        if(!reduceMotion)fxP({x:f.x+(Math.random()-.5)*16,y:f.y-6,vx:-f.kbx*.12,vy:-f.kby*.12,
+          g:0,life:.25,life0:.25,sz:2,col:'#e03050',add:true,shrink:true});
+      }
       const nx=f.x+f.kbx*dt,ny=f.y+f.kby*dt;
-      if(!SOLID(at(Math.floor(nx/16),Math.floor(f.y/16))))f.x=nx;
-      if(!SOLID(at(Math.floor(f.x/16),Math.floor(ny/16))))f.y=ny;
+      const okX=!SOLID(at(Math.floor(nx/16),Math.floor(f.y/16)));
+      if(okX)f.x=nx;
+      const okY=!SOLID(at(Math.floor(f.x/16),Math.floor(ny/16)));
+      if(okY)f.y=ny;
+      /* wyrżnęła rogami w barierkę — liczy się oś, wzdłuż której leciała */
+      const wall=Math.abs(f.kbx)>=Math.abs(f.kby)?!okX:!okY;
+      if(f.charging>0&&wall){
+        f.charging=0;f.kb=0;f.stun=1.6;
+        fxRing(f.x,f.y-8,40,'#f5c542',{life:.45,w:4});
+        fxSparks(f.x,f.y-10,'#f5c542',14,150,{life:.5});
+        fxDust(f.x,f.y+8,10);addShake(4.5,.35);addHitStop(.06);
+        addHit(f.x,f.y-32,'ROGI W BARIERKĘ!','#f5c542');
+        beep(120,.35,'square',.09,50);
+      }
       continue;}
     const td=FOE_TYPES[f.t];
     const slowK=(slowAll>0||f.slow>0)?.45:1;
@@ -1910,7 +2039,11 @@ function updateFoes(dt){
       if(f.mvT<=0&&d<240&&f.warnT===undefined&&td.moves&&td.moves.length){
         f.mvT=2.3+Math.random()*1.3;
         const mv=pickA(td.moves);
-        if(MB_MOVES[mv])MB_MOVES[mv](f);
+        if(MB_MOVES[mv]){
+          /* mini-bossowie też przystają na czas ataku (szarże mają własny rozpęd) */
+          if(mv!=='kradnij'&&mv!=='przelot'&&mv!=='teleport')bossHold(f,.7);
+          MB_MOVES[mv](f);
+        }
       }
     }
     /* generyczny SLAM mini-bossa (telegraf ustawiony przez MB_MOVES.slamfala) */
@@ -1949,7 +2082,7 @@ function updateFoes(dt){
       if(hd>BOSS_LEASH){
         if(!f.leash){
           f.leash=true;
-          f.hp=f.maxHp;f.hp0=f.maxHp;f.ph2=false;f.stun=0;f.burn=0;f.aura=null;f.kb=0;
+          f.hp=f.maxHp;f.hp0=f.maxHp;f.ph2=false;f.stun=0;f.burn=0;f.aura=null;f.kb=0;f.hold=0;
           bossShots=[];
           addHit(f.x,f.y-30,'TCHÓRZ!','#f5c542');
           toast('🏃 Uciekłeś z areny! '+f.bn+' wraca na środek — walka OD NOWA!',3600);
@@ -1965,14 +2098,28 @@ function updateFoes(dt){
         fxSparks(f.x,f.y-10,'#e04848',16,150,{life:.6});
         addShake(5,.4);addHitStop(.08);
         toast('⚠️ '+f.bn+' WPADA W SZAŁ!');SFX.no();}
+      if(f.telT!==undefined){updateBossTelegraph(f,dt);}   // telegraf trwa — żadnego nowego ataku
+      else if(f.moves&&f.moves.length){
+        /* boss z własnym zestawem ataków: losowanie bez powtórki tego samego pod rząd */
+        f.at=(f.at||2.6)-dt;
+        if(f.at<=0&&d<260){
+          f.at=f.ph2?1.7:2.6;
+          let mv=pickA(f.moves);
+          if(f.moves.length>1)for(let g=0;g<4&&mv===f.lastMv;g++)mv=pickA(f.moves);
+          f.lastMv=mv;
+          if(BOSS_MOVES[mv])BOSS_MOVES[mv](f);
+        }
+      }else{
       f.at=(f.at||2.5)-dt;
       if(f.at<=0&&d<230){
         f.at=f.ph2?2:3.2;
         if(f.batk==='charge'){ // Król Dzików: szarża na gracza
           f.kb=.5;f.kbx=(P.x-f.x)/Math.max(1,d)*300;f.kby=(P.y-f.y)/Math.max(1,d)*300;
           f.chDust=.5;fxDust(f.x,f.y+10,8);addShake(2.4,.25);
+          f.postHold=.5;                                     // po szarży przystaje
           addHit(f.x,f.y-26,'SZARŻA!','#f5a032');SFX.boar();
         }else{ // Dres: kettle / Kraken: bryzg — pocisk w gracza
+          bossHold(f,f.ph2?.6:.85);                          // staje na czas zamachu
           const a=Math.atan2(P.y-f.y,P.x-f.x);
           const sAtk=Math.round(FOE_TYPES[f.t].atk*.85);
           bossShots.push({x:f.x,y:f.y-10,dx:Math.cos(a)*130,dy:Math.sin(a)*130,life:2.2,t:f.batk,atk:sAtk});
@@ -1982,13 +2129,23 @@ function updateFoes(dt){
         }
       }
       }
+      }
     }
+    /* COMMIT W ATAK: dopóki trwa `hold`, boss/mini-boss stoi jak wryty.
+       Ustawiane przez bossHold() — dzięki temu każdy atak ma czytelne okno na unik. */
+    if(f.hold>0){f.hold-=dt;f.dx=0;f.dy=0;
+      if(!reduceMotion&&Math.random()<.25)fxDust(f.x,f.y+8,1);}   // kurz spod nóg = „zaparł się"
+    /* zadyszka zaraz po szarży (postHold czeka, aż skończy się rozpęd `kb`) */
+    if(f.postHold&&!(f.kb>0)){bossHold(f,f.postHold);delete f.postHold;}
     const nx=f.x+f.dx*slowK*dt,ny=f.y+f.dy*slowK*dt;
     if(td.flying){ // latające ignorują przeszkody (lecą nad wodą/murami)
-      f.x=Math.max(8,Math.min(MW*16-8,nx));f.y=Math.max(8,Math.min(MH*16-8,ny));
+      const fx=Math.max(8,Math.min(MW*16-8,nx)),fy=Math.max(8,Math.min(MH*16-8,ny));
+      /* …ale NIE nad barierki areny bossa — mewy potrafiły wlatywać w środek walki */
+      if(f.boss||!inBossArena(fx,fy)){f.x=fx;f.y=fy;}
+      else{f.dx*=-1;f.dy*=-1;}
     }else{
-      if(!SOLID(at(Math.floor(nx/16),Math.floor(f.y/16))))f.x=nx;else f.dx*=-1;
-      if(!SOLID(at(Math.floor(f.x/16),Math.floor(ny/16))))f.y=ny;else f.dy*=-1;
+      if(!SOLID(at(Math.floor(nx/16),Math.floor(f.y/16)))&&(f.boss||!inBossArena(nx,f.y)))f.x=nx;else f.dx*=-1;
+      if(!SOLID(at(Math.floor(f.x/16),Math.floor(ny/16)))&&(f.boss||!inBossArena(f.x,ny)))f.y=ny;else f.dy*=-1;
     }
     if(!f.sub&&d<(f.boss?22:td.elite?16:13))hurtPlayer(f);
     /* SZARŻA: jeden czysty cios na wroga + odrzut, żeby Dych nie utknął w przeciwniku */
@@ -2009,7 +2166,8 @@ function updateFoes(dt){
     if(!reduceMotion){b.trT=(b.trT||0)-dt;
       if(b.trT<=0){b.trT=.035;
         const tc=b.t==='ogien'?'#f5a032':b.t==='snieg'?'#bfe8f4':b.t==='laser'?'#e03028':
-                 b.t==='flash'?'#ffffff':b.t==='kettle'?'#8f88b0':'#6fd8e8';
+                 b.t==='flash'?'#ffffff':b.t==='kettle'?'#8f88b0':
+                 b.t==='fon'?'#6fd8e8':b.t==='konfet'?'#e88ac8':'#6fd8e8';
         fxP({x:b.x,y:b.y,vx:(Math.random()-.5)*14,vy:(Math.random()-.5)*14,g:0,
           life:.26,life0:.26,sz:2,col:tc,add:true,shrink:true});}}
     if(Math.hypot(P.x-b.x,(P.y-8)-b.y)<11){b.life=0;hurtPlayer(b);
@@ -2147,6 +2305,7 @@ const ARTS={
   obrazek:{n:'Obrazek z Lusterka Taksówki',slot:0,star:3,st:{hp:60,def:6},ic:'🖼️'},
   oscypekT:{n:'Oscypek Szczęścia',slot:0,star:4,st:{hp:90,atk:8},ic:'🧀'},
   kiel:{n:'Kieł Króla Dzików',slot:0,star:5,st:{atk:18,cd:20},ic:'🦷'},
+  rogiK:{n:'Rogi Klaunicy z Festiwalu',slot:0,star:5,st:{atk:17,cd:22},ic:'🤡'},
   sygnet:{n:'Sygnet z Bazaru',slot:1,star:2,st:{atk:8},ic:'💍'},
   pierscionek:{n:'Pierścionek z Tindera',slot:1,star:3,st:{cd:25},ic:'💖'},
   lancuchG:{n:'Łańcuch Grubości Palca',slot:1,star:4,st:{atk:14,hp:30},ic:'⛓️'},
@@ -2265,6 +2424,45 @@ function initPartyHP(full){
   }
 }
 function healParty(frac){for(const id of S.party)PHP[id]=Math.min(chHpMax(id),Math.max(0,(PHP[id]||0))+Math.round(chHpMax(id)*frac));}
+/* ---------------- PRZYSTANEK PKS = PUNKT REGENERACJI ----------------
+   Samo podejście do przystanku leczy CAŁĄ ekipę do pełna (i stawia na nogi
+   tych, co padli). Przy paskach HP lecą zielone plusiki, a paski podświetlają
+   się na zielono. `HEAL.t` = czas podświetlenia, `HEAL.plus` = plusiki. */
+const HEAL={t:0,plus:[],cd:0};
+function updateHeal(dt){
+  if(HEAL.cd>0)HEAL.cd-=dt;
+  if(HEAL.t>0)HEAL.t-=dt;
+  if(HEAL.plus.length){
+    for(const p of HEAL.plus){if(p.dl>0)p.dl-=dt;else p.life-=dt;}   // plusiki sypią się kaskadą
+    HEAL.plus=HEAL.plus.filter(p=>p.life>0);
+  }
+}
+function pksHeal(){
+  if(HEAL.cd>0)return false;
+  const hurt=S.party.filter(id=>(PHP[id]||0)<chHpMax(id));
+  if(!hurt.length)return false;
+  const downed=S.party.filter(id=>(PHP[id]||0)<=0).length;
+  for(const id of S.party)PHP[id]=chHpMax(id);
+  HEAL.cd=2.5;HEAL.t=1.8;
+  /* plusiki przy pasku KAŻDEJ postaci z drużyny */
+  for(let i=0;i<S.party.length;i++)
+    for(let k=0;k<6;k++)
+      HEAL.plus.push({i,ox:4+Math.random()*58,life:.85+Math.random()*.6,life0:1.45,
+        vy:15+Math.random()*16,sz:Math.random()<.34?9:6.5,dl:k*.06});
+  /* zielona poświata wokół ekipy na mapie */
+  fxRing(P.x,P.y-6,34,'#7bc950',{life:.5,w:3});
+  fxRing(P.x,P.y+4,26,'#9bf05a',{life:.4,w:2,ground:true});
+  for(let k=0;k<10;k++)
+    fxP({x:P.x+(Math.random()-.5)*26,y:P.y+4,vx:(Math.random()-.5)*16,vy:-30-Math.random()*30,
+      g:-30,life:.7,life0:.7,sz:1.8,col:'#9bf05a',add:true,shrink:true});
+  addDmgNum(P.x,P.y-30,'PEŁNE HP','#9bf05a');
+  SFX.ok();beep(660,.1,'triangle',.05,880);
+  setTimeout(()=>beep(880,.14,'triangle',.05,1180),90);
+  toast(downed?'🚏 Przystanek PKS — ekipa odpoczęła, wszyscy z powrotem na nogach!'
+              :'🚏 Przystanek PKS — ekipa odpoczęła, pełne HP!',2600);
+  if(Math.random()<.5&&!curVoice)vsay('v_elegancko');   // „czuję się jak nowo narodzony"
+  return true;
+}
 function applyChar(){
   const c=CHARS[S.ch];
   P.speed=c.spd;
@@ -2770,6 +2968,28 @@ const BOSSES={
     intro:[['Edek','Dych Dziki człowieku, patrz tam! Auto laweta leci, pewnie po nas. Wsiadamy czy co?','c_laweta'],
            ['PAN LAWETA 3000','DWA ROBOTY NA POBOCZU?! HAK JUŻ OPUSZCZONY. NA ZŁOM Z WAMI!'],
            ['Edek','Panie kierowco, panie kierowco! My jedziemy na Poland Rocka, nie na złomowisko!','c_paniekierowco']]},
+  /* KLAUNICA Z FESTIWALU — scena 1:1 z shorta „ja nic takiego nie zrobiłem".
+     `auto` = wejście do areny samo odpala dialog (bez [E]), `moves` = 4 własne ataki. */
+  klaunica:{r:'morze',x:90,y:21,t:'klaunica',n:'KLAUNICA Z FESTIWALU',auto:true,
+    moves:['mamnagrane','jestdowod','narogi','niechcacy'],
+    film:'DZIEWCZYNA Z FESTIWALU MIAŁA WSZYSTKO NAGRANE (musiałem się tłumaczyć)',
+    intro:[['Klaunica','O matko jedyna.','k_matko'],
+           ['Klaunica','Ej, pod spódnicę mi włożyłeś rękę. Rękę pod spódnicę mi włożyłeś niechcący.','k_spodnica'],
+           ['Edek','Przykro mi, ale nie mogę spełnić tej prośby, ponieważ jest ona nieodpowiednia.','c_przykromi'],
+           ['Klaunica','To nie była prośba. Ty to zrobiłeś już.','k_nieprosba'],
+           ['Edek','No co ty mówisz? Ja nic takiego nie zrobiłem.','c_nictakiego'],
+           ['Edek','Chyba ci się z kimś innym pomyliłem.','c_pomylilem'],
+           ['Klaunica','Mam nagrane. Mam nagranie.','k_mamnagrane'],
+           ['Klaunica','Jest dowód. Jest dowód, że to zrobiłeś, Edward.','k_jestdowod'],
+           ['Edek','…naprawdę masz nagrane?','c_naprawde'],
+           ['Edek','No świetnie.','c_swietnie'],
+           ['Klaunica','Pokaż co tam masz.','k_pokaz'],
+           ['Edek','Teraz do namiotu, ale jeśli chcesz to chodź ze mną, będzie super.','c_donamiotu'],
+           ['Klaunica','Do namiotu?! Najpierw kasujesz to nagranie, blaszaku. Po dobroci albo po mojemu!'],
+           ['Edek','Nikt nie będzie zaczepiał tu moich ziomali. A mnie tym bardziej. Lecimy!','c_ziomali']],
+    intro2:[['Klaunica','Wróciłeś? Nagranie dalej mam. Jest dowód, że to zrobiłeś, Edward.','k_jestdowod'],
+            ['Edek','Chyba ci się z kimś innym pomyliłem.','c_pomylilem'],
+            ['Klaunica','No to jedziemy jeszcze raz, blaszaku.']]},
   yeti:{r:'tatry',x:96,y:57,t:'yeti',n:'YETI Z GIEWONTU',batk:'snieg',
     film:'YETI ISTNIEJE!!! (nagranie z Giewontu, nie klikbajt)',
     intro:[['Baca','Edek, cosik po graniach chodzi i porywa oscypki! Jak nic — YETI!'],
@@ -2780,19 +3000,28 @@ let bossCdT={};
 const bossOnMap=id=>foes.some(f=>f.bid===id);
 function startBoss(id){
   const b=BOSSES[id];
-  say(b.intro.map(([who,t,v])=>({who,t,v})),()=>{
+  /* rewanż: nie odtwarzamy całej scenki po raz drugi (bossy `auto` wchodzą samym wejściem) */
+  const lines=(b.intro2&&(S.bossLvl[id]||0)>0)?b.intro2:b.intro;
+  say(lines.map(([who,t,v])=>({who,t,v})),()=>{
     const lvl=S.bossLvl[id]||0,td=FOE_TYPES[b.t];
     const maxHp=Math.round(td.hp*(1+.5*lvl));
-    foes.push({t:b.t,boss:true,bid:id,bn:b.n,batk:b.batk,
+    foes.push({t:b.t,boss:true,bid:id,bn:b.n,batk:b.batk,moves:b.moves,
       x:b.x*16+8,y:b.y*16+8,homeX:b.x*16+8,homeY:b.y*16+8,
       hp:maxHp,maxHp,hp0:maxHp,atk:Math.round(td.atk*(1+.15*lvl)),
       dx:0,dy:0,wt:0,stun:0,kb:0,kbx:0,kby:0,flash:0,at:2});
+    /* bossowie wchodzący sami (bez [E]) materializują się z hukiem na środku areny */
+    if(b.auto){const ex=b.x*16+8,ey=b.y*16+8;
+      fxRing(ex,ey-8,58,'#e03050',{life:.5,w:4});
+      fxRing(ex,ey+4,44,'#f5c542',{life:.4,w:3,ground:true});
+      fxSparks(ex,ey-10,'#e03050',18,160,{life:.6});
+      fxStarFlash(ex,ey-12,'#fff7f2',14,{life:.3});
+      addShake(5,.4);burstConfetti();worldFlash=.5;}
     toast('⚔️ BOSS: '+b.n+(lvl?' — POZIOM '+(lvl+1):'')+'!',3000);
     SFX.no();
   });
 }
 const BOSS_DROP={krol:['art','kiel'],mdres:['weap','kettle'],kraken:['art','kolczykK'],
-  smok:['art','luska'],yeti:['weap','ciupaga'],laweta:['art','hakL']};
+  smok:['art','luska'],yeti:['weap','ciupaga'],laweta:['art','hakL'],klaunica:['art','rogiK']};
 function bossDefeated(f){
   const id=f.bid,lvl=S.bossLvl[id]||0;
   const di=1+(lvl>=2?1:0),ch=6+lvl*2,dd=60+lvl*25;
@@ -2810,7 +3039,7 @@ function bossDefeated(f){
   toast('👑 POKONANY: '+f.bn+'!<br>+'+di+'💠 +'+ch+'⚙️ +'+dd+'💎',4200);
   addViews(30000+lvl*15000,false);
   setTimeout(()=>postFilm(BOSSES[id].film,80000),1600);
-  vsay('v_elegancko');
+  vsay(id==='klaunica'?pickA(['c_swietnie','c_donamiotu','v_elegancko']):'v_elegancko');
 }
 
 /* =====================================================================
@@ -2836,7 +3065,7 @@ function rollOne(){
   }
   const r=Math.random();
   if(r<.22){ // sprzęt: broń albo artefakt
-    const bossOnly=['kiel','kettle','kolczykK','luska','ciupaga'];
+    const bossOnly=['kiel','kettle','kolczykK','luska','ciupaga','hakL','rogiK'];
     const g5=['rolexM','wasP','dorszM'].filter(k=>!S.gearOwn[k]);
     const pool=Object.keys(WEAPONS).concat(Object.keys(ARTS))
       .filter(k=>!S.gearOwn[k]&&!bossOnly.includes(k)&&!g5.includes(k));
@@ -3393,6 +3622,44 @@ function moveVec(){
   const m=Math.hypot(dx,dy);if(m>1){dx/=m;dy/=m}
   return[dx,dy];
 }
+/* SPRINT: trzymany klawisz (domyślnie SHIFT) albo joystick wypchnięty do oporu.
+   Wytrzymałość jak w Genshinie — pomarańczowy pasek pod postacią, po wyczerpaniu
+   krótka zadyszka, w czasie której nie da się biec. */
+const STAM={v:100,max:100,rest:0,tired:false,show:0};
+const SPRINT_MULT=1.6;
+function wantsSprint(){
+  if(keys[KEYMAP.sprint])return true;
+  if(KEYMAP.sprint==='ShiftLeft'&&keys.ShiftRight)return true;   // prawy SHIFT też, gdy domyślne przypisanie
+  return !!(joy&&Math.hypot(joy.dx,joy.dy)>52);   // dotyk: wychylenie do oporu = bieg
+}
+function updateStamina(dt,sprinting){
+  if(sprinting){
+    STAM.v=Math.max(0,STAM.v-24*dt);STAM.rest=.5;STAM.show=1.6;
+    if(STAM.v<=0&&!STAM.tired){STAM.tired=true;beep(180,.18,'triangle',.05,90);
+      addHit(P.x,P.y-30,'ZADYSZKA!','#f5a032');}
+  }else{
+    if(STAM.rest>0)STAM.rest-=dt;
+    else if(STAM.v<STAM.max){
+      STAM.v=Math.min(STAM.max,STAM.v+30*dt);STAM.show=1.6;
+      if(STAM.tired&&STAM.v>=STAM.max*.3)STAM.tired=false;   // po odsapnięciu można znów biec
+    }
+  }
+  if(STAM.show>0)STAM.show-=dt;
+}
+/* pasek wytrzymałości pod postacią (chowa się, gdy pełny — jak w Genshinie) */
+function drawStamina(){
+  if(STAM.v>=STAM.max&&STAM.show<=0)return;
+  const w=42,h=4,sx=P.x-camX-w/2,sy=P.y-camY+16;
+  const a=STAM.v>=STAM.max?Math.max(0,Math.min(1,STAM.show/.6)):1;
+  cx.save();cx.globalAlpha=a;
+  cx.fillStyle='rgba(10,8,22,.62)';rr(cx,sx-1.5,sy-1.5,w+3,h+3,2.5,'rgba(10,8,22,.62)');
+  R(cx,sx,sy,w,h,'rgba(60,50,40,.85)');
+  const k=STAM.v/STAM.max;
+  R(cx,sx,sy,w*k,h,STAM.tired?'#c85a2a':'#f5a032');
+  R(cx,sx,sy,w*k,1.4,STAM.tired?'#e88a4a':'#ffc46a');
+  if(STAM.tired&&Math.floor(anim*8)%2===0){cx.globalAlpha=a*.5;R(cx,sx,sy,w,h,'#e04848');}
+  cx.restore();
+}
 
 /* ---------------- UI ---------------- */
 let toastT=null;
@@ -3499,7 +3766,7 @@ function findPrompt(){
       if(Math.hypot(P.x-(dm.x*16+8),P.y-(dm.y*16+8))<24){prompt={domain:id,label:'🌀 Wejdź: '+dm.n};break;}
     }
     if(!prompt)for(const[id,b]of Object.entries(BOSSES)){
-      if(b.r!==REG||bossOnMap(id)||(bossCdT[id]>0))continue;
+      if(b.r!==REG||b.auto||bossOnMap(id)||(bossCdT[id]>0))continue;   // `auto` = odpala się samo po wejściu na arenę
       if(Math.hypot(P.x-(b.x*16+8),P.y-(b.y*16+8))<28){prompt={bossId:id,label:'⚔ WYZWIJ: '+b.n};break;}
     }
   }
@@ -4513,7 +4780,7 @@ function drawChest(sx,sy,open){
 }
 /* BOSSOWIE — duże sprite'y */
 function drawBoss(f,sx,sy){
-  const bob=f.stun>0?0:Math.sin(anim*5)*1.2;
+  const bob=(f.stun>0||f.hold>0)?0:Math.sin(anim*5)*1.2;   // w trakcie ataku stoi jak wryty
   if(f.flash>0)cx.globalAlpha=.6;
   cx.save();cx.translate(sx,sy+bob);
   if(f.t==='krol'){ // KRÓL DZIKÓW — wielki dzik w koronie
@@ -4579,6 +4846,58 @@ function drawBoss(f,sx,sy){
     cx.fillStyle='#ece9f4';R(cx,-3,-3,2,2.4,'#ece9f4');R(cx,1,-3,2,2.4,'#ece9f4'); // kły
     // sopelki na futrze
     if(Math.floor(anim*2)%2){cx.fillStyle='#bfe8f4';R(cx,-8,14,2,4,'#bfe8f4');R(cx,7,13,2,5,'#bfe8f4');}
+  }else if(f.t==='klaunica'){ // KLAUNICA Z FESTIWALU — rogi klauna, czerwone włosy, telefon z dowodem
+    const fl=P.x<f.x?-1:1,sw=Math.sin(anim*6)*1.2;
+    cx.fillStyle='rgba(0,0,0,.32)';cx.beginPath();cx.ellipse(0,26,15,4.5,0,0,7);cx.fill();
+    // czarne buty
+    R(cx,-8,20,6,6,'#12121a');R(cx,2,20,6,6,'#12121a');
+    R(cx,-8.5,24.5,7,2,'#0a0a10');R(cx,1.5,24.5,7,2,'#0a0a10');
+    // PODKOLANÓWKI do kolan — biało-czarne paski
+    for(let i=0;i<5;i++){const c2=i%2?'#12121a':'#f2f0f8';
+      R(cx,-8,10+i*2,6,2,c2);R(cx,2,10+i*2,6,2,c2);}
+    // czarna spódniczka (kloszowana)
+    cx.fillStyle='#15151f';cx.beginPath();
+    cx.moveTo(-9,10);cx.lineTo(9,10);cx.lineTo(13,1);cx.lineTo(-13,1);cx.closePath();cx.fill();
+    cx.fillStyle='#22222e';cx.beginPath();
+    cx.moveTo(-9,10);cx.lineTo(0,10);cx.lineTo(-4,1);cx.lineTo(-13,1);cx.closePath();cx.fill();
+    R(cx,-10,-1,20,3,'#0d0d14');                             // pasek spódnicy
+    // brzuch + CZERWONY STANIK
+    rr(cx,-7,-9,14,10,2,'#e8c9a0');
+    cx.fillStyle='#e03050';cx.beginPath();
+    cx.moveTo(-8,-10);cx.lineTo(8,-10);cx.lineTo(6,-3);cx.lineTo(0,-6);cx.lineTo(-6,-3);cx.closePath();cx.fill();
+    R(cx,-8.5,-11,17,2,'#c02040');
+    // ręce — jedna trzyma telefon i NAGRYWA
+    R(cx,-12,-8,4,10,'#e8c9a0');R(cx,8,-9+sw,4,9,'#e8c9a0');
+    rr(cx,7.5,-16+sw,6,9,1.4,'#1a1a24');R(cx,8.4,-15+sw,4.2,6.6,'#6fd8e8');
+    if(Math.floor(anim*3)%2)R(cx,9.4,-14.4+sw,1.6,1.6,'#e03028');   // dioda REC
+    // głowa + CZERWONE WŁOSY (grzywka i pasma po bokach, twarz zostaje odkryta)
+    rr(cx,-8,-26,16,16,4.5,'#e8c9a0');
+    cx.fillStyle='#d81f34';
+    cx.beginPath();cx.arc(0,-24,10,Math.PI,0);cx.fill();             // czupryna nad czołem
+    R(cx,-10,-25,3.5,17,'#d81f34');R(cx,6.5,-25,3.5,17,'#d81f34');   // pasma po bokach twarzy
+    R(cx,-10,-25,20,4,'#d81f34');                                    // grzywka
+    R(cx,-9.6,-25,1.6,13,'#f0344a');R(cx,7,-24,1.4,10,'#b81628');    // światło i cień we włosach
+    rr(cx,-6,-21,12,11,3,'#e8c9a0');                                 // TWARZ (odkryta spod włosów)
+    // oczy + wściekła mina
+    cx.fillStyle='#fff7f2';cx.beginPath();cx.arc(-3.2,-17,2.8,0,7);cx.arc(3.2,-17,2.8,0,7);cx.fill();
+    cx.fillStyle='#12121a';cx.beginPath();cx.arc(-3.2+fl*.8,-17,1.6,0,7);cx.arc(3.2+fl*.8,-17,1.6,0,7);cx.fill();
+    R(cx,-6,-20.6,4.6,1.7,'#8a1420');R(cx,1.4,-20.6,4.6,1.7,'#8a1420');  // zmarszczone brwi
+    R(cx,-2.6,-13.4,5.2,2,'#a3243a');R(cx,-1.6,-13,3.2,1,'#e8737f');     // krzywy uśmiech
+    // ROGI KLAUNA — długie, wygięte na boki, z kulkami na końcach
+    const horn=(dir,col,ball)=>{
+      const wob=Math.sin(anim*3+dir)*1.6,ex=dir*23,ey=-30+wob;
+      cx.strokeStyle=col;cx.lineWidth=3.8;cx.lineCap='round';
+      cx.beginPath();cx.moveTo(dir*5,-25);
+      cx.quadraticCurveTo(dir*15,-41,ex,ey);cx.stroke();
+      cx.fillStyle=ball;cx.beginPath();cx.arc(ex,ey,3.6,0,7);cx.fill();
+      cx.fillStyle='rgba(255,255,255,.4)';cx.beginPath();cx.arc(ex-1.1,ey-1.1,1.3,0,7);cx.fill();
+    };
+    horn(-1,'#15151f','#f6f4fa');   // lewy: CZARNY róg z BIAŁĄ kulką
+    horn( 1,'#e03050','#12121a');   // prawy: CZERWONY róg z CZARNĄ kulką
+    cx.lineCap='butt';
+    // telegraf szarży: pochyla się do przodu i sypie iskrami
+    if(f.telT!==undefined){cx.fillStyle='rgba(224,48,80,.28)';
+      cx.beginPath();cx.arc(0,-6,22+Math.sin(anim*22)*3,0,7);cx.fill();}
   }else if(f.t==='laweciarz'){ // PAN LAWETA 3000 — pomarańczowa laweta z hakiem
     const fl=P.x<f.x;
     cx.fillStyle='rgba(0,0,0,.3)';cx.beginPath();cx.ellipse(0,20,26,5,0,0,7);cx.fill();
@@ -5461,13 +5780,25 @@ function updateWorld(dt){
   }else{
   const[dx,dy]=moveVec();
   P.moving=dx!==0||dy!==0;
+  /* SPRINT: tylko w ruchu, przy zdrowej nodze i gdy starczy wytrzymałości */
+  P.sprint=P.moving&&wantsSprint()&&!STAM.tired&&STAM.v>0&&!P.slow;
+  updateStamina(dt,P.sprint);
   if(P.moving){
     if(Math.abs(dx)>Math.abs(dy))P.dir=dx<0?1:2;else P.dir=dy<0?3:0;
-    let sp=P.speed*(S.ch==='edek'?(SHOE_SPD[S.equip.shoes]||1):1)*(P.slow?.55:1)*(BUFF.t>0?1+BUFF.spd:1);
+    let sp=P.speed*(S.ch==='edek'?(SHOE_SPD[S.equip.shoes]||1):1)*(P.slow?.55:1)*(BUFF.t>0?1+BUFF.spd:1)
+           *(P.sprint?SPRINT_MULT:1);
     const nx=P.x+dx*sp*dt,ny=P.y+dy*sp*dt;
     if(canWalk(nx,P.y))P.x=nx;
     if(canWalk(P.x,ny))P.y=ny;
-    P.frame+=dt*8;
+    P.frame+=dt*(P.sprint?13:8);
+    /* pęd biegu: kurz spod nóg i lekkie powidoki */
+    if(P.sprint&&!reduceMotion){
+      P.spT=(P.spT||0)-dt;
+      if(P.spT<=0){P.spT=.07;
+        fxDust(P.x-dx*7,P.y+5,1);
+        fxP({x:P.x-dx*9+(Math.random()-.5)*6,y:P.y-4-dy*9,vx:-dx*32,vy:-dy*32,g:0,
+          life:.2,life0:.2,sz:1.4,col:'#f5a032',add:true,shrink:true});}
+    }
     const done2=Object.keys(QUESTS).filter(q=>qs(q)===2).length;
     if(REG==='wawa'&&S.trip===0&&done2>=2&&at(Math.floor(P.x/16),Math.floor(P.y/16))===2){
       S.trip=1;P.slow=true;save();SFX.hit();
@@ -5508,6 +5839,20 @@ function updateWorld(dt){
   /* BRAMKI POLAND ROCKA: podejście pod bramę odpala finałowy odcinek z policją */
   else if(REG==='trasa'&&scene==='world'&&POL.cd<=0&&qs('przyczepa')===2&&qs('policja')!==2
     &&Math.hypot(P.x-632,P.y-524)<38)startPoliceEpisode();
+  updateHeal(dt);
+  /* PRZYSTANEK PKS: podejście = pełna regeneracja ekipy */
+  if(scene==='world'&&REG!=='arena'){
+    const pks=DOORS.find(d=>d.r===REG&&d.act==='pks');
+    if(pks&&Math.hypot(P.x-(pks.x*16+8),P.y-(pks.y*16+8))<44)pksHeal();
+  }
+  /* BOSSOWIE `auto`: samo wejście do areny odpala scenkę, a po niej boss staje na środku */
+  if(scene==='world')for(const[id,b]of Object.entries(BOSSES)){
+    if(!b.auto||b.r!==REG||bossOnMap(id)||(bossCdT[id]>0))continue;
+    const A=arenasOf(REGIONS[REG]).find(a=>a.bid===id);
+    if(!A)continue;
+    const tx=P.x/16,ty=P.y/16;
+    if(tx>=A.ai[0]&&tx<=A.ai[2]+1&&ty>=A.ai[1]&&ty<=A.ai[3]+1){startBoss(id);break;}
+  }
   idleT-=dt;
   if(idleT<=0){
     if(scene==='world'&&REG!=='arena'&&!curVoice){
@@ -5515,7 +5860,8 @@ function updateWorld(dt){
       const roll=Math.random();
       const want=roll<.3?1:roll<.75?2:3;
       const ch=[];
-      const pool=REG==='morze'?IDLE_POOL.concat(['c_zyciemorze','c_mielno','c_czapka','c_morzejazda','c_zyciemorze','c_mielno'])
+      const pool=REG==='morze'?IDLE_POOL.concat(['c_zyciemorze','c_mielno','c_czapka','c_morzejazda',
+        'c_zyciemorze','c_mielno','c_przykromi','c_pomylilem','c_swietnie'])
         /* na samym POLU festiwalu Edek melduje się z Poland Rocka, poza polem gada o trasie */
         :REG==='trasa'?(insideFest(Math.floor(P.x/16),Math.floor(P.y/16))?ROCK_POOL:TRASA_POOL):IDLE_POOL;
       while(ch.length<want){const c=pickA(pool);if(!ch.includes(c))ch.push(c);}
@@ -5534,7 +5880,7 @@ const MAPCOL={0:'#2f6b3a',1:'#b39a68',2:'#454552',3:'#2f6db0',4:'#173a20',5:'#9a
   7:'#3a7a46',8:'#dcc888',9:'#8a6a42',16:'#7a7a8c',17:'#e8eef8',
   18:'#3a7a44',30:'#1f4a24',19:'#2a5a2e',20:'#7a7a8c',21:'#4a7050',22:'#a02c44',23:'#8a6746',
   24:'#2f6db0',25:'#4a7a3a',26:'#5a4028',27:'#e0662a',28:'#4a9a52',29:'#c8a86a',31:'#357a3e',
-  32:'#e04848',33:'#1a1a24',34:'#b0b0be',35:'#3a7ad0',36:'#d84848'};
+  32:'#e04848',33:'#1a1a24',34:'#b0b0be',35:'#3a7ad0',36:'#d84848',37:'#9a9aa4'};
 const mapColor=v=>MAPCOL[v]||(v>=10&&v<=15?'#6a6a80':'#2f6b3a');
 function drawMapOverlay(){
   cx.fillStyle='rgba(9,7,18,.93)';cx.fillRect(0,0,W,H);
@@ -5573,7 +5919,7 @@ function drawMapOverlay(){
 const TCOL={0:'#2e5a34',1:'#a08a5a',2:'#3a3a48',7:'#2e5a34',8:'#d8c084',9:'#8a6a42',16:'#7a7a8c',17:'#e8eef8',
   18:'#2e5a34',19:'#2e5a34',20:'#2e5a34',21:'#2e5a34',22:'#2e5a34',23:'#7a5636',24:'#2e5a34',25:'#2e5a34',
   26:'#2e5a34',27:'#2e5a34',28:'#2e5a34',29:'#2e5a34',30:'#2e5a34',31:'#2e5a34',
-  32:'#2e5a34',33:'#2e5a34',34:'#a08a5a',35:'#2e5a34',36:'#3a3a48'};
+  32:'#2e5a34',33:'#2e5a34',34:'#a08a5a',35:'#2e5a34',36:'#3a3a48',37:'#9a9aa4'};
 /* podłoże pod asset (trawa/piasek/śnieg wg regionu) — spójne tło dekoracji */
 function baseTile(){return REG==='morze'?8:REG==='tatry'?17:0;}
 function baseCol(){return REG==='morze'?'#d8c084':REG==='tatry'?'#e8eef8':'#2e5a34';}
@@ -5606,6 +5952,16 @@ function drawWorld(){
       if((tx*3+ty)%5===0)R(cx,sx+10,sy+11,2,2,'#93805052');
       if(at(tx,ty-1)!==1&&at(tx,ty-1)!==2)R(cx,sx,sy,16,2,'#b39a68');
       if(at(tx,ty+1)!==1&&at(tx,ty+1)!==2)R(cx,sx,sy+14,16,2,'#6e5c3a');
+    }
+    if(v===37){ // CHODNIK BETONOWY — płyty ze spoinami i dylatacją
+      R(cx,sx,sy,16,16,'#9a9aa4');
+      R(cx,sx,sy,16,8,'#a4a4ae');                                   // jaśniejsza górna płyta
+      R(cx,sx,sy+7,16,1,'#7e7e88');R(cx,sx+7,sy,1,16,'#7e7e88');    // spoiny między płytami
+      R(cx,sx,sy,16,1,'#b4b4bc');
+      if((tx*7+ty*3)%5===0)R(cx,sx+3,sy+3,2,2,'#8e8e98');           // wykruszenia betonu
+      if((tx*3+ty*11)%7===0)R(cx,sx+10,sy+11,3,1,'#8e8e98');
+      if((tx+ty)%9===0)R(cx,sx+11,sy+2,2,3,'#b0b0b8');
+      if(at(tx,ty+1)!==37)R(cx,sx,sy+14,16,2,'#82828c');            // krawężnik od dołu
     }
     if(v===2){R(cx,sx,sy,16,16,'#3a3a48');
       if(ty%2===0&&tx%2===0)R(cx,sx+2,sy+7,7,2,'#5a5a6a');
@@ -5907,18 +6263,18 @@ function drawWorld(){
         cx.fillText('BOSS: '+b.n,sx,sy-16);cx.textAlign='left';
       }
     }
-    /* drogowskaz do oddzielonej areny bossa (przy wejściu do korytarza) */
-    const AR=REGIONS[REG].arena;
-    if(AR&&AR.sign){
-      const bid=Object.keys(BOSSES).find(id=>BOSSES[id].r===REG);
+    /* drogowskazy do oddzielonych aren bossów (przy wejściach do korytarzy) */
+    for(const AR of arenasOf(REGIONS[REG])){
+      if(!AR.sign)continue;
+      const bid=AR.bid||Object.keys(BOSSES).find(id=>BOSSES[id].r===REG);
       if(bid&&!bossOnMap(bid)&&!(bossCdT[bid]>0)){
         const sx=AR.sign[0]*16+8-camX,sy=AR.sign[1]*16+8-camY;
         if(sx>-60&&sx<W+60&&sy>-40&&sy<H+40){
-          const p=1+Math.sin(anim*4)*.1;
+          const p=1+Math.sin(anim*4)*.1,lab=AR.label||'⚔ ARENA →';
           cx.save();cx.translate(sx,sy-6);cx.scale(p,p);
           cx.font='7px "Press Start 2P"';cx.textAlign='center';
-          cx.fillStyle='#000';cx.fillText('⚔ ARENA →',1,1);
-          cx.fillStyle='#f5c542';cx.fillText('⚔ ARENA →',0,0);
+          cx.fillStyle='#000';cx.fillText(lab,1,1);
+          cx.fillStyle='#f5c542';cx.fillText(lab,0,0);
           cx.restore();cx.textAlign='left';
         }
       }
@@ -6028,6 +6384,7 @@ function drawWorld(){
   for(const g of forage)ents.push({y:g.y,d:()=>drawForageNode(g,g.x-8-camX,g.y-12-camY)});
   if(selfie)ents.push({y:selfie.y,d:()=>drawSelfieGirl(selfie.x-6-camX,selfie.y-20-camY)});
   ents.sort((a,b)=>a.y-b.y).forEach(e=>e.d());
+  drawStamina();          // pomarańczowy pasek sprintu pod postacią
   // pociski postaci: dorsz Bogdana / serduszko Julki
   for(const p of PROJ){
     const sx=p.x-camX,sy=p.y-camY;
@@ -6069,6 +6426,20 @@ function drawWorld(){
       cx.fillStyle='#e03028';cx.beginPath();cx.arc(0,0,4.6,0,7);cx.fill();
       cx.fillStyle='#fff7f2';cx.beginPath();cx.arc(0,0,2.6,0,7);cx.fill();
       cx.fillStyle='#e03028';R(cx,-1.6,-1.2,3.2,2.4,'#e03028');
+      cx.restore();
+    }else if(b.t==='fon'){          // TELEFON z dowodem — koziołkuje, świeci ekranem, nagrywa
+      cx.save();cx.translate(sx,sy);cx.rotate(anim*7);
+      rr(cx,-3.4,-6,6.8,12,1.4,'#1a1a24');
+      R(cx,-2.4,-4.6,4.8,9.2,'#6fd8e8');
+      R(cx,-2.4,-4.6,4.8,2.6,'#a8e8f4');
+      if(Math.floor(anim*8)%2){cx.fillStyle='#e03028';cx.beginPath();cx.arc(0,-5.1,1.1,0,7);cx.fill();}
+      cx.restore();
+    }else if(b.t==='konfet'){       // konfetti z piruetu — kolorowa kulka z ogonkiem
+      const col=['#e88ac8','#f5c542','#6fd8e8','#7bc950','#e04848'][Math.floor(sx+sy)%5];
+      cx.save();cx.translate(sx,sy);cx.rotate(anim*13);
+      cx.fillStyle=col;cx.beginPath();cx.arc(0,0,3.6,0,7);cx.fill();
+      cx.fillStyle='#fff7f2';cx.beginPath();cx.arc(-1,-1,1.5,0,7);cx.fill();
+      R(cx,-4.6,-1,3,2,col);R(cx,1.6,-1,3,2,col);
       cx.restore();
     }else if(b.t==='widly'){        // widły Sołtysa — lecą zębami do przodu
       cx.save();cx.translate(sx,sy);cx.rotate(Math.atan2(b.dy,b.dx));
@@ -6205,11 +6576,43 @@ function drawWorld(){
     }
     R(cx,23,y-9,46,7,'rgba(0,0,0,.55)');
     R(cx,24,y-8,44*fr,5,v<=0?'#555':fr>.5?'#7bc950':fr>.25?'#f5c542':'#e04848');
+    /* PKS: pasek rozświetla się na zielono zaraz po regeneracji */
+    const hg=HEAL.t>0?Math.min(1,HEAL.t/1.2):0;
+    if(hg>0){
+      const pulse=.55+Math.sin(anim*14)*.2;
+      cx.save();
+      cx.globalAlpha=.6*hg*pulse;R(cx,24,y-8,44,5,'#c8ff8a');
+      cx.globalCompositeOperation='lighter';
+      cx.globalAlpha=.45*hg;R(cx,22,y-10,48,9,'rgba(123,201,80,.5)');
+      cx.restore();
+      cx.save();cx.globalAlpha=hg;
+      cx.strokeStyle='#9bf05a';cx.lineWidth=1.4;cx.strokeRect(22.3,y-9.7,47.4,8.4);
+      cx.restore();
+    }
     if(act){cx.strokeStyle='#ece9f4';cx.lineWidth=1;cx.strokeRect(23,y-9,46,7);}
-    cx.font='5px "Press Start 2P"';cx.fillStyle=v<=0?'#e04848':'#ece9f4';
+    cx.font='5px "Press Start 2P"';cx.fillStyle=v<=0?'#e04848':(hg>0?'#c8ff8a':'#ece9f4');
     cx.fillText(v<=0?'PADŁ':v+'/'+m,72,y-3);
     cx.globalAlpha=1;
   }
+  /* ZIELONE PLUSIKI unoszące się znad pasków HP po regeneracji na PKS-ie */
+  for(const p of HEAL.plus){
+    if(p.dl>0)continue;
+    const by=H-10-(S.party.length-1-p.i)*17;
+    const k=1-p.life/p.life0;
+    const px2=23+p.ox,py2=by-6-k*p.vy*1.6;
+    const a=Math.min(1,p.life*2.6)*(1-k*.35);
+    const th=2.2,s2=p.sz/2;                                     // grubość ramion krzyżyka
+    cx.save();cx.globalAlpha=a;
+    R(cx,px2-s2-.7,py2-th/2-.7,p.sz+1.4,th+1.4,'rgba(8,24,6,.7)');   // ciemny kontur
+    R(cx,px2-th/2-.7,py2-s2-.7,th+1.4,p.sz+1.4,'rgba(8,24,6,.7)');
+    R(cx,px2-s2,py2-th/2,p.sz,th,'#9bf05a');                          // poziome ramię
+    R(cx,px2-th/2,py2-s2,th,p.sz,'#9bf05a');                          // pionowe ramię
+    cx.globalAlpha=a*.85;
+    R(cx,px2-s2,py2-th/2,p.sz,.9,'#e8ffd0');                          // światło od góry
+    R(cx,px2-th/2,py2-s2,th,.9,'#e8ffd0');
+    cx.restore();
+  }
+  cx.globalAlpha=1;
   // UMIEJĘTNOŚCI: okrągłe naczynia (E = skill, Q = SUPER-HIT) w prawym dolnym rogu
   {const c=CHARS[S.ch],B=BURSTS[S.ch];
    const ready=spcT<=0,cdFill=c.spcCd?1-Math.max(0,spcT)/c.spcCd:1;

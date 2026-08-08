@@ -1,5 +1,12 @@
 # 🧪 Testowanie gry — skróty i przydatne komendy
 
+**Sterowanie (nowe):** `SHIFT` (trzymany) = SPRINT. Pomarańczowy pasek wytrzymałości
+pokazuje się pod postacią; po wyczerpaniu jest krótka ZADYSZKA. Klawisz można zmienić
+w menu Esc → STEROWANIE.
+
+**Regeneracja:** podejście do dowolnego **przystanku PKS** leczy całą drużynę do pełna
+(także padniętych) — zielone plusiki i podświetlenie pasków HP.
+
 Plik do kopiowania „na przyszłość” — otwórz w edytorze i bierz stąd, czego trzeba.
 
 ## Skróty testowe w adresie (bez konsoli)
@@ -21,6 +28,7 @@ Po wejściu zrób **Ctrl+F5**, na ekranie tytułowym pojawi się plakietka
 | `?test=przyczepa` | przy Panu Mirku z kamperem (jazda przyczepą) |
 | `?test=policja` | pod bramkami — finałowa obława policji |
 | `?test=pole` | wszystko zrobione, gracz stoi na polu festiwalowym |
+| `?test=klaunica` | POLSKIE MORZE, tuż przed bramą STREFY IMPREZY — wejdź na arenę, żeby odpalić scenkę i walkę z KLAUNICĄ Z FESTIWALU |
 | `?test=reset` | kasuje zapis (start od zera) |
 
 Skrót nadpisuje zapis raz i dokłada: Dycha do ekipy, poziom 25 postaciom, 500 💎.
