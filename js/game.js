@@ -44,10 +44,18 @@ const mouseAction=btn=>{
 let rebindAction=null;   // trwa przypisywanie klawisza do tej akcji
 
 /* ---------------- ZAPIS ---------------- */
+/* świeża karta postaci: poziom 1, brak wzniesień, talenty na 1, zero konstelacji */
+const newChar=()=>({lvl:1,asc:0,con:0,tal:{n:1,e:1,q:1}});
+/* WZNIESIENIA (jak w Genshinie): 6 progów, każdy podnosi limit poziomu */
+const ASC_CAP=[20,40,50,60,70,80,90];
+const ascCap=asc=>ASC_CAP[Math.min(6,asc|0)];
+const ascFromLvl=lvl=>{let a=0;while(a<6&&ASC_CAP[a]<lvl)a++;return a;};
+
 const DEFAULT_SAVE={dia:25,owned:['was_klasyk','rolex_d'],equip:{mustache:'was_klasyk',watch:'rolex_d'},
   quests:{},col:{},k:{},trip:0,legend:false,px:456,py:368,
   region:'wawa',ch:'edek',dych:0,subs:120,views:0,films:[],mile:{},visited:{wawa:1},
-  chars:{edek:{lvl:1,st:0}},party:['edek'],mats:{sr:0,ch:0,di:0},pity:0,domLvl:{},bossLvl:{},
+  chars:{edek:{lvl:1,asc:0,con:0,tal:{n:1,e:1,q:1}}},party:['edek'],cons:{},
+  mats:{sr:0,ch:0,di:0},pity:0,domLvl:{},bossLvl:{},
   gear:{},gearOwn:{kij:1},food:{picie:2},ingr:{}};
 let S=null;
 function loadSave(){
@@ -60,11 +68,11 @@ function loadSave(){
     if(!S.col)S.col={};
     // migracja v5 -> v6 (WARCHOCKI IMPACT): stary zapis nie miał kolekcji postaci
     if(!p.chars){
-      S.chars={edek:{lvl:1,st:0}};
-      if(S.dych)S.chars.dych={lvl:1,st:0};
+      S.chars={edek:newChar()};
+      if(S.dych)S.chars.dych=newChar();
       S.party=S.dych?['edek','dych']:['edek'];
     }
-    if(!S.chars.edek)S.chars.edek={lvl:1,st:0};
+    if(!S.chars.edek)S.chars.edek=newChar();
     if(!S.party||!S.party.length)S.party=['edek'];
     if(!S.mats)S.mats={sr:0,ch:0,di:0};
     if(S.pity===undefined)S.pity=0;
@@ -74,6 +82,17 @@ function loadSave(){
     if(!p.gearOwn){S.gear={};S.gearOwn={kij:1};S.food={picie:2};}
     if(!S.food)S.food={};if(!S.gear)S.gear={};if(!S.gearOwn)S.gearOwn={};
     if(!S.ingr)S.ingr={};   // surowce do gotowania (v10.2)
+    /* migracja v13 -> v14 (BUDOWANIE POSTACI DO 90): stare `st` (gwiazdki z
+       duplikatów) to dokładnie to, czym w Genshinie są KONSTELACJE — więc
+       przechodzi na `con`, a każda postać dostaje wzniesienie i talenty. */
+    if(!S.cons)S.cons={};                 // niewydane gwiazdy fortuny (duplikaty z gachy)
+    for(const id in S.chars){
+      const d=S.chars[id];
+      if(d.con===undefined){d.con=Math.min(6,d.st||0);delete d.st;}
+      if(d.asc===undefined)d.asc=ascFromLvl(d.lvl);   // stary max 10 mieści się w wzniesieniu 0
+      if(!d.tal)d.tal={n:1,e:1,q:1};
+      d.lvl=Math.max(1,Math.min(90,d.lvl|0));
+    }
     if(!S.party.includes(S.ch))S.ch=S.party[0];
   }catch(e){S=null}
 }
@@ -113,9 +132,14 @@ const TEST_SETUPS={
   if(!t)return;
   if(!S)S=JSON.parse(JSON.stringify(DEFAULT_SAVE));
   S.dych=1;
-  if(!S.chars.dych)S.chars.dych={lvl:1,st:0};
+  if(!S.chars.dych)S.chars.dych=newChar();
   if(!S.party.includes('dych'))S.party.push('dych');
-  for(const id of S.party){const c=S.chars[id];if(c&&c.lvl<25)c.lvl=25;}   // uczciwa walka
+  /* uczciwa walka: poziom 25 + wzniesienie, które ten poziom w ogóle dopuszcza */
+  for(const id of S.party){const c=S.chars[id];
+    if(!c)continue;
+    if(c.lvl<25)c.lvl=25;
+    c.asc=Math.max(c.asc||0,ascFromLvl(c.lvl));
+    if(!c.tal)c.tal={n:1,e:1,q:1};if(c.con===undefined)c.con=0;}
   S.quests=Object.assign({},S.quests,t.q);
   S.visited[t.reg]=1;S.introDone=true;
   S.region=t.reg;S.px=t.at[0]*16+8;S.py=t.at[1]*16+8;
@@ -1843,7 +1867,7 @@ function tryAttack(){
   for(const f of foes){
     const br=f.boss?12:0;
     if(Math.hypot(f.x-fx,f.y-fy)<rng+br||Math.hypot(f.x-P.x,f.y-P.y)<15+br){
-      hit=true;dealDmg(f,S.ch,1);
+      hit=true;dealDmg(f,S.ch,talMul(S.ch,'n'));   // talent CIOSÓW
       if(c.burn){f.burn=Math.max(f.burn||0,c.burn*.7);f.burnDmg=Math.round(chATK(S.ch)*.2);}
       if(c.slow)f.slow=Math.max(f.slow||0,c.slow);
     }
@@ -1906,7 +1930,8 @@ function killFoe(f){
 function trySpecial(){
   if(scene!=='world'||spcT>0)return;
   const c=CHARS[S.ch];
-  spcT=c.spcCd;
+  spcT=chSkillCd(S.ch);       // talent [E] + konstelacja C2 skracają ładowanie
+  const skM=chSkillMul(S.ch); // mnożnik obrażeń umiejętności
   switch(S.ch){
     case 'edek':{ // BŁYSK ROLEXA — stun na cały ekran
       worldFlash=.55;
@@ -1919,12 +1944,17 @@ function trySpecial(){
       for(const f of foes){
         const sx=f.x-camX,sy=f.y-camY;
         if(sx>-10&&sx<W+10&&sy>-10&&sy<H+10){f.stun=2.6;
+          /* C6 ROLEX Z DIAMENTAMI: błysk nie tylko oślepia, ale i przypiera */
+          if(hasCon('edek',6))dealDmg(f,'edek',1.4*skM,{ox:P.x,oy:P.y});
           fxStarFlash(f.x,f.y-20,'#fff7d6',6,{life:.5});}
       }
       toast('⌚ BŁYSK ROLEXA! Hejterzy oślepieni!');
       if(!curVoice)vsay('c_rolexlewa');SFX.dia();break;}
     case 'dych':{ // DZIKA SZARŻA
       dashT=.28;dashDir=P.dir;
+      /* C6 DZIKO, MORDECZKO: druga szarża zaraz po pierwszej */
+      if(hasCon('dych',6))setTimeout(()=>{if(scene==='world'){dashT=.28;dashDir=P.dir;
+        addHit(P.x,P.y-18,'JESZCZE RAZ!','#7bc950');fxDust(P.x,P.y+4,8);}},340);
       addHit(P.x,P.y-18,'SZARŻA!','#f5a032');
       fxDust(P.x,P.y+4,8);
       fxRing(P.x,P.y,20,'#f5a032',{life:.25,w:2,ground:true});
@@ -1934,7 +1964,10 @@ function trySpecial(){
       const gmax=chHpMax(S.ch),ghl=Math.round(gmax*.5);
       PHP[S.ch]=Math.min(gmax,PHP[S.ch]+ghl);worldFlash=.3;
       addDmgNum(P.x,P.y-26,'+'+ghl,'#7bc950');
-      for(const f of foes)if(Math.hypot(f.x-P.x,f.y-P.y)<64)dealDmg(f,'grazynka',1.25);
+      /* C6 ROSÓŁ DLA WSZYSTKICH: talerz leci na całą ekipę */
+      if(hasCon('grazynka',6)){healParty(.5);
+        addHit(P.x,P.y-40,'DLA CAŁEJ EKIPY!','#7bc950');}
+      for(const f of foes)if(Math.hypot(f.x-P.x,f.y-P.y)<64)dealDmg(f,'grazynka',1.25*skM);
       for(let i=0;i<14;i++)smoke.push({x:P.x+(Math.random()-.5)*40,y:P.y-(Math.random()*20),r:2,life:1.6});
       fxRing(P.x,P.y+2,66,'#7bc950',{life:.5,w:3,ground:true});
       for(let i=0;i<(reduceMotion?5:12);i++) // złote i zielone drobinki lecą w górę
@@ -1944,7 +1977,7 @@ function trySpecial(){
       toast('🍲 GORĄCY ROSÓŁ! +50% HP, hejterzy sparzeni!');
       SFX.buy();break;}
     case 'jarek':{ // STOP-KLATKA — globalne spowolnienie
-      slowAll=6;worldFlash=.3;
+      slowAll=hasCon('jarek',6)?10:6;worldFlash=.3;   // C6: zegarek na gwarancji
       fxRing(P.x,P.y-8,130,'#6fd8e8',{life:.6,w:3});
       fxRing(P.x,P.y-8,90,'#ffffff',{life:.45,w:1.6});
       fxRing(P.x,P.y-8,50,'#6fd8e8',{life:.3,w:1.6});
@@ -1958,13 +1991,16 @@ function trySpecial(){
       flameT=.45;flameDir=P.dir;   // strumień ognia rysowany przez chwilę (updateWorld)
       for(const f of foes){
         const rx=f.x-P.x,ry=f.y-P.y,d=Math.hypot(rx,ry);
-        if(d<76&&rx*dv[0]+ry*dv[1]>d*.35){dealDmg(f,'zenek',1.5);f.burn=Math.max(f.burn||0,3);f.burnDmg=Math.round(chATK('zenek')*.25);}
+        if(d<76&&rx*dv[0]+ry*dv[1]>d*.35){dealDmg(f,'zenek',1.5*skM);
+          f.burn=Math.max(f.burn||0,hasCon('zenek',6)?6:3);   // C6 SPAW NA ZIMNO
+          f.burnDmg=Math.round(chATK('zenek')*.25*skM);}
       }
       addShake(2,.3);
       toast('🔥 PALNIK 3000°C! PSSSST!');
       beep(140,.5,'sawtooth',.1,60);break;}
     case 'julka':{ // ZAUROCZENIE — 3 najbliżsi walczą po naszej stronie
-      const near=foes.filter(f=>!f.boss&&!FOE_TYPES[f.t].elite).sort((a,b)=>Math.hypot(a.x-P.x,a.y-P.y)-Math.hypot(b.x-P.x,b.y-P.y)).slice(0,3);
+      const elity=hasCon('julka',6);   // C6 SERDUSZKA DLA KAŻDEGO
+      const near=foes.filter(f=>!f.boss&&(elity||!FOE_TYPES[f.t].elite)).sort((a,b)=>Math.hypot(a.x-P.x,a.y-P.y)-Math.hypot(b.x-P.x,b.y-P.y)).slice(0,3);
       for(const f of near){f.charm=6;addHit(f.x,f.y-18,'💘','#e88ac8');
         fxHearts(f.x,f.y-16,6);fxRing(f.x,f.y-8,18,'#e88ac8',{life:.35,w:2});}
       fxHearts(P.x,P.y-20,4);
@@ -1981,7 +2017,7 @@ function trySpecial(){
       }
       addShake(3.6,.35);
       for(const f of foes)if(Math.hypot(f.x-P.x,f.y-P.y)<95){
-        dealDmg(f,'bogdan',1.1,{kb:0});f.kb=.5;
+        dealDmg(f,'bogdan',(hasCon('bogdan',6)?2.2:1.1)*skM,{kb:0});f.kb=.5;   // C6 SZTORM 12
         const d=Math.max(1,Math.hypot(f.x-P.x,f.y-P.y));
         f.kbx=(f.x-P.x)/d*300;f.kby=(f.y-P.y)/d*300;
       }
@@ -2075,7 +2111,7 @@ function burstBlast(b){
     addShake(6,.4);addHitStop(.06);
     beep(55,.4,'sawtooth',.11,28);
     for(const f of foes)if(!f.dead&&Math.hypot(f.x-b.x,f.y-b.y)<74){
-      dealDmg(f,'dych',2.4,{ox:b.x,oy:b.y,noEnergy:true});
+      dealDmg(f,'dych',2.4*chBurstMul('dych'),{ox:b.x,oy:b.y,noEnergy:true});   // talent [Q] + C5
       if(!f.dead&&!f.boss){const d=Math.max(1,Math.hypot(f.x-b.x,f.y-b.y));
         f.kb=.5;f.kbx=(f.x-b.x)/d*340;f.kby=(f.y-b.y)/d*340;}
     }
@@ -2098,7 +2134,7 @@ function burstBlast(b){
   addShake(b.big?5:2.6,b.big?.3:.16);
   beep(b.big?70:110,.18,'sawtooth',.09,40);
   for(const f of foes)if(!f.dead&&Math.hypot(f.x-b.x,f.y-b.y)<r)
-    dealDmg(f,'edek',b.big?2.2:1.4,{ox:b.x,oy:b.y,noEnergy:true});
+    dealDmg(f,'edek',(b.big?2.2:1.4)*chBurstMul('edek'),{ox:b.x,oy:b.y,noEnergy:true});   // talent [Q] + C5
 }
 function hurtPlayer(srcF){
   if(hurtT>0||dashT>0)return;
@@ -2482,7 +2518,7 @@ function updateFoes(dt){
     /* SZARŻA: jeden czysty cios na wroga + odrzut, żeby Dych nie utknął w przeciwniku */
     if(dashT>0&&Math.hypot(P.x-f.x,P.y-f.y)<(f.boss?28:20)&&!(f.dHit>anim)){
       f.dHit=anim+.6;
-      dealDmg(f,'dych',1.3);
+      dealDmg(f,'dych',1.3*chSkillMul('dych'));
       if(!f.boss&&!f.dead){
         const dd=Math.max(1,Math.hypot(f.x-P.x,f.y-P.y));
         f.kb=.35;f.kbx=(f.x-P.x)/dd*260;f.kby=(f.y-P.y)/dd*260;
@@ -2517,7 +2553,7 @@ function updateFoes(dt){
     for(const f of foes){
       if(f.dead)continue;
       if(Math.hypot(f.x-p.x,(f.y-8)-p.y)<(f.boss?24:13)){
-        dealDmg(f,p.type,1,{ox:p.x-p.dx*.1,oy:p.y-p.dy*.1});
+        dealDmg(f,p.type,talMul(p.type,'n'),{ox:p.x-p.dx*.1,oy:p.y-p.dy*.1});
         if(p.type==='julka'&&!f.boss&&!FOE_TYPES[f.t].elite&&Math.random()<.25){f.charm=Math.max(f.charm||0,2.5);addHit(f.x,f.y-20,'💘','#e88ac8');}
         p.life=0;break;
       }
@@ -2575,11 +2611,13 @@ const reactKey=(a,b)=>[a,b].sort().join('|');
 
 const CHARS={
   edek:{n:'Edward Warchocki',elId:'elegancja',star:5,
+    idleV:['c_rolexlewa','c_elegancko2','c_kamera','v_elegancko','c_ziomali'],
     spd:85,batk:22,rng:23,atk:'melee',
     spcN:'BŁYSK ROLEXA',spcCd:12,spcD:'oślepia wszystkich wrogów na ekranie',
     hitTxt:['ŁUP!','BAM!','Z KOPYTA!'],
     desc:'Pierwszy polski robot-influencer. Rolex, wąs, zasięgi.',how:'START'},
   dych:{n:'Dych Dziki',elId:'dzikosc',star:5,
+    idleV:['d_siemanko','d_wariacie','d_mordeczko','d_lecimy'],
     spd:95,batk:30,rng:26,atk:'melee',
     spcN:'DZIKA SZARŻA',spcCd:5,spcD:'taranuje wszystko na swojej drodze',
     hitTxt:['DZIKO!','ŁUBUDU!','BZZT!'],
@@ -2718,7 +2756,7 @@ const SHOPS={
 };
 
 /* --- STATYSTYKI: HP / ATK / DEF / CRIT DMG (postać + broń + artefakty) --- */
-const chData=id=>S.chars[id]||{lvl:1,st:0};
+const chData=id=>S.chars[id]||{lvl:1,asc:0,con:0,tal:{n:1,e:1,q:1}};
 function gearOf(id){if(!S.gear[id])S.gear[id]={w:null,a:[null,null,null]};return S.gear[id];}
 function gearStats(id){
   const g=gearOf(id);let hp=0,atk=0,def=0,cd=0;
@@ -2726,11 +2764,56 @@ function gearStats(id){
   for(const a of g.a)if(a&&ARTS[a]){const s=ARTS[a].st;hp+=s.hp||0;atk+=s.atk||0;def+=s.def||0;cd+=s.cd||0;}
   return{hp,atk,def,cd};
 }
-const chATK=id=>{const c=CHARS[id],d=chData(id);return Math.round(c.batk*(1+.22*(d.lvl-1))*(1+.08*d.st))+gearStats(id).atk;};
+/* --- KONSTELACJE: 6 stopni, ostatni jest inny dla każdej postaci ---------
+   Duplikat z paczki = GWIAZDA FORTUNY (`S.cons[id]`), którą odpalasz kolejny
+   stopień. C1-C5 to wspólna drabinka (żeby dało się je uczciwie policzyć w
+   statystykach), C6 to autorska sztuczka wpięta w `trySpecial`. */
+const CON_LADDER=[
+  {n:'ROZPOZNAWALNOŚĆ',   d:'+8% ATK — ludzie już wiedzą, kto idzie'},
+  {n:'KRÓTSZY MONTAŻ',    d:'−15% czasu ładowania [E]'},
+  {n:'WIĘKSZY ZASIĘG',    d:'+15% obrażeń umiejętności [E]'},
+  {n:'TWARDSZA BLACHA',   d:'+15% HP'},
+  {n:'WIRALOWY HIT',      d:'+20% obrażeń SUPER-HITU [Q]'},
+];
+const CON6={
+  edek:    {n:'ROLEX Z DIAMENTAMI',d:'BŁYSK ROLEXA nie tylko oślepia — teraz też przypiera hejterów obrażeniami'},
+  dych:    {n:'DZIKO, MORDECZKO',  d:'DZIKA SZARŻA leci dwa razy pod rząd'},
+  grazynka:{n:'ROSÓŁ DLA WSZYSTKICH',d:'GORĄCY ROSÓŁ leczy CAŁĄ ekipę, nie tylko Grażynkę'},
+  jarek:   {n:'ZEGAREK NA GWARANCJI',d:'STOP-KLATKA trwa 10 s zamiast 6'},
+  zenek:   {n:'SPAW NA ZIMNO',     d:'PALNIK podpala dwa razy dłużej'},
+  julka:   {n:'SERDUSZKA DLA KAŻDEGO',d:'ZAUROCZENIE łapie także elity i mini-bossów'},
+  bogdan:  {n:'SZTORM 12 W SKALI', d:'FALA BAŁTYCKA zadaje obrażenia, nie tylko odrzuca'},
+};
+const conOf=id=>Math.min(6,chData(id).con||0);
+const hasCon=(id,n)=>conOf(id)>=n;
+/* --- TALENTY: 3 na postać (ciosy / [E] / [Q]), poziomy 1-10 ------------- */
+const TALENTS=[
+  {k:'n',ic:'👊',n:'CIOSY',      d:'zwykłe uderzenia'},
+  {k:'e',ic:'⚡',n:'UMIEJĘTNOŚĆ [E]',d:'skill postaci'},
+  {k:'q',ic:'💥',n:'SUPER-HIT [Q]',d:'ultimate'},
+];
+const MAXTAL=10;
+const talLvl=(id,k)=>{const t=chData(id).tal;return t&&t[k]?t[k]:1;};
+/* mnożnik obrażeń z poziomu talentu: 1.00 na 1, 1.81 na 10 */
+const talMul=(id,k)=>1+.09*(talLvl(id,k)-1);
+/* [E]: talent skraca ładowanie, konstelacja C2 dokłada swoje */
+const chSkillCd=id=>{const c=CHARS[id];
+  return Math.max(1.5,c.spcCd*(1-.03*(talLvl(id,'e')-1))*(hasCon(id,2)?.85:1));};
+/* mnożniki obrażeń umiejętności i supera (talent + konstelacje) */
+const chSkillMul=id=>talMul(id,'e')*(hasCon(id,3)?1.15:1);
+const chBurstMul=id=>talMul(id,'q')*(hasCon(id,5)?1.2:1);
+
+/* --- STATYSTYKI: poziom (1-90) + wzniesienie + konstelacje + sprzęt -----
+   Krzywa dobrana tak, żeby postać na 90 z wzniesieniem 6 była ~6× mocniejsza
+   od świeżej — bossowie skalują się do tego przez partyPower/bossScale. */
+const chATK=id=>{const c=CHARS[id],d=chData(id);
+  return Math.round(c.batk*(1+.028*(d.lvl-1))*(1+.12*(d.asc||0))*(hasCon(id,1)?1.08:1))
+    +gearStats(id).atk;};
 const chDmg=chATK;
-const chHpMax=id=>{const d=chData(id);return 100+18*(d.lvl-1)+15*d.st+gearStats(id).hp;};
-const chDEF=id=>8+gearStats(id).def;
-const chCD=id=>150+gearStats(id).cd;   // CRIT DMG %
+const chHpMax=id=>{const d=chData(id);
+  return Math.round((100+9.5*(d.lvl-1)+60*(d.asc||0))*(hasCon(id,4)?1.15:1))+gearStats(id).hp;};
+const chDEF=id=>8+Math.round((chData(id).asc||0)*2.5)+gearStats(id).def;
+const chCD=id=>150+(chData(id).asc||0)*5+gearStats(id).cd;   // CRIT DMG %
 
 /* --- SIŁA DRUŻYNY → SIŁA BOSSA ---------------------------------------
    Bossowie skalują się do ŚREDNIEJ mocy ekipy (poziomy, gwiazdki, broń,
@@ -3501,13 +3584,16 @@ function rollOne(){
     S.pity=0;
     const id=pickA(GACHA_POOL);
     if(!S.chars[id]){
-      S.chars[id]={lvl:1,st:0};
+      S.chars[id]=newChar();
       if(S.party.length<3)S.party.push(id);
       return{t:'char',id,nw:true};
     }
+    /* DUPLIKAT = GWIAZDA FORTUNY: zasób na KONSTELACJĘ tej konkretnej postaci
+       (dokładnie jak w Genshinie). Przy komplecie C6 zamienia się w materiały. */
     const d=S.chars[id];
-    if(d.st<5)d.st++;
-    S.mats.ch+=5;
+    if((d.con||0)>=6&&!(S.cons[id]>0)){S.mats.ch+=12;S.mats.di+=1;
+      return{t:'char',id,dup:true,maxed:true};}
+    S.cons[id]=(S.cons[id]||0)+1;S.mats.ch+=5;
     return{t:'char',id,dup:true};
   }
   const r=Math.random();
@@ -3543,7 +3629,8 @@ function gresHtml(r,i){
   if(r.t==='char'){
     const c=CHARS[r.id];
     if(r.nw)return'<div class="gres char" '+d+'><span class="gbig">'+c.el+'</span>⭐ NOWA POSTAĆ!<br><b>'+c.n+'</b></div>';
-    return'<div class="gres dup" '+d+'><span class="gbig">'+c.el+'</span>'+c.n+'<br>+1 GWIAZDKA ✨ (+5⚙️)</div>';
+    if(r.maxed)return'<div class="gres dup" '+d+'><span class="gbig">'+c.el+'</span>'+c.n+'<br>C6 KOMPLET → +12⚙️ +1💠</div>';
+    return'<div class="gres dup" '+d+'><span class="gbig">⭐</span>'+c.n+'<br>+1 GWIAZDA FORTUNY<br><i style="font-size:8px">→ KONSTELACJE (+5⚙️)</i></div>';
   }
   if(r.t==='gear'){
     const it=WEAPONS[r.id]||ARTS[r.id];
@@ -3559,7 +3646,7 @@ function renderGacha(res){
   $('gachaDia').textContent='💎 '+S.dia;
   const owned=GACHA_POOL.filter(id=>S.chars[id]).length;
   let html='<p style="font-size:11px;line-height:1.9;margin:6px 0">Fani wysyłają Edkowi paczki!<br>W środku: <b style="color:var(--gold)">nowe postacie</b> ('+owned+'/'+GACHA_POOL.length+'), 🗡 <b style="color:var(--gold)">bronie i artefakty</b>, 🔩⚙️💠 materiały.</p>'+
-    '<p class="pity">GWARANTOWANA POSTAĆ za '+(PITY_AT-S.pity)+' paczek! (duplikat = +1 gwiazdka ✨)</p>'+
+    '<p class="pity">GWARANTOWANA POSTAĆ za '+(PITY_AT-S.pity)+' paczek!<br>duplikat = ⭐ GWIAZDA FORTUNY → KONSTELACJA tej postaci</p>'+
     '<div class="btnrow">'+
     '<button class="bigbtn px" style="font-size:12px" id="pull1">🎁 OTWÓRZ 1 (40💎)</button>'+
     '<button class="bigbtn px" style="font-size:12px" id="pull10">🎁 OTWÓRZ 10 (360💎)</button></div>'+
@@ -3570,21 +3657,80 @@ function renderGacha(res){
 }
 function openGacha(){SFX.open();renderGacha(null);$('gacha').classList.remove('hidden');}
 
-/* --- panel postaci: drużyna + ulepszanie --- */
-const lvlCost=lvl=>({sr:6*lvl,ch:lvl>=3?(lvl-2)*3:0,di:lvl>=6?1:0});
-const MAXLVL=10;
-function costTxt(c){let t=c.sr+'🔩';if(c.ch)t+=' '+c.ch+'⚙️';if(c.di)t+=' '+c.di+'💠';return t;}
+/* --- BUDOWANIE POSTACI: poziom 1-90, wzniesienia, talenty, konstelacje --- */
+const MAXLVL=90;
+/* koszt jednego poziomu rośnie łagodnie, ale przez 90 poziomów robi się z tego
+   prawdziwy grind — dokładnie o to chodzi, bo bossowie skalują się do ekipy */
+const lvlCost=lvl=>({sr:4+Math.round(lvl*1.7),ch:lvl>=15?Math.round((lvl-13)*.55):0,di:0});
+/* wzniesienie: brama co 20/40/50/60/70/80 — bez niego poziom staje w miejscu */
+const ascCost=asc=>({sr:80+asc*90,ch:12+asc*16,di:1+asc});
+const talCost=tl=>({sr:0,ch:6+tl*7,di:tl>=5?1:0});
+function costTxt(c){const p=[];if(c.sr)p.push(c.sr+'🔩');if(c.ch)p.push(c.ch+'⚙️');if(c.di)p.push(c.di+'💠');
+  return p.length?p.join(' '):'za darmo';}
 function canAfford(c){return S.mats.sr>=c.sr&&S.mats.ch>=c.ch&&S.mats.di>=c.di;}
-function tryLvlUp(id){
-  const d=S.chars[id];if(!d||d.lvl>=MAXLVL)return;
-  const c=lvlCost(d.lvl);
-  if(!canAfford(c)){SFX.no();toast('Brakuje materiałów! Wbijaj do domen i na bossów 🔩⚙️💠');return;}
-  S.mats.sr-=c.sr;S.mats.ch-=c.ch;S.mats.di-=c.di;
-  d.lvl++;save();SFX.lvl();burstConfetti();
+function payCost(c){S.mats.sr-=c.sr;S.mats.ch-=c.ch;S.mats.di-=c.di;}
+const brakMat=()=>{SFX.no();toast('Brakuje materiałów! Wbijaj do domen i na bossów 🔩⚙️💠');};
+/* ile poziomów da się kupić na raz (przycisk ×10 / MAX) */
+function lvlUpMany(id,ile){
+  const d=S.chars[id];if(!d)return 0;
+  let n=0;
+  while(n<ile&&d.lvl<MAXLVL&&d.lvl<ascCap(d.asc||0)){
+    const c=lvlCost(d.lvl);
+    if(!canAfford(c))break;
+    payCost(c);d.lvl++;n++;
+  }
+  if(!n){
+    if(d.lvl>=MAXLVL)toast('✨ To już 90 poziom — wyżej się nie da, byku!');
+    else if(d.lvl>=ascCap(d.asc||0))toast('🔒 Limit poziomu! Najpierw WZNIESIENIE.');
+    else brakMat();
+    SFX.no();return 0;
+  }
+  save();SFX.lvl();burstConfetti();
+  if(id===S.ch)applyChar();
+  PHP[id]=Math.min(chHpMax(id),(PHP[id]||0)+n*10);
+  toast('⬆️ '+CHARS[id].n+' — POZIOM '+d.lvl+(n>1?' (+'+n+')':'')+'!<br>Mocniejsze ciosy, więcej ♥');
+  return n;
+}
+const tryLvlUp=id=>lvlUpMany(id,1);
+function tryAscend(id){
+  const d=S.chars[id];if(!d)return;
+  const a=d.asc||0;
+  if(a>=6){toast('✨ Pełne wzniesienie — dalej już tylko konstelacje!');return;}
+  if(d.lvl<ascCap(a)){toast('🔒 Najpierw dobij do poziomu '+ascCap(a)+', potem wzniesienie.');SFX.no();return;}
+  const c=ascCost(a);
+  if(!canAfford(c)){brakMat();return;}
+  payCost(c);d.asc=a+1;save();SFX.lvl();burstConfetti();burstConfetti();
   if(id===S.ch)applyChar();
   PHP[id]=chHpMax(id);
-  toast('⬆️ '+CHARS[id].n+' — POZIOM '+d.lvl+'!<br>Mocniejsze ciosy, więcej ♥');
-  renderChars();
+  toast('🌟 WZNIESIENIE '+d.asc+'/6 — '+CHARS[id].n+'!<br>Limit poziomu: '+ascCap(d.asc)+' · +ATK +HP +DEF +CRIT');
+  if(!curVoice)vsay('c_elegancko2');
+}
+function tryTalent(id,k){
+  const d=S.chars[id];if(!d)return;
+  if(!d.tal)d.tal={n:1,e:1,q:1};
+  const tl=d.tal[k]||1;
+  if(tl>=MAXTAL){toast('✨ Talent na maksa!');return;}
+  /* talenty gonią wzniesienie — inaczej dałoby się wymaksować je na 1 poziomie */
+  const limit=Math.min(MAXTAL,2+(d.asc||0)*2);
+  if(tl>=limit){toast('🔒 Talent czeka na WZNIESIENIE (limit '+limit+').');SFX.no();return;}
+  const c=talCost(tl);
+  if(!canAfford(c)){brakMat();return;}
+  payCost(c);d.tal[k]=tl+1;save();SFX.lvl();
+  const T=TALENTS.find(t=>t.k===k);
+  toast(T.ic+' '+T.n+' — POZIOM '+d.tal[k]+'/'+MAXTAL+'!');
+}
+function tryCon(id){
+  const d=S.chars[id];if(!d)return;
+  const c=d.con||0;
+  if(c>=6){toast('✨ Komplet konstelacji C6 — pełna moc!');return;}
+  if(!(S.cons[id]>0)){SFX.no();
+    toast('⭐ Brak Gwiazdy Fortuny!<br>Wylosuj tę postać jeszcze raz w 🎁 paczkach od fanów.');return;}
+  S.cons[id]--;d.con=c+1;save();SFX.lvl();burstConfetti();
+  if(id===S.ch)applyChar();
+  PHP[id]=chHpMax(id);
+  const info=d.con<=5?CON_LADDER[d.con-1]:CON6[id];
+  toast('⭐ KONSTELACJA C'+d.con+' — '+info.n+'!<br>'+info.d,4600);
+  if(!curVoice)vsay('c_elegancko2');
 }
 function togglePartyChar(id){
   if(!S.chars[id])return;
@@ -3596,52 +3742,13 @@ function togglePartyChar(id){
     if(S.party.length>=3){toast('Drużyna pełna (max 3)! Zdejmij kogoś.');return;}
     S.party.push(id);
   }
-  save();refreshHUD();renderChars();SFX.ok();
+  save();refreshHUD();SFX.ok();
+  if(!$('hero').classList.contains('hidden'))renderHero();
 }
-function renderChars(){
-  $('charsDia').textContent='💎 '+S.dia;
-  $('matBar').innerHTML='🔩 śrubki: <b>'+S.mats.sr+'</b> · ⚙️ mikroczipy: <b>'+S.mats.ch+'</b> · 💠 Diament do Rolexa: <b>'+S.mats.di+'</b>'+
-    ' · <span style="color:var(--mut)">materiały: hejterzy, 🌀 domeny, ⚔️ bossowie</span>';
-  const g=$('charGrid');g.innerHTML='';
-  for(const[id,c]of Object.entries(CHARS)){
-    const owned=!!S.chars[id],d=chData(id),inP=S.party.includes(id);
-    const el=document.createElement('div');
-    el.className='chc'+(inP?' inparty':'')+(owned?'':' locked');
-    const cv2=document.createElement('canvas');cv2.width=32;cv2.height=40;
-    const c2=cv2.getContext('2d');c2.imageSmoothingEnabled=false;
-    c2.save();c2.translate(8,7);drawCharBody(c2,id,0,0,0,0);c2.restore();
-    if(!owned){c2.globalCompositeOperation='source-atop';c2.fillStyle='rgba(20,17,39,.88)';c2.fillRect(0,0,32,40);}
-    el.appendChild(cv2);
-    const stars='★'.repeat(c.star)+(d.st?' <span style="color:var(--cyan)">'+'✦'.repeat(d.st)+'</span>':'');
-    el.insertAdjacentHTML('beforeend','<span class="nm">'+(owned?c.n:'???')+'</span>'+
-      '<span class="el">'+c.el+' '+c.elN+'</span>'+
-      '<span class="st">'+stars+'</span>');
-    if(owned){
-      el.insertAdjacentHTML('beforeend','<span class="stat">POZ. '+d.lvl+' · ♥'+chHpMax(id)+' 👊'+chATK(id)+'<br>🛡'+chDEF(id)+' 💥'+chCD(id)+'% · [Z] '+c.spcN+'</span>');
-      const bE=document.createElement('button');
-      bE.className='chbtn';bE.textContent='⚔️ EKWIPUNEK';
-      bE.addEventListener('click',()=>openHero(id));
-      el.appendChild(bE);
-      const bP=document.createElement('button');
-      bP.className='chbtn'+(inP?' on':'');
-      bP.textContent=inP?(S.ch===id?'✔ AKTYWNA':'✔ W DRUŻYNIE'):'DO DRUŻYNY';
-      bP.addEventListener('click',()=>togglePartyChar(id));
-      el.appendChild(bP);
-      const bL=document.createElement('button');
-      bL.className='chbtn';
-      if(d.lvl>=MAXLVL){bL.textContent='MAX POZIOM';bL.disabled=true;}
-      else{const cc=lvlCost(d.lvl);bL.textContent='⬆️ ULEPSZ: '+costTxt(cc);bL.disabled=!canAfford(cc);}
-      bL.addEventListener('click',()=>tryLvlUp(id));
-      el.appendChild(bL);
-    }else{
-      el.insertAdjacentHTML('beforeend','<span class="stat">'+c.desc+'</span>'+
-        '<span class="st" style="color:var(--cyan)">'+c.how+'</span>');
-    }
-    g.appendChild(el);
-  }
-}
-function openChars(){SFX.open();renderChars();$('chars').classList.remove('hidden');}
-
+/* (siatka kafelków postaci usunięta w v14.1 — panel budowania ją zastąpił) */
+/* Zakładka 🎴 „Postacie" wchodzi OD RAZU w panel budowania — stara siatka
+   kafelków była tylko klikiem po drodze. Otwiera się na aktywnej postaci. */
+function openChars(){openHero(S.chars[S.ch]?S.ch:S.party[0]||'edek');}
 /* ---------------- SKLEPY ---------------- */
 let curShop=null;
 function shopItemInfo(kind,id){
@@ -3757,7 +3864,7 @@ const MENU_TILES=[
   {ic:'⏸️',n:'Pauza',fn:()=>togglePause()},
   {ic:'⌨️',n:'Sterowanie',fn:showKeybind,keep:true},
 ];
-const MENU_IDS=['menu','fit','quests','phone','travel','chars','gacha','hero','bag','shop','audio','cook'];
+const MENU_IDS=['menu','fit','quests','phone','travel','gacha','hero','bag','shop','audio','cook'];
 function anyPanelOpen(){return MENU_IDS.some(id=>!$(id).classList.contains('hidden'));}
 function closeMenu(){$('menu').classList.add('hidden');rebindAction=null;}
 function openMenu(){
@@ -3814,44 +3921,289 @@ $('keysReset').addEventListener('click',()=>{KEYMAP=Object.assign({},DEFAULT_KEY
 
 /* ---------------- PANEL BOHATERA: statystyki + ekwipunek ---------------- */
 let curHero=null;
+/* =====================================================================
+   PANEL BUDOWANIA POSTACI — układ jak w Genshinie
+   Zakładki po lewej · postać z animacją na środku · szczegóły po prawej.
+   Po ~4 s bez klikania postać przestaje stać jak kołek i odpala swój POKAZ.
+   ===================================================================== */
+const BUILD_TABS=[
+  {k:'lvl', ic:'⬆️',n:'POZIOM POSTACI',s:'wzniesienia i statystyki'},
+  {k:'weap',ic:'🗡', n:'BROŃ',          s:'co trzyma w łapach'},
+  {k:'tal', ic:'⚡', n:'TALENTY',       s:'ciosy · [E] · [Q]'},
+  {k:'art', ic:'🧿', n:'ARTEFAKTY',     s:'3 sloty bonusów'},
+  {k:'con', ic:'⭐', n:'KONSTELACJE',   s:'duplikaty z paczek'},
+];
+let buildTab='lvl',buildIdle=0,buildT=0,buildRAF=0,buildFx=[],buildShow=-1;
+/* każde kliknięcie w panelu budzi postać z pokazu i resetuje licznik bezczynności */
+function buildPoke(){buildIdle=0;if(buildShow>=0){buildShow=-1;buildFx=[];}}
+
 function renderHero(){
   const id=curHero;if(!id||!S.chars[id])return;
-  const c=CHARS[id],d=chData(id),g=gearOf(id);
-  $('heroTitle').textContent=c.el+' '+c.n+' — POZ. '+d.lvl+(d.st?' '+'✦'.repeat(d.st):'');
-  const el=$('heroBody');
-  let html='<canvas id="heroCv" width="40" height="46" style="width:160px;height:184px;image-rendering:pixelated"></canvas>';
-  html+='<p style="font-size:10px;color:var(--cyan);margin:4px 0">'+c.el+' '+c.elN+' · '+c.desc+'</p>';
-  html+='<div class="heroStats">'+
-    '<div>♥ HP<br><b>'+chHpMax(id)+'</b></div>'+
-    '<div>👊 ATK<br><b>'+chATK(id)+'</b></div>'+
-    '<div>🛡 DEF<br><b>'+chDEF(id)+'</b></div>'+
-    '<div>💥 CRIT DMG<br><b>'+chCD(id)+'%</b></div></div>';
-  html+='<p style="font-size:10px;margin:2px 0 10px;color:var(--mut)">[Z] '+c.spcN+' — '+c.spcD+'</p>';
-  const wOpts=Object.keys(S.gearOwn).filter(k=>WEAPONS[k]);
-  html+='<div class="selRow"><label>🗡 BROŃ</label><select data-slot="w"><option value="">— gołe pięści —</option>'+
-    wOpts.map(k=>{const h=gearHolder(k);
-      return '<option value="'+k+'"'+(g.w===k?' selected':'')+'>'+WEAPONS[k].ic+' '+WEAPONS[k].n+' (ATK+'+WEAPONS[k].atk+')'+(h&&h!==id?' [u: '+CHARS[h].n.split(' ')[0]+']':'')+'</option>';}).join('')+'</select></div>';
-  for(let s=0;s<3;s++){
-    const opts=Object.keys(S.gearOwn).filter(k=>ARTS[k]&&ARTS[k].slot===s);
-    html+='<div class="selRow"><label>'+ART_SLOTS[s]+'</label><select data-slot="'+s+'"><option value="">— pusto —</option>'+
-      opts.map(k=>{const h=gearHolder(k);
-        return '<option value="'+k+'"'+(g.a[s]===k?' selected':'')+'>'+ARTS[k].ic+' '+ARTS[k].n+' ('+statTxt(ARTS[k].st)+')'+(h&&h!==id?' [u: '+CHARS[h].n.split(' ')[0]+']':'')+'</option>';}).join('')+'</select></div>';
+  const c=CHARS[id],d=chData(id);
+  $('heroTitle').textContent='🎴 POSTACIE — BUDOWANIE (drużyna max 3)';
+  $('heroMats').innerHTML='💎'+S.dia+' · 🔩'+S.mats.sr+' ⚙️'+S.mats.ch+' 💠'+S.mats.di;
+  /* --- lewa kolumna: zakładki --- */
+  const tb=$('buildTabs');tb.innerHTML='';
+  for(const t of BUILD_TABS){
+    const b=document.createElement('button');
+    b.className='btab'+(buildTab===t.k?' on':'');
+    b.innerHTML='<i>'+t.ic+'</i><span>'+t.n+'<small>'+t.s+'</small></span>';
+    b.addEventListener('click',()=>{buildTab=t.k;buildPoke();SFX.ok();renderHero();});
+    tb.appendChild(b);
   }
-  if(d.lvl<MAXLVL){const cc=lvlCost(d.lvl);
-    html+='<button class="bigbtn px" id="heroLvl" style="font-size:11px;margin-top:6px"'+(canAfford(cc)?'':' disabled')+'>⬆️ ULEPSZ NA POZ. '+(d.lvl+1)+' — '+costTxt(cc)+'</button>';}
-  else html+='<p style="font-size:11px;color:var(--gold)">✨ MAKSYMALNY POZIOM</p>';
-  el.innerHTML=html;
-  const hc=document.getElementById('heroCv').getContext('2d');
-  hc.imageSmoothingEnabled=false;hc.save();hc.translate(12,10);drawCharBody(hc,id,0,0,0,Math.floor(anim*2)%2);hc.restore();
-  el.querySelectorAll('select').forEach(sel=>sel.addEventListener('change',()=>{
-    const slot=sel.dataset.slot;
-    equipGear(id,slot==='w'?'w':+slot,sel.value||null);
-    SFX.equip();renderHero();refreshHUD();
-  }));
-  const lb=document.getElementById('heroLvl');
-  if(lb)lb.addEventListener('click',()=>{tryLvlUp(id);renderHero();});
+  /* --- środek: kto stoi na scenie + przełącznik postaci --- */
+  const inP=S.party.includes(id),act=S.ch===id;
+  $('buildName').innerHTML=c.n+'<span>'+c.el+' '+c.elN+' · '+'★'.repeat(c.star)+'</span>'+
+    '<i>POZ. '+d.lvl+'/'+ascCap(d.asc||0)+' · 🌟'+(d.asc||0)+'/6 · ⭐C'+(d.con||0)+
+    (S.cons[id]?' <b style="color:var(--cyan)">+'+S.cons[id]+'⭐</b>':'')+'</i>'+
+    '<i>♥'+chHpMax(id)+' 👊'+chATK(id)+' 🛡'+chDEF(id)+' 💥'+chCD(id)+'%</i>';
+  /* przycisk drużyny — to jedyna rzecz, po którą trzeba było wracać do siatki */
+  const pb=$('buildParty');
+  pb.className='chbtn'+(inP?' on':'');
+  pb.textContent=act?'✔ AKTYWNA':inP?'✔ W DRUŻYNIE (kliknij, by zdjąć)':'+ DO DRUŻYNY';
+  pb.onclick=()=>{
+    if(act&&S.party.length>1){const inny=S.party.find(p=>p!==id);S.ch=inny;applyChar();}
+    togglePartyChar(id);buildPoke();renderHero();
+  };
+  /* wizytówka pod postacią: co potrafi i skąd się wzięła — wcześniej była tu pustka */
+  $('buildCard').innerHTML=
+    '<b>⚡ [E] '+c.spcN+'</b><i>'+c.spcD+'</i>'+
+    '<i style="color:var(--gold-dim)">ładowanie '+chSkillCd(id).toFixed(1)+' s</i>'+
+    '<b style="margin-top:7px">💥 [Q] SUPER-HIT</b><i>obrażenia ×'+chBurstMul(id).toFixed(2)+'</i>'+
+    '<i style="margin-top:7px;color:var(--mut)">'+c.desc+'</i>';
+  /* GÓRNY PASEK POSTACI (jak w Genshinie): portret + imię + poziom, zielona
+     kropka = w drużynie. Kliknięcie przerzuca całą resztę panelu na tę postać. */
+  const bc=$('buildChars');bc.innerHTML='';
+  for(const oid of Object.keys(CHARS)){
+    const own=!!S.chars[oid],od=chData(oid);
+    const b=document.createElement('button');
+    b.className='bchip'+(oid===id?' on':'')+(own?'':' lock')+
+      (own&&S.party.includes(oid)?' party':'');
+    const cv=document.createElement('canvas');cv.width=40;cv.height=40;
+    const g2=cv.getContext('2d');g2.imageSmoothingEnabled=false;
+    g2.save();g2.translate(12,4);g2.scale(1.15,1.15);drawCharBody(g2,oid,0,0,0,0);g2.restore();
+    if(!own){g2.globalCompositeOperation='source-atop';g2.fillStyle='rgba(20,17,39,.85)';g2.fillRect(0,0,40,40);}
+    b.appendChild(cv);
+    b.insertAdjacentHTML('beforeend','<b>'+(own?CHARS[oid].n.split(' ')[0]:'???')+'</b>'+
+      '<b>'+(own?'POZ.'+od.lvl+(od.con?' ⭐'+od.con:''):'🔒')+'</b>');
+    b.title=own?CHARS[oid].n+' — poz. '+od.lvl:'??? — '+CHARS[oid].how;
+    if(own)b.addEventListener('click',()=>{curHero=oid;buildPoke();SFX.ok();renderHero();});
+    else b.addEventListener('click',()=>{SFX.no();
+      toast('🔒 '+CHARS[oid].el+' JESZCZE NIE MASZ TEJ POSTACI<br>'+CHARS[oid].how,3600);});
+    bc.appendChild(b);
+  }
+  /* --- prawa kolumna: treść zakładki --- */
+  const pane=$('buildPane');
+  pane.innerHTML=({lvl:paneLvl,weap:paneWeap,tal:paneTal,art:paneArt,con:paneCon})[buildTab](id);
+  pane.onclick=null;
+  paneBind(id,pane);
+  startBuildAnim();
 }
-function openHero(id){SFX.open();curHero=id;renderHero();$('hero').classList.remove('hidden');}
+/* ---------- ZAKŁADKA: POZIOM POSTACI ---------- */
+function paneLvl(id){
+  const d=chData(id),cap=ascCap(d.asc||0),a=d.asc||0;
+  const nextTxt=d.lvl<MAXLVL?(()=>{                 // podgląd „co dostanę za poziom"
+    const bak=d.lvl;d.lvl++;const h=chHpMax(id),t=chATK(id);d.lvl=bak;
+    return{hp:h-chHpMax(id),atk:t-chATK(id)};})():{hp:0,atk:0};
+  let h='<h3>⬆️ POZIOM POSTACI</h3>';
+  h+='<div class="bLvlBar"><i style="width:'+Math.round(d.lvl/90*100)+'%"></i></div>';
+  h+='<p>POZIOM <b style="color:var(--gold);font-size:12px">'+d.lvl+'</b> / '+cap+
+     ' &nbsp;·&nbsp; limit z wzniesienia (max 90)</p>';
+  h+='<div class="bStats">'+
+    '<div>♥ HP<b>'+chHpMax(id)+'</b>'+(nextTxt.hp?'<u>+'+nextTxt.hp+' za poziom</u>':'')+'</div>'+
+    '<div>👊 ATK<b>'+chATK(id)+'</b>'+(nextTxt.atk?'<u>+'+nextTxt.atk+' za poziom</u>':'')+'</div>'+
+    '<div>🛡 DEF<b>'+chDEF(id)+'</b></div>'+
+    '<div>💥 CRIT DMG<b>'+chCD(id)+'%</b></div></div>';
+  if(d.lvl>=MAXLVL)h+='<p style="color:var(--gold)">✨ POZIOM 90 — sufit osiągnięty, byku!</p>';
+  else if(d.lvl>=cap)h+='<p style="color:var(--cyan)">🔒 Limit poziomu. Czas na WZNIESIENIE ↓</p>';
+  else{
+    const c1=lvlCost(d.lvl);
+    h+='<div class="bBtns">'+
+      '<button class="chbtn" data-act="lvl1"'+(canAfford(c1)?'':' disabled')+'>+1 — '+costTxt(c1)+'</button>'+
+      '<button class="chbtn" data-act="lvl10">+10</button>'+
+      '<button class="chbtn" data-act="lvlmax">DO LIMITU</button></div>';
+  }
+  h+='<h3 style="margin-top:14px">🌟 WZNIESIENIE '+a+'/6</h3>';
+  if(a>=6)h+='<p style="color:var(--gold)">✨ Pełne wzniesienie — dalej tylko konstelacje.</p>';
+  else{
+    const ac=ascCost(a),gotowy=d.lvl>=cap;
+    h+='<p>Podnosi limit poziomu do <u style="color:var(--cyan)">'+ascCap(a+1)+'</u>'+
+       ' oraz dokłada +ATK, +HP, +DEF, +CRIT DMG i odblokowuje wyższe TALENTY.</p>'+
+       '<div class="bBtns"><button class="chbtn" data-act="asc"'+
+       (gotowy&&canAfford(ac)?'':' disabled')+'>🌟 WZNIEŚ — '+costTxt(ac)+'</button></div>'+
+       (gotowy?'':'<p style="color:var(--mut)">Najpierw dobij do poziomu '+cap+'.</p>');
+  }
+  return h;
+}
+/* ---------- ZAKŁADKA: BROŃ ---------- */
+function paneWeap(id){
+  const g=gearOf(id);
+  let h='<h3>🗡 BROŃ</h3><p>Jedna broń na postać. Zabranie komuś broni odpina ją automatycznie.</p>';
+  h+=gearRow(id,'w','',{k:'',ic:'✊',n:'GOŁE PIĘŚCI',d:'bez bonusu',on:!g.w});
+  const list=Object.keys(S.gearOwn).filter(k=>WEAPONS[k])
+    .sort((x,y)=>WEAPONS[y].star-WEAPONS[x].star||WEAPONS[y].atk-WEAPONS[x].atk);
+  if(!list.length)h+='<p style="color:var(--mut)">Pusto! Broń kupisz na bazarze albo wypadnie z 🎁 paczek.</p>';
+  for(const k of list){const w=WEAPONS[k],ho=gearHolder(k);
+    h+=gearRow(id,'w',k,{k,ic:w.ic,n:w.n+' '+'★'.repeat(w.star),
+      d:'ATK +'+w.atk+(w.sub?' · '+statTxt(w.sub):''),on:g.w===k,ho:ho&&ho!==id?CHARS[ho].n:null});}
+  return h;
+}
+/* ---------- ZAKŁADKA: ARTEFAKTY ---------- */
+function paneArt(id){
+  const g=gearOf(id);
+  let h='<h3>🧿 ARTEFAKTY</h3><p>Trzy sloty. Każdy artefakt może nosić tylko jedna postać.</p>';
+  for(let sl=0;sl<3;sl++){
+    h+='<h3 style="margin:12px 0 7px;color:var(--cyan);font-size:9px">'+ART_SLOTS[sl]+'</h3>';
+    h+=gearRow(id,sl,'',{k:'',ic:'▫️',n:'PUSTO',d:'brak bonusu',on:!g.a[sl]});
+    const list=Object.keys(S.gearOwn).filter(k=>ARTS[k]&&ARTS[k].slot===sl)
+      .sort((x,y)=>ARTS[y].star-ARTS[x].star);
+    for(const k of list){const ar=ARTS[k],ho=gearHolder(k);
+      h+=gearRow(id,sl,k,{k,ic:ar.ic,n:ar.n+' '+'★'.repeat(ar.star),d:statTxt(ar.st),
+        on:g.a[sl]===k,ho:ho&&ho!==id?CHARS[ho].n:null});}
+  }
+  return h;
+}
+const gearRow=(id,slot,k,o)=>'<div class="bRow'+(o.on?' on':'')+'" data-slot="'+slot+'" data-gear="'+k+'">'+
+  '<span class="ic">'+o.ic+'</span><span class="inf"><b>'+o.n+'</b><i>'+o.d+
+  (o.ho?' <u>· nosi: '+o.ho.split(' ')[0]+'</u>':'')+'</i></span>'+
+  (o.on?'<span style="color:var(--green);flex:none">✔</span>':'')+'</div>';
+/* ---------- ZAKŁADKA: TALENTY ---------- */
+function paneTal(id){
+  const d=chData(id),c=CHARS[id],limit=Math.min(MAXTAL,2+(d.asc||0)*2);
+  let h='<h3>⚡ TALENTY</h3><p>Trzy talenty na postać. Wyższe poziomy odblokowuje '+
+    'WZNIESIENIE (teraz limit <u style="color:var(--cyan)">'+limit+'</u>/'+MAXTAL+').</p>';
+  const opis={
+    n:'obrażenia zwykłych ciosów ×'+talMul(id,'n').toFixed(2),
+    e:c.spcN+' — obrażenia ×'+chSkillMul(id).toFixed(2)+', ładowanie '+chSkillCd(id).toFixed(1)+' s',
+    q:'SUPER-HIT — obrażenia ×'+chBurstMul(id).toFixed(2),
+  };
+  for(const t of TALENTS){
+    const tl=talLvl(id,t.k),cc=talCost(tl),mx=tl>=MAXTAL,lock=tl>=limit;
+    h+='<div class="bRow'+(mx?' max':'')+'"><span class="ic">'+t.ic+'</span>'+
+      '<span class="inf"><b>'+t.n+' — POZ. '+tl+'/'+MAXTAL+'</b><i>'+opis[t.k]+'</i></span>'+
+      (mx?'<span style="color:var(--gold);flex:none">MAX</span>'
+        :'<button class="chbtn" style="width:auto;flex:none" data-tal="'+t.k+'"'+
+          (lock||!canAfford(cc)?' disabled':'')+'>'+(lock?'🔒 WZNIEŚ':'+1 '+costTxt(cc))+'</button>')+
+      '</div>';
+  }
+  return h;
+}
+/* ---------- ZAKŁADKA: KONSTELACJE ---------- */
+function paneCon(id){
+  const d=chData(id),con=d.con||0,mam=S.cons[id]||0,c=CHARS[id];
+  let h='<h3>⭐ KONSTELACJE</h3>'+
+    '<p>Wylosowanie w 🎁 paczkach postaci, którą już masz, daje <u style="color:var(--gold)">'+
+    'GWIAZDĘ FORTUNY</u> tej postaci. Za jedną gwiazdę odpalasz kolejny stopień.</p>'+
+    '<p style="color:var(--gold);font-size:10px">⭐ Gwiazdy Fortuny '+c.n.split(" ")[0]+': <b>'+mam+'</b>'+
+    ' &nbsp;·&nbsp; stopień <b>C'+con+'</b>/6</p>';
+  for(let i=1;i<=6;i++){
+    const info=i<=5?CON_LADDER[i-1]:CON6[id];
+    const got=con>=i,nx=con===i-1;
+    h+='<div class="conNode'+(got?' got':nx?' next':'')+'">'+
+      '<span class="cdot">'+(got?'★':'C'+i)+'</span>'+
+      '<span class="inf"><b>C'+i+' · '+info.n+'</b><i>'+info.d+'</i></span>'+
+      (got?'<span style="color:var(--gold);flex:none">✔</span>'
+        :nx?'<button class="chbtn" style="width:auto;flex:none" data-con="1"'+(mam?'':' disabled')+'>'+
+            (mam?'⭐ ODPAL':'BRAK ⭐')+'</button>':'')+
+      '</div>';
+  }
+  if(con>=6)h+='<p style="color:var(--gold)">✨ KOMPLET C6! Kolejne duplikaty lecą na materiały.</p>';
+  return h;
+}
+/* ---------- podpięcie klików w prawej kolumnie ---------- */
+function paneBind(id,pane){
+  const od=()=>{buildPoke();renderHero();refreshHUD();};
+  pane.querySelectorAll('[data-act]').forEach(b=>b.addEventListener('click',()=>{
+    const a=b.dataset.act;
+    if(a==='lvl1')lvlUpMany(id,1);
+    else if(a==='lvl10')lvlUpMany(id,10);
+    else if(a==='lvlmax')lvlUpMany(id,90);
+    else if(a==='asc')tryAscend(id);
+    od();
+  }));
+  pane.querySelectorAll('[data-gear]').forEach(r=>r.addEventListener('click',()=>{
+    const sl=r.dataset.slot;
+    equipGear(id,sl==='w'?'w':+sl,r.dataset.gear||null);
+    SFX.equip();od();
+  }));
+  pane.querySelectorAll('[data-tal]').forEach(b=>b.addEventListener('click',()=>{
+    tryTalent(id,b.dataset.tal);od();}));
+  pane.querySelectorAll('[data-con]').forEach(b=>b.addEventListener('click',()=>{
+    tryCon(id);od();}));
+}
+/* =====================================================================
+   SCENA POSTACI: stoi, oddycha, a po chwili bezczynności robi swój POKAZ
+   (obrót → zamach → skok → taniec). Własna pętla rAF i własne cząsteczki,
+   bo to osobny canvas, nie świat gry.
+   ===================================================================== */
+const SHOW_LEN=5.6;                    // długość jednego pokazu w sekundach
+function startBuildAnim(){
+  if(buildRAF)return;
+  let prev=performance.now();
+  const step=now=>{
+    if($('hero').classList.contains('hidden')){buildRAF=0;buildFx=[];buildShow=-1;return;}
+    const dt=Math.min(.05,(now-prev)/1000);prev=now;
+    buildT+=dt;buildIdle+=dt;
+    if(buildShow<0&&buildIdle>4){buildShow=0;                  // czas na pokaz
+      if(!curVoice&&!muted)vsay(pickA(CHARS[curHero].idleV||['v_elegancko']));}
+    if(buildShow>=0){buildShow+=dt;if(buildShow>SHOW_LEN)buildShow=0;}
+    drawBuildStage(dt);
+    buildRAF=requestAnimationFrame(step);
+  };
+  buildRAF=requestAnimationFrame(step);
+}
+function drawBuildStage(dt){
+  const cv=$('heroCv');if(!cv)return;
+  const g=cv.getContext('2d');
+  g.imageSmoothingEnabled=false;
+  g.clearRect(0,0,cv.width,cv.height);
+  const id=curHero,c=CHARS[id],t=buildShow,sh=t>=0;
+  /* podłoga: krąg światła w kolorze żywiołu postaci */
+  const el=ELEMENTS[c.elId];
+  g.save();g.translate(cv.width/2,cv.height-26);
+  g.globalAlpha=.5;g.strokeStyle=el.col;g.lineWidth=2;
+  g.beginPath();g.ellipse(0,0,52,17,0,0,7);g.stroke();
+  g.globalAlpha=.16;g.fillStyle=el.col;
+  g.beginPath();g.ellipse(0,0,50,16,0,0,7);g.fill();
+  g.globalAlpha=1;g.restore();
+  /* faza pokazu → kierunek, klatka i przesunięcie postaci */
+  let dir=0,fr=0,ox=0,oy=0,rot=0,sc=1;
+  const bob=Math.sin(buildT*2.6)*1.4;                         // spokojny oddech
+  if(!sh){oy=bob;fr=Math.floor(buildT*1.6)%2;}
+  else if(t<1.4){dir=[0,2,3,1][Math.floor(t/.35)%4];fr=Math.floor(t*7)%2;oy=bob;}  // OBRÓT
+  else if(t<2.4){dir=2;fr=1;ox=Math.sin((t-1.4)*6.3)*7;oy=bob*.4;rot=Math.sin((t-1.4)*6.3)*.16;} // ZAMACH
+  else if(t<3.4){const k=(t-2.4);dir=0;fr=1;oy=-Math.sin(k*Math.PI)*34;sc=1+Math.sin(k*Math.PI)*.07;} // SKOK
+  else{const k=(t-3.4);dir=k%1<.5?1:2;fr=Math.floor(k*6)%2;                        // TANIEC
+       ox=Math.sin(k*5)*9;oy=bob-Math.abs(Math.sin(k*5))*5;rot=Math.sin(k*5)*.12;}
+  /* cząsteczki: przy skoku i tańcu sypie się blichtr w kolorze żywiołu */
+  if(sh&&t>2.4&&Math.random()<.5&&!reduceMotion)
+    buildFx.push({x:cv.width/2+(Math.random()-.5)*60,y:cv.height-30,
+      vx:(Math.random()-.5)*30,vy:-38-Math.random()*54,life:.9,life0:.9,
+      col:Math.random()<.5?el.col:'#f5c542',sz:2+Math.random()*2});
+  for(const p of buildFx){p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=70*dt;}
+  buildFx=buildFx.filter(p=>p.life>0);
+  for(const p of buildFx){
+    g.globalAlpha=Math.max(0,p.life/p.life0);g.fillStyle=p.col;
+    g.fillRect(p.x-p.sz/2,p.y-p.sz/2,p.sz,p.sz);}
+  g.globalAlpha=1;
+  /* sama postać — rysowana 3× w pikselach, tak jak w świecie gry */
+  g.save();
+  g.translate(cv.width/2+ox,cv.height-30+oy);
+  g.rotate(rot);g.scale(4*sc,4*sc);g.translate(-8,-26);
+  drawCharBody(g,id,0,0,dir,fr);
+  g.restore();
+  /* podpowiedź, że postać zaraz coś pokaże */
+  if(!sh&&buildIdle>2.4){
+    g.globalAlpha=.35+Math.sin(buildT*5)*.2;
+    g.font='7px "Press Start 2P"';g.fillStyle='#8f88b0';g.textAlign='center';
+    g.fillText('...',cv.width/2,18);g.globalAlpha=1;g.textAlign='left';
+  }
+}
+function openHero(id){
+  SFX.open();curHero=id;buildTab='lvl';buildIdle=0;buildShow=-1;buildFx=[];
+  $('hero').classList.remove('hidden');
+  renderHero();                       // renderHero odpala też pętlę animacji sceny
+}
 
 /* ---------------- KANAŁ EDKA: zasięgi ---------------- */
 const fmtN=n=>n>=1e6?(n/1e6).toFixed(1).replace('.',',')+' mln':n>=1e4?Math.round(n/1e3)+' tys.':(''+Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g,' ');
@@ -4213,7 +4565,7 @@ function refreshHUD(){
   $('questHint').textContent=act?('▶ '+QUESTS[act].n):(S.legend?'👑 LEGENDA INTERNETU':
     discN?('questy: '+doneN+'/'+discN+' odkrytych — szukaj „!”'):'szukaj ludzi z „!” nad głową');
 }
-function closePanels(){['menu','fit','quests','phone','travel','chars','gacha','hero','bag','shop','audio','cook'].forEach(id=>$(id).classList.add('hidden'));rebindAction=null;}
+function closePanels(){['menu','fit','quests','phone','travel','gacha','hero','bag','shop','audio','cook'].forEach(id=>$(id).classList.add('hidden'));rebindAction=null;}
 document.querySelectorAll('.xbtn').forEach(b=>b.addEventListener('click',()=>{SFX.close();$(b.dataset.close).classList.add('hidden');}));
 $('btnFit').addEventListener('click',()=>openFit(false));
 $('btnQuest').addEventListener('click',openQuests);
@@ -4524,7 +4876,7 @@ function talkTo(n){
           L('Edek','Miasto to nie chlew. A kto zaczepia moich ziomali, ten ma problem.','c_problemy'),
           L(n.n,'Od dziś wbijam z Tobą na każdy rejon, byku. Dwa roboty to już gang!','d_lecimy'),
           L(n.n,'DYCH DZIKI melduje się do szarży. No i elegancko... znaczy: no i DZIKO!'),
-        ],()=>{S.dych=1;S.chars.dych={lvl:1,st:0};addToParty('dych');resetFollowers();save();completeQuest('dych');
+        ],()=>{S.dych=1;S.chars.dych=newChar();addToParty('dych');resetFollowers();save();completeQuest('dych');
           setTimeout(()=>toast('🦾 DYCH DZIKI W KOLEKCJI I W DRUŻYNIE!<br>Przełączanie: C / 1-2-3 · panel: 🎴',4200),4200);
           setTimeout(()=>{if(!curVoice)vsay('d_song');},9000);});
         else say([L(n.n,'BZZT... czujniki pokazują jeszcze '+(3-(S.k.dych||0))+' dresiarzy na plaży!')]);

@@ -91,18 +91,6 @@
     <div class="panelBody"><div id="phoneBody"></div></div>
   </div>
 
-  <div id="chars" class="panel px hidden">
-    <div class="panelHead">
-      <h2>🎴 POSTACIE — DRUŻYNA (max 3)</h2>
-      <span class="dia" id="charsDia">💎 0</span>
-      <button class="xbtn" data-close="chars">✕</button>
-    </div>
-    <div class="panelBody" style="flex-direction:column">
-      <div class="matbar" id="matBar"></div>
-      <div id="charGrid"></div>
-    </div>
-  </div>
-
   <div id="gacha" class="panel px hidden">
     <div class="panelHead">
       <h2>🎁 PACZKI OD FANÓW</h2>
@@ -115,9 +103,20 @@
   <div id="hero" class="panel px hidden">
     <div class="panelHead">
       <h2 id="heroTitle">POSTAĆ</h2>
+      <span class="dia" id="heroMats"></span>
       <button class="xbtn" data-close="hero">✕</button>
     </div>
-    <div class="panelBody"><div id="heroBody"></div></div>
+    <div class="buildTop" id="buildChars"></div>
+    <div class="panelBody buildBody">
+      <div class="buildTabs" id="buildTabs"></div>
+      <div class="buildStage">
+        <canvas id="heroCv" width="200" height="250"></canvas>
+        <div class="buildName" id="buildName"></div>
+        <button class="chbtn" id="buildParty"></button>
+        <div class="buildCard" id="buildCard"></div>
+      </div>
+      <div class="buildPane" id="buildPane"></div>
+    </div>
   </div>
 
   <div id="bag" class="panel px hidden">
