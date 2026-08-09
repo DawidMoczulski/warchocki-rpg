@@ -94,7 +94,9 @@ const TEST_SETUPS={
   przyczepa:{q:{dych:2,graty:2,stop1:2,bateria:2,stop2:2},reg:'trasa',at:[47,27]},
   policja:{q:{dych:2,graty:2,stop1:2,bateria:2,stop2:2,przyczepa:2},reg:'trasa',at:[38,29]},
   pole:{q:{dych:2,graty:2,stop1:2,bateria:2,stop2:2,przyczepa:2,policja:2},reg:'trasa',at:[38,36]},
-  klaunica:{q:{dych:2},reg:'morze',at:[67,21]},   // tuż przed bramą STREFY IMPREZY
+  klaunica:{q:{dych:2},reg:'trasa',at:[8,63]},    // tuż przed bramą STREFY IMPREZY (pod polem)
+  horda:{q:{dych:2},reg:'krakow',at:[7,62]},      // tuż przed bramą PASIEKI (lewy dolny róg)
+  pasieka:{q:{dych:2},reg:'krakow',at:[21,42]},   // za kładką na Wiśle, początek ścieżki do pasieki
   jezioro:{q:{dych:2},reg:'chodziez',at:[15,12]},  // start serii — przy Sąsiedzie Mietku
   plaza:{q:{dych:2,pletwy:2,gdzieplaza:2},reg:'chodziez',at:[30,50]},   // od razu na plaży
   torpeda:{q:{dych:2,pletwy:2,gdzieplaza:2,sprawdzwode:2,multiwitamina:2},
@@ -279,10 +281,37 @@ function playNextBattle(){
     s.start();
   }).catch(()=>{if(tok===btTok&&REG==='arena')setTimeout(playNextBattle,1500);});
 }
-function startBattleMusic(){stopSong();stopBattleMusic();playNextBattle();}
+function startBattleMusic(){stopSong();stopBossMusic();stopBattleMusic();playNextBattle();}
 function stopBattleMusic(){
   btTok++;
   if(battleSrc){const s=battleSrc;battleSrc=null;s.onended=null;try{s.stop()}catch(e){}}
+}
+/* --- MOTYW BOSSA: jeden kawałek na wszystkie areny, zapętlony.
+   Plik `bossmix.mp3` jest już przycięty do fragmentu od 0:25 oryginału, więc
+   wystarczy go puścić od zera z `loop`. Ładowany LENIWIE (2,5 MB) i trzymany
+   w BUFS — drugi boss startuje już bez czekania. Idzie przez `battleGain`,
+   czyli przycisza się sam, kiedy Edek gada. */
+let bossSrc=null,bossTok=0,bossLoading=false;
+function startBossMusic(){
+  /* `bossLoading` jest KONIECZNE: startBossMusic wołamy też z pętli klatek, a bez
+     niego każde wywołanie w trakcie ładowania unieważniałoby własny token i utwór
+     nigdy by nie wystartował. */
+  if(!AC||bossSrc||bossLoading)return;
+  bossLoading=true;
+  const tok=++bossTok;
+  stopSong();stopBattleMusic();
+  (BUFS.bossmix?Promise.resolve(BUFS.bossmix):loadClip('bossmix')).then(buf=>{
+    bossLoading=false;
+    /* w międzyczasie boss mógł już paść albo gracz wyjść z areny */
+    if(tok!==bossTok||bossSrc||!foes.some(f=>f.boss))return;
+    BUFS.bossmix=buf;
+    const s=AC.createBufferSource();s.buffer=buf;s.loop=true;
+    s.connect(battleGain);bossSrc=s;s.start();
+  }).catch(()=>{bossLoading=false;});
+}
+function stopBossMusic(){
+  bossTok++;bossLoading=false;
+  if(bossSrc){const s=bossSrc;bossSrc=null;try{s.stop()}catch(e){}}
 }
 function beep(f,d,t,v,sl){
   if(!AC||muted)return;const T=AC.currentTime,o=AC.createOscillator(),g=AC.createGain();
@@ -377,12 +406,15 @@ let last67=-1e9;
 function check67(n){
   if(n===67&&performance.now()-last67>30000){
     last67=performance.now();
-    if(!curVoice)vsay('s_67');
+    if(!curVoice&&!bossOnArena())vsay('s_67');   // „67" też nie wchodzi bossowi w paradę
     toast('6️⃣7️⃣ SIX SEVEN!!! 6️⃣7️⃣');
   }
 }
 /* --- Edward FM: radio — dłuższe bloki (2-3 kawałki albo pełny utwór) --- */
-let radioT=25;
+let radioT=25,radioOn=false;   // radioOn = właśnie leci audycja (blok kawałków)
+/* Radio MILKNIE na arenie bossa: „Metro", „Dziki" czy „67" w środku walki
+   zagłuszały motyw areny i brzmiały jak dwa utwory na raz. */
+function killRadio(){if(radioOn){radioOn=false;stopVoice();}}
 const RADIO=[
   {k:'s_dziki',t:'„Dziki” 🐗'},
   {k:'s_elegancko',t:'„ELEGANCKO” 🕺'},
@@ -391,7 +423,9 @@ const RADIO=[
   {k:'d_song',t:'„JESTEM DYCH DZIKI” 🦾🔥'},
 ];
 function updateRadio(dt){
+  if(radioOn&&!curVoice&&!voiceQ.length)radioOn=false;   // blok się skończył
   if(scene!=='world'||REG==='arena'||curVoice)return;
+  if(bossOnArena()){radioT=Math.max(radioT,12);return;}  // na arenie bossa ani jednej nuty
   radioT-=dt;
   if(radioT<=0){
     const hooks=RADIO.slice(0,3).concat(S.chars&&S.chars.dych?[RADIO[4]]:[]);
@@ -407,7 +441,7 @@ function updateRadio(dt){
       block=pool.slice(0,Math.min(Math.random()<.5?4:3,pool.length));
       if(Math.random()<.25&&!block.includes(RADIO[3]))block.push(RADIO[3]);
     }
-    vsayChain(block.map(b=>b.k));
+    vsayChain(block.map(b=>b.k));radioOn=true;
     toast('📻 EDWARD FM: '+block.map(b=>b.t).join(' + '),3800);
     /* następna audycja dopiero po skończeniu bloku + oddech */
     radioT=chainDur(block.map(b=>b.k))+16+Math.random()*18;
@@ -577,7 +611,8 @@ const COLLECT={
   graty:{r:'trasa',pts:[[8,27],[26,31],[45,27]],label:'grat',c1:'#e04848',c2:'#ffd77a',
     labels:['namiot','karimata','WIELKI plecak']},
   /* sprzęt na jezioro: płetwy Dzikiego (0), okulary (1), dmuchane koło (2) */
-  pletwy:{r:'chodziez',pts:[[8,20],[34,10],[44,23]],label:'sprzęt',c1:'#6fd8e8',c2:'#bff0ff',
+  /* koło leży z dala od Plażowicza Ryśka (44,24) — inaczej [E] łapało zawsze NPC-a */
+  pletwy:{r:'chodziez',pts:[[8,20],[34,10],[51,22]],label:'sprzęt',c1:'#6fd8e8',c2:'#bff0ff',
     labels:['płetwy Dzikiego','okulary do pływania','dmuchane koło']},
 };
 const colGot=q=>(S.col[q]||[]).length;
@@ -699,11 +734,12 @@ function buildMorze(){
   for(let x=2;x<=54;x+=9)if(at(x,26)===0)set(x,26,11);
   set(33,27,12);set(13,27,12);
 }
-/* STREFA IMPREZY (arena Klaunicy) — wnętrze areny na wschodniej plaży.
-   Kawałek miasta wciśnięty w piach: betonowe chodniki, asfaltowa uliczka
+/* STREFA IMPREZY (arena Klaunicy) — wnętrze areny pod polem Poland Rocka.
+   Kawałek miasta wciśnięty w klepisko: betonowe chodniki, asfaltowa uliczka
    z pasami dla pieszych, scena z wieżami głośnikowymi i namioty pod barierkami. */
 function buildStrefaImprezy(A){
   const[x0,y0,x1,y1]=A.ai;
+  rect(x0,y0,x1,y1,8);                                // klepisko — ziemia zdeptana przez tłum
   rect(x0+10,y0+1,x1-10,y1-1,37);                     // betonowy plac na środku
   rect(x0,y0+4,x1,y0+4,37);rect(x0,y0+7,x1,y0+7,37);  // chodniki wzdłuż uliczki
   rect(x0,y0+5,x1,y0+6,2);                            // ULICZKA ASFALTOWA przez całą arenę
@@ -741,6 +777,52 @@ function buildKrakow(){
   for(let x=2;x<=16;x++)if(at(x,25)===0)set(x,25,13);
   for(let y=0;y<MH;y+=2)if(at(0,y)===0)set(0,y,4);
   for(let x=0;x<MW;x+=2)if(at(x,0)===0)set(x,0,4);
+  buildPasieka();
+}
+/* PASIEKA POD KRAKOWEM — cały lewy dolny róg mapy (wcześniej: sam las i pustka).
+   Za Wisłą, przez KŁADKĘ (jedyne przejście na południowy brzeg), leży wieś z
+   pasieką: sad, chatka pszczelarza, stawek, rzędy uli i łąki miodne. Na końcu
+   ścieżki stoi ogrodzona pasieka-arena z HORDĄ PSZCZÓŁ. */
+function buildPasieka(){
+  /* KŁADKA przez Wisłę (rzeka rozdziela miasto od południowego brzegu, x0–59) */
+  rect(20,33,21,40,9);
+  rect(19,31,22,32,1);rect(19,41,22,42,1);          // dojścia po obu stronach
+  /* ŚCIEŻKA: od kładki na zachód i w dół, pod bramę pasieki.
+     Poniżej y=49 zaczyna się pas areny (band), który i tak wszystko czyści —
+     dlatego CAŁA wieś mieści się w pasie y41–48. Zejście do bramy dokopuje
+     potem ensureConnectivity. */
+  const sciezka=(x0,y0,x1,y1)=>{for(let y=Math.min(y0,y1);y<=Math.max(y0,y1);y++)
+    for(let x=Math.min(x0,x1);x<=Math.max(x0,x1);x++)if(at(x,y)===0)set(x,y,23);};
+  sciezka(20,41,21,44);sciezka(7,44,21,45);sciezka(7,45,8,48);
+  /* WIEŚ PSZCZELARSKA (pas y41–48) */
+  rect(26,42,30,45,5);                               // chatka pszczelarza
+  rect(33,42,36,44,6);                               // miodarnia
+  set(24,46,22);                                     // altanka
+  rect(38,43,41,46,24);set(37,44,25);set(42,45,25);  // stawek z trzcinami
+  for(let x=25;x<=37;x++)if(at(x,41)===0)set(x,41,13);// płotek zagrody
+  set(28,47,27);set(23,43,26);set(31,47,26);         // ognisko i pieńki
+  /* SAD zamiast dzikiego lasu: dęby w równych rzędach + brzozy przy ścieżce */
+  for(let y=42;y<=48;y+=3)for(let x=44;x<=56;x+=3)if(at(x,y)===0)set(x,y,30);
+  for(const[bx,by]of[[13,42],[11,45],[15,47],[10,48],[17,43]])if(at(bx,by)===0)set(bx,by,18);
+  /* ŁĄKI MIODNE I ULE PRZY DRODZE — przedsmak tego, co czeka w pasiece */
+  for(const[mx,my]of[[22,47],[32,46],[43,47],[15,44],[50,42],[52,46]])
+    for(let y=my;y<my+2;y++)for(let x=mx;x<mx+4;x++)if(at(x,y)===0)set(x,y,28);
+  for(const[ux,uy]of[[22,44],[33,48],[45,44],[53,44],[18,48]])if(at(ux,uy)===0)set(ux,uy,38);
+  for(const[kx,ky]of[[19,46],[35,47],[41,48],[48,43],[56,47]])if(at(kx,ky)===0)set(kx,ky,19);
+  set(12,48,29);                                     // drogowskaz „PASIEKA →" przy zejściu
+}
+/* wnętrze areny HORDY: łąka miodna, rzędy uli pod płotem i kwietne kobierce */
+function buildPasiekaArena(A){
+  const[x0,y0,x1,y1]=A.ai;
+  rect(x0,y0,x1,y1,28);                              // cała niecka = ŁĄKA KWIETNA
+  rect(x0+6,y0+4,x1-6,y1-4,0);                       // wydeptane klepisko wokół ula
+  /* ULE pod płotem: dwa rzędy — to z nich sypie się rój */
+  for(let x=x0+3;x<=x1-3;x+=5){set(x,y0+1,38);set(x,y1-1,38);}
+  set(x0+1,y0+4,38);set(x1-1,y1-4,38);
+  /* detale: pieńki pod ulami, kamyki na klepisku, krzaki w rogach */
+  for(let x=x0+3;x<=x1-3;x+=5){if(at(x,y0+2)===28)set(x,y0+2,21);if(at(x,y1-2)===28)set(x,y1-2,21);}
+  set(x0+2,y0+2,19);set(x1-2,y0+2,19);set(x0+2,y1-2,19);set(x1-2,y1-2,19);
+  set(x0+8,y0+6,26);set(x1-8,y1-6,26);               // pieńki-siedziska
 }
 /* ---------------- TATRY / ZAKOPANE ---------------- */
 function buildTatry(){
@@ -827,26 +909,27 @@ const REGIONS={
       flank:[[66,54,71,54],[66,58,71,58]],sign:[63,56],boss:[80,57],
       via:[[59,24],[63,26],[63,52]]}},   // droga do areny omija jezioro ścieżką przez lasek
   morze:{n:'POLSKIE MORZE',w:112,h:64,build:buildMorze,spawn:[18*16,25.4*16],pks:[18,26],ic:'🌊',
-    tdesc:'plaża · molo · bursztyny · Zatopione Molo · Kraken · 🤡 KLAUNICA Z FESTIWALU',
+    tdesc:'plaża · molo · bursztyny · Zatopione Molo · Kraken',
     cars:false,boars:false,leaves:false,smoke:false,boat:true,
     foesMax:7,foeTypes:['dres','hejter','zlyrobot','pies','mewa','krab'],
     zones:[[4,28,108,58],[58,12,72,24]],
     /* arena Krakena: piaszczysta wyspa otoczona morzem (fosą), pomost jako brama */
     arena:{bid:'kraken',label:'⚔ ARENA →',floor:8,wall:3,band:[82,36,111,63],ai:[88,42,103,55],
-      corr:[80,47,88,49],flank:[],sign:[79,48],boss:[96,49]},
-    /* arena Klaunicy: STREFA IMPREZY na wschodniej plaży — barierki festiwalowe,
-       betonowe chodniki i asfaltowa uliczka wjeżdżająca prosto przez bramę */
-    arena2:{bid:'klaunica',label:'🤡 STREFA IMPREZY →',floor:8,wall:34,band:[70,11,111,31],
-      ai:[76,15,105,27],corr:[70,20,76,22],corrTile:2,flank:[[70,19,75,19],[70,23,75,23]],
-      sign:[69,21],boss:[90,21],deco:buildStrefaImprezy}},
+      corr:[80,47,88,49],flank:[],sign:[79,48],boss:[96,49]}},
   krakow:{n:'KRAKÓW',w:120,h:80,build:buildKrakow,spawn:[51*16,29.5*16],pks:[51,28],ic:'🐉',
-    tdesc:'Rynek · Sukiennice · Wawel · Smocza Jama · SMOK',
+    tdesc:'Rynek · Sukiennice · Wawel · Smocza Jama · SMOK · 🐝 HORDA PSZCZÓŁ',
     cars:false,boars:false,leaves:true,smoke:false,boat:false,
     foesMax:7,foeTypes:['hejter','zazdrosnik','oburzona','pies','dron','wilk','zmija','rywal'],
-    zones:[[4,44,114,76],[64,4,114,40]],
+    zones:[[56,44,114,76],[64,4,114,40]],
     /* arena Smoka: skalna jama za miastem */
     arena:{floor:0,wall:16,band:[90,52,119,79],ai:[96,58,111,71],corr:[88,63,96,65],
-      flank:[[90,62,95,62],[90,66,95,66]],sign:[87,64],boss:[104,65]}},
+      flank:[[90,62,95,62],[90,66,95,66]],sign:[87,64],boss:[104,65]},
+    /* arena HORDY PSZCZÓŁ: pasieka w lewym dolnym rogu, ogrodzona płotem, brama od
+       zachodu. `via` prowadzi ścieżkę przez KŁADKĘ na Wiśle — bez tego generator
+       ciął drogę na skos przez rzekę i południowy brzeg zostawał odcięty. */
+    arena2:{bid:'horda',label:'🐝 PASIEKA →',floor:0,wall:13,band:[5,49,47,77],
+      ai:[12,54,42,70],corr:[6,61,12,63],corrTile:23,flank:[[6,60,11,60],[6,64,11,64]],
+      sign:[5,62],boss:[27,62],deco:buildPasiekaArena,via:[[21,32],[21,41],[6,52]]}},
   tatry:{n:'TATRY — ZAKOPANE',w:112,h:72,build:buildTatry,spawn:[39*16,28.5*16],pks:[39,26],ic:'🏔',
     tdesc:'Krupówki · Giewont · oscypki · Lodowa Grota · YETI',
     cars:false,boars:false,leaves:true,smoke:false,boat:false,
@@ -856,18 +939,24 @@ const REGIONS={
     arena:{floor:17,wall:16,band:[82,44,111,71],ai:[88,50,103,63],corr:[80,55,88,57],
       flank:[[82,54,87,54],[82,58,87,58]],sign:[79,56],boss:[96,57]}},
   trasa:{n:'TRASA NA POLAND ROCK',w:112,h:76,build:buildTrasa,spawn:[3*16+8,27*16],pks:[3,26],ic:'🎸',
-    tdesc:'krajowa · stopem na festiwal · pole namiotowe · PAN LAWETA 3000',
+    tdesc:'krajowa · stopem na festiwal · pole namiotowe · PAN LAWETA 3000 · 🤡 KLAUNICA',
     cars:true,carN:9,boars:false,leaves:true,smoke:false,boat:false,
     foesMax:8,foeTypes:['hejter','dres','pies','golab','dron','zlomiarz','rywal','oburzona'],
     zones:[[4,52,108,72],[60,4,108,16]],
     /* arena Pana Lawety: leśny parking za trasą */
     arena:{floor:0,wall:4,band:[82,48,111,75],ai:[88,54,103,67],corr:[80,59,88,61],
-      flank:[[82,58,87,58],[82,62,87,62]],sign:[79,60],boss:[96,61]}},
+      flank:[[82,58,87,58],[82,62,87,62]],sign:[79,60],boss:[96,61]},
+    /* arena Klaunicy: STREFA IMPREZY tuż POD polem namiotowym Poland Rocka —
+       ogrodzona barierkami festiwalowymi, wjazd asfaltową uliczką od zachodu
+       (obchodzisz płot pola z lewej i schodzisz na dół, dokładnie pod scenę) */
+    arena2:{bid:'klaunica',label:'🤡 STREFA IMPREZY →',floor:0,wall:34,band:[6,52,50,75],
+      ai:[14,57,44,69],corr:[8,62,14,64],corrTile:2,flank:[[8,61,13,61],[8,65,13,65]],
+      sign:[7,63],boss:[29,63],deco:buildStrefaImprezy}},
 };
 let REG='wawa';
 /* kafle blokujące ruch (tablica = szybkie sprawdzanie w AI/ruchu). Nowe assety 18–31. */
 const SOLIDF=new Uint8Array(64);
-[3,4,5,6,10,11,12,13,14,15,16,   18,19,20,22,24,26,27,29,30,   32,33,34,35,36].forEach(v=>{SOLIDF[v]=1;});
+[3,4,5,6,10,11,12,13,14,15,16,   18,19,20,22,24,26,27,29,30,   32,33,34,35,36,38].forEach(v=>{SOLIDF[v]=1;});
 const SOLID=v=>SOLIDF[v]===1;
 
 const DOORS=[
@@ -952,6 +1041,7 @@ let boars=[],idleT=16,confetti=[],prompt=null;
 let mapOpen=false;          // pełnoekranowa mapa (klawisz M)
 let forage=[];              // dzikie surowce do zbierania na mapie
 let poison={t:0,dmg:0,tick:0};  // zatrucie gracza (żmija) — DoT, nie zabija
+let honeyT=0;                   // MIÓD KRÓLOWEJ: grzęźniesz w kleksie — wolniej i bez sprintu
 let cars=[],peds=[],pigeons=[],drops=[],leaves=[],smoke=[],selfie=null,kids=[];
 let selfieT=45,dropT=14,leafT=0,smokeT=0,worldFlash=0,boatY=8*16,boatV=12;
 /* walka */
@@ -1064,7 +1154,12 @@ function carvePath(x0,y0,x1,y1,w,tile){
        inaczej siatka bezpieczeństwa zrobiłaby dziurę w bramie pola festiwalowego.
        WODA (3) też jest nietykalna: droga z ziemi przez środek jeziora wygląda
        jak błąd, a połączenie zapewnia ścieżka poprowadzona ręcznie w regionie. */
-    const v=at(tx,ty);if(v===1||v===2||v===3||v===5||v===6||v===32||v===33||v===34)continue;
+    /* 9 = KŁADKA/POMOST: to CELOWE przejście nad wodą — przekopanie go ścieżką
+       zamieniało most na leśny dukt zawieszony nad Wisłą.
+       13 = PŁOT: ogrodzenie stawia się z rozmysłem (płot pasieki jest MUREM areny
+       HORDY) — bez tego siatka bezpieczeństwa robiła w nim dziury jak w serze. */
+    const v=at(tx,ty);
+    if(v===1||v===2||v===3||v===5||v===6||v===9||v===13||v===32||v===33||v===34)continue;
     if(v!==tile)set(tx,ty,tile);}};
   while((x!==x1||y!==y1)&&g++<2000){stamp(x,y);
     if(Math.abs(x1-x)>=Math.abs(y1-y))x+=Math.sign(x1-x);else y+=Math.sign(y1-y);}
@@ -1130,6 +1225,10 @@ function setRegion(id){
   ensureConnectivity(cfg);   // gwarancja dojścia do wszystkich drzwi/domen/areny
   resetAmbient();
   spawnForage();
+  /* opuszczamy region = opuszczamy jego bossa: motyw milknie, a rozpakowany
+     bufor (kilkadziesiąt MB PCM) idzie do kosza. W obrębie regionu bufor
+     zostaje, żeby powrót na arenę nie czekał na ponowne dekodowanie. */
+  stopBossMusic();delete BUFS.bossmix;
   foes=[];hitFX=[];foeT=1.5;PROJ=[];bossShots=[];dmgNums=[];miniBlasts=[];
   for(let i=0;i<cfg.foesMax;i++)spawnFoe();
   if(S){S.region=id;
@@ -1221,6 +1320,10 @@ const FOE_TYPES={
   yeti:{hp:2000,atk:26,spd:70,c:'#ece9f4',hood:'#d8d4e8',skin:'#bfe8f4',dia:0,pts:0},
   laweciarz:{hp:1800,atk:25,spd:66,c:'#f5a032',hood:'#c8384a',skin:'#e8c9a0',dia:0,pts:0},
   klaunica:{hp:1700,atk:26,spd:66,c:'#e03050',hood:'#1a1a24',skin:'#e8c9a0',dia:0,pts:0},
+  /* --- HORDA PSZCZÓŁ (Kraków, pasieka): UL → 4 fazy roju → KRÓLOWA --- */
+  ul:{hp:2000,atk:14,spd:0,c:'#c8935a',hood:'#8a5a2a',skin:'#a3743f',dia:0,pts:0,kbres:true,rooted:true},
+  pszczola:{hp:24,atk:11,spd:106,c:'#f5c542',dia:2,pts:600,flying:true},
+  krolowa:{hp:1900,atk:25,spd:76,c:'#f5c542',hood:'#3a2410',skin:'#f5c542',dia:0,pts:0,flying:true},
 };
 function spawnFoe(){
   const cfg=REGIONS[REG];
@@ -1229,6 +1332,9 @@ function spawnFoe(){
     const z=pickA(cfg.zones);
     const tx=z[0]+(Math.random()*(z[2]-z[0]))|0,ty=z[1]+(Math.random()*(z[3]-z[1]))|0;
     if(SOLID(at(tx,ty)))continue;
+    /* nigdy w niecce areny bossa — taki wróg i tak nie mógłby się ruszyć (inBossArena)
+       i stałby zamrożony w środku, psując walkę z bossem */
+    if(insideArena(cfg,tx,ty))continue;
     const x=tx*16+8,y=ty*16+8;
     if(Math.hypot(P.x-x,P.y-y)<110)continue;
     const t=pickA(cfg.foeTypes),td=FOE_TYPES[t];
@@ -1248,8 +1354,8 @@ function mbShoot(f,type,n,sp){
       life:2.2,t:type,atk:Math.round(f.atk*.85)});
   beep(type==='flash'?700:type==='rolex'?1000:300,.12,'square',.06,150);
 }
-function mbBlastAt(x,y,r,atk,poison){
-  miniBlasts.push({x,y,warn:.8,r,atk,poison:!!poison});
+function mbBlastAt(x,y,r,atk,poison,honey){
+  miniBlasts.push({x,y,warn:.8,r,atk,poison:!!poison,honey:!!honey});
 }
 const MB_MOVES={
   widly:  f=>{mbShoot(f,'widly',1,180);addHit(f.x,f.y-30,'A SIO MI TU!','#c8a858');},
@@ -1329,14 +1435,14 @@ const BOSS_MOVES={
     const n=f.ph2?5:3,a=Math.atan2(P.y-f.y,P.x-f.x);
     for(let i=0;i<n;i++){const off=(i-(n-1)/2)*.26;
       bossShots.push({x:f.x,y:f.y-10,dx:Math.cos(a+off)*170,dy:Math.sin(a+off)*170,
-        life:2.4,t:'fon',atk:Math.round(f.atk*.7)});}
+        life:2.4,t:'fon',atk:Math.round(f.atk*.95)});}
     fxSparks(f.x,f.y-12,'#6fd8e8',8,110,{life:.35});
     addHit(f.x,f.y-32,'MAM NAGRANE!','#6fd8e8');
     beep(880,.12,'square',.06,1300);bossVoice(f,'k_mamnagrane');},
   /* „JEST DOWÓD!" — telegrafowane wybuchy: jeden pod graczem, reszta dookoła */
   jestdowod:f=>{
     bossHold(f,f.ph2?.9:1.15);
-    const n=f.ph2?6:4,rad=f.ph2?38:52,dmg=Math.round(f.atk*.8);
+    const n=f.ph2?6:4,rad=f.ph2?38:52,dmg=Math.round(f.atk*1.05);
     mbBlastAt(P.x,P.y,26,dmg);
     for(let i=0;i<n-1;i++){const a=Math.random()*6.28;
       mbBlastAt(P.x+Math.cos(a)*rad,P.y+Math.sin(a)*rad,26,dmg);}
@@ -1352,7 +1458,7 @@ const BOSS_MOVES={
   /* „NIECHCĄCY?!" — piruet: pełny okrąg konfetti + fala odpychająca */
   niechcacy:f=>{
     bossHold(f,f.ph2?1:1.3);
-    const n=f.ph2?14:10,rings=f.ph2?2:1,dmg=Math.round(f.atk*.6);
+    const n=f.ph2?14:10,rings=f.ph2?2:1,dmg=Math.round(f.atk*.8);
     for(let r=0;r<rings;r++)for(let i=0;i<n;i++){
       const a=i/n*6.28+r*(3.14/n)+anim;
       bossShots.push({x:f.x,y:f.y-8,dx:Math.cos(a)*(120+r*34),dy:Math.sin(a)*(120+r*34),
@@ -1365,22 +1471,112 @@ const BOSS_MOVES={
     const d=Math.max(1,Math.hypot(P.x-f.x,P.y-f.y));
     if(d<74){const kx=P.x+(P.x-f.x)/d*30,ky=P.y+(P.y-f.y)/d*30;
       if(canWalk(kx,P.y))P.x=kx;if(canWalk(P.x,ky))P.y=ky;}},
+  /* --- KRÓLOWA PSZCZÓŁ: trzy ataki --- */
+  /* ŻĄDŁO — przymierza się w miejscu, po czym wbija się w gracza jak pocisk */
+  zadlo:f=>{
+    f.telT=f.ph2?.45:.62;f.telMv='zadlo';
+    bossHold(f,f.telT);
+    fxRing(f.x,f.y-6,32,'#f5c542',{life:.35,w:3});
+    addHit(f.x,f.y-34,'ŻĄDŁO!','#f5c542');
+    beep(1200,.2,'sawtooth',.07,300);},
+  /* ROJNICA — okrąg żądeł na wszystkie strony + świeże pszczoły z boków */
+  rojnica:f=>{
+    bossHold(f,f.ph2?.85:1.1);
+    const n=f.ph2?14:10,dmg=Math.round(f.atk*.7);
+    for(let i=0;i<n;i++){const a=i/n*6.28+anim;
+      bossShots.push({x:f.x,y:f.y-8,dx:Math.cos(a)*136,dy:Math.sin(a)*136,
+        life:2.2,t:'zadlo',atk:dmg});}
+    swarmSpawn(f,f.ph2?4:3,f.ph2?4:3);
+    fxRing(f.x,f.y-6,58,'#f5c542',{life:.45,w:4});
+    fxRing(f.x,f.y+4,46,'#c8935a',{life:.35,w:2,ground:true});
+    addShake(3,.26);addHit(f.x,f.y-34,'DO NIEGO, ROJU!','#f5c542');
+    beep(420,.3,'square',.08,900);},
+  /* MIODOSPAD — telegrafowane kleksy miodu; trafiony grzęźnie i wolniej chodzi */
+  miodospad:f=>{
+    bossHold(f,f.ph2?.9:1.15);
+    const n=f.ph2?6:4,dmg=Math.round(f.atk*.85);
+    mbBlastAt(P.x,P.y,30,dmg,false,true);
+    for(let i=0;i<n-1;i++){const a=Math.random()*6.28,r=30+Math.random()*36;
+      mbBlastAt(P.x+Math.cos(a)*r,P.y+Math.sin(a)*r,30,dmg,false,true);}
+    addHit(f.x,f.y-34,'MIODOSPAD!','#f5a032');
+    beep(180,.35,'sine',.08,70);},
 };
+/* --- RÓJ: wypuszczenie pszczół z ula albo zza królowej ---------------------
+   `moc` (1-4) = faza ula: im wyżej, tym pszczoły twardsze, mocniejsze i szybsze.
+   `swarm:true` przepuszcza je przez barierę areny (inBossArena blokuje zwykłe
+   mruchy, żeby nie wchodziły bossowi pod nogi — rój to część walki). */
+const SWARM_CAP=16;
+function swarmSpawn(f,ile,moc){
+  const td=FOE_TYPES.pszczola;
+  const wolne=SWARM_CAP-foes.filter(o=>o.t==='pszczola'&&!o.dead).length;
+  const n=Math.max(0,Math.min(ile,wolne));
+  for(let i=0;i<n;i++){
+    const a=Math.random()*6.28,r=20+Math.random()*16;
+    const h=Math.round(td.hp*(1+.55*(moc-1)));
+    foes.push({t:'pszczola',swarm:true,x:f.x+Math.cos(a)*r,y:f.y+Math.sin(a)*r,
+      hp:h,hp0:h,atk:Math.round(td.atk*(1+.32*(moc-1))*bossScale().atk),
+      spdK:1+.1*(moc-1),dx:0,dy:0,wt:.2,stun:.25+Math.random()*.3,
+      kb:0,kbx:0,kby:0,flash:0});
+    fxSparks(f.x,f.y-8,'#f5c542',4,80,{life:.3});
+  }
+  return n;
+}
+/* UL: 4 fazy po 25% HP. Każdy próg = wielki wyrój + mocniejsze pszczoły. */
+const HIVE_PHASE=[null,
+  {n:2,cd:3.0,txt:'BZZZ… WYLATUJĄ!',   col:'#f5c542'},
+  {n:3,cd:2.5,txt:'ROZDRAŻNIONE!',     col:'#f5a032'},
+  {n:4,cd:2.0,txt:'WŚCIEKŁY RÓJ!',     col:'#e88030'},
+  {n:5,cd:1.5,txt:'CAŁA HORDA NA RAZ!',col:'#e04848'}];
+function hiveUpdate(f,dt){
+  f.dx=0;f.dy=0;                       // ul stoi — bije za niego rój
+  const faza=f.hp>f.maxHp*.75?1:f.hp>f.maxHp*.5?2:f.hp>f.maxHp*.25?3:4;
+  if(!f.faza)f.faza=1;
+  if(faza>f.faza){                     // PRÓG FAZY: wielki wyrój
+    f.faza=faza;
+    const ph=HIVE_PHASE[faza];
+    swarmSpawn(f,ph.n+2,faza);
+    f.at=ph.cd;
+    fxRing(f.x,f.y-6,70,ph.col,{life:.55,w:4});
+    fxRing(f.x,f.y+6,56,'#c8935a',{life:.4,w:3,ground:true});
+    fxSparks(f.x,f.y-10,ph.col,20,170,{life:.6});
+    addShake(4.5,.35);addHitStop(.06);worldFlash=Math.max(worldFlash,.3);
+    addHit(f.x,f.y-38,ph.txt,ph.col);
+    toast('🐝 FAZA '+faza+'/4 — '+ph.txt,2600);SFX.no();
+    if(faza===4&&!curVoice)vsay('c_odganiam');
+    return;
+  }
+  const ph=HIVE_PHASE[f.faza];
+  f.at=(f.at===undefined?1.2:f.at)-dt;
+  if(f.at<=0){f.at=ph.cd;
+    if(swarmSpawn(f,ph.n,f.faza)>0){
+      fxRing(f.x,f.y-4,26,'#f5c542',{life:.3,w:2});
+      beep(700,.14,'square',.05,1400);
+    }
+  }
+}
 /* głos bossa przy ataku — rzadko, żeby nie zagłuszał muzyki bitewnej */
 function bossVoice(f,key){if(Math.random()<.28&&!curVoice)vsay(key);}
 /* telegraf → wykonanie (szarża na rogi). Wywoływane z pętli wrogów. */
 function updateBossTelegraph(f,dt){
   f.telT-=dt;
+  const tc=f.telMv==='szarza'?'#f5a032':f.telMv==='zadlo'?'#f5c542':'#e03050';
   if(!reduceMotion&&Math.floor(anim*20)%2===0)
     fxP({x:f.x+(Math.random()-.5)*24,y:f.y+6,vx:0,vy:-30,g:-40,life:.3,life0:.3,
-      sz:1.8,col:'#e03050',add:true,shrink:true});
+      sz:1.8,col:tc,add:true,shrink:true});
   if(f.telT>0)return;
   delete f.telT;
-  if(f.telMv==='narogi'){
+  if(f.telMv==='zadlo'){                       // KRÓLOWA: wbicie żądła — szybkie i celne
+    const d=Math.max(1,Math.hypot(P.x-f.x,P.y-f.y)),sp=f.ph2?520:440;
+    f.kb=.42;f.kbx=(P.x-f.x)/d*sp;f.kby=(P.y-f.y)/d*sp;
+    f.charging=.42;f.postHold=.5;
+    fxSparks(f.x,f.y-8,'#f5c542',10,140,{life:.4});addShake(3,.25);
+    beep(1500,.18,'sawtooth',.08,400);
+  }else if(f.telMv==='narogi'||f.telMv==='szarza'){
     const d=Math.max(1,Math.hypot(P.x-f.x,P.y-f.y)),sp=f.ph2?420:360;
     f.kb=.55;f.kbx=(P.x-f.x)/d*sp;f.kby=(P.y-f.y)/d*sp;
     f.charging=.55;f.chDust=.5;f.postHold=.6;   // po szarży sapie — okno na kontrę
     fxDust(f.x,f.y+10,10);addShake(3.2,.3);
+    if(f.telMv==='szarza'){addHit(f.x,f.y-26,'SZARŻA!','#f5a032');SFX.boar();}
     beep(90,.3,'sawtooth',.1,45);
   }
   delete f.telMv;
@@ -1390,14 +1586,17 @@ function updateMiniBlasts(dt){
     b.warn-=dt;
     if(b.warn<=0&&!b.done){
       b.done=true;
-      fxStarFlash(b.x,b.y-4,b.poison?'#7bc950':'#b98cf0',10,{life:.25});
-      fxRing(b.x,b.y,b.r,b.poison?'#7bc950':'#b98cf0',{life:.3,w:3,ground:true});
-      fxSparks(b.x,b.y-4,b.poison?'#7bc950':'#b98cf0',8,120,{life:.4});
+      const bc=b.honey?'#f5a032':b.poison?'#7bc950':'#b98cf0';
+      fxStarFlash(b.x,b.y-4,bc,10,{life:.25});
+      fxRing(b.x,b.y,b.r,bc,{life:.3,w:3,ground:true});
+      fxSparks(b.x,b.y-4,bc,8,120,{life:.4});
       addShake(2,.15);beep(b.poison?300:90,.15,'sawtooth',.07,45);
       if(Math.hypot(P.x-b.x,P.y-b.y)<b.r){
         hurtPlayer({x:b.x,y:b.y,atk:b.atk});
         if(b.poison){poison.t=3.5;poison.dmg=Math.max(2,Math.round(b.atk*.25));poison.tick=.7;
           addHit(P.x,P.y-34,'ZATRUCIE!','#7bc950');}
+        if(b.honey){honeyT=Math.max(honeyT,3);
+          addHit(P.x,P.y-34,'W MIODZIE!','#f5a032');}
       }
     }
   }
@@ -1407,9 +1606,9 @@ function drawMiniBlasts(){
   for(const b of miniBlasts){ // ostrzeżenie: pulsujący, kurczący się okrąg
     const sx=b.x-camX,sy=b.y-camY,k=Math.max(0,b.warn/.8);
     cx.globalAlpha=.5+Math.sin(anim*20)*.2;
-    cx.strokeStyle=b.poison?'#7bc950':'#b98cf0';cx.lineWidth=1.6;
+    cx.strokeStyle=b.honey?'#f5a032':b.poison?'#7bc950':'#b98cf0';cx.lineWidth=1.6;
     cx.beginPath();cx.ellipse(sx,sy,b.r*(.4+.6*k),b.r*(.4+.6*k)*.5,0,0,7);cx.stroke();
-    cx.globalAlpha=.16;cx.fillStyle=b.poison?'#7bc950':'#b98cf0';
+    cx.globalAlpha=.16;cx.fillStyle=b.honey?'#f5a032':b.poison?'#7bc950':'#b98cf0';
     cx.beginPath();cx.ellipse(sx,sy,b.r,b.r*.5,0,0,7);cx.fill();
     cx.globalAlpha=1;
   }
@@ -1603,7 +1802,9 @@ function dealDmg(f,chId,mult,opts){
   addDmgNum(f.x,f.y-18,dmg,eCol,crit);
   if(crit){SFX.crit();addHitStop(.055);}
   const armored=FOE_TYPES[f.t]&&FOE_TYPES[f.t].kbres;
-  const kbMul=armored?.25:1;   // opancerzeni (krab/bałwan/złomiarz) prawie nie lecą
+  /* `rooted` = przybity do ziemi (UL stoi na podeście): ani drgnie. Bez tego
+     ul odjeżdżał przez całą pasiekę popychany kolejnymi ciosami. */
+  const kbMul=(FOE_TYPES[f.t]&&FOE_TYPES[f.t].rooted)?0:armored?.25:1;
   const kbF=(opts.kb!==undefined?opts.kb:1)*180*kbMul;
   const ox=opts.ox!==undefined?opts.ox:P.x,oy=opts.oy!==undefined?opts.oy:P.y;
   const d=Math.max(1,Math.hypot(f.x-ox,f.y-oy));
@@ -1652,7 +1853,8 @@ function tryAttack(){
 function hurtFoe(f,dmg,ox,oy,chId){
   f.hp-=dmg;f.flash=.15;
   const d=Math.max(1,Math.hypot(f.x-ox,f.y-oy));
-  f.kb=.22;f.kbx=(f.x-ox)/d*180;f.kby=(f.y-oy)/d*180;
+  if(!(FOE_TYPES[f.t]&&FOE_TYPES[f.t].rooted)){
+    f.kb=.22;f.kbx=(f.x-ox)/d*180;f.kby=(f.y-oy)/d*180;}
   const c=CHARS[chId]||CHARS[S.ch];
   fxSparks(f.x,f.y-10,c.hitCol,4,90,{life:.35});
   addHit(f.x,f.y-14,pickA(c.hitTxt),c.hitCol);
@@ -1665,6 +1867,10 @@ function killFoe(f){
     fxDeath(f.x,f.y-10,'#f5c542',true);
     fxRing(f.x,f.y+6,52,'#f5c542',{life:.5,w:3,ground:true});
     addHitStop(.12);worldFlash=Math.max(worldFlash,.35);
+    /* BOSS DWUETAPOWY (ul → królowa): pierwszy etap nie kończy walki, tylko
+       wypuszcza drugi. Łupy i poziom liczą się dopiero po ostatnim etapie. */
+    const nx=BOSSES[f.bid]&&BOSSES[f.bid].next;
+    if(nx&&!f.stage2){bossStage2(f,nx);return;}
     bossDefeated(f);return;
   }
   const td=FOE_TYPES[f.t];
@@ -1724,9 +1930,10 @@ function trySpecial(){
       fxRing(P.x,P.y,20,'#f5a032',{life:.25,w:2,ground:true});
       addShake(2,.28);
       beep(90,.3,'sawtooth',.09,45);break;}
-    case 'grazynka':{ // GORĄCY ROSÓŁ — full heal + para parzy
-      PHP[S.ch]=chHpMax(S.ch);worldFlash=.3;
-      addDmgNum(P.x,P.y-26,'+MAX','#7bc950');
+    case 'grazynka':{ // GORĄCY ROSÓŁ — leczy 50% HP + para parzy
+      const gmax=chHpMax(S.ch),ghl=Math.round(gmax*.5);
+      PHP[S.ch]=Math.min(gmax,PHP[S.ch]+ghl);worldFlash=.3;
+      addDmgNum(P.x,P.y-26,'+'+ghl,'#7bc950');
       for(const f of foes)if(Math.hypot(f.x-P.x,f.y-P.y)<64)dealDmg(f,'grazynka',1.25);
       for(let i=0;i<14;i++)smoke.push({x:P.x+(Math.random()-.5)*40,y:P.y-(Math.random()*20),r:2,life:1.6});
       fxRing(P.x,P.y+2,66,'#7bc950',{life:.5,w:3,ground:true});
@@ -1734,7 +1941,7 @@ function trySpecial(){
         fxP({x:P.x+(Math.random()-.5)*30,y:P.y-4-Math.random()*10,vx:(Math.random()-.5)*16,
           vy:-30-Math.random()*35,g:-20,life:.9,life0:.9,sz:1.8,
           col:Math.random()<.5?'#7bc950':'#f5c542',add:true,shrink:true});
-      toast('🍲 GORĄCY ROSÓŁ! Pełne HP, hejterzy sparzeni!');
+      toast('🍲 GORĄCY ROSÓŁ! +50% HP, hejterzy sparzeni!');
       SFX.buy();break;}
     case 'jarek':{ // STOP-KLATKA — globalne spowolnienie
       slowAll=6;worldFlash=.3;
@@ -1949,14 +2156,25 @@ function partyWipe(){
     const sp=REGIONS[REG].spawn;P.x=sp[0];P.y=sp[1];resetFollowers();
     initPartyHP(true);hurtT=2.5;
     /* boss wraca na środek areny z pełnym HP — walka od nowa */
-    let bossReset=false;
+    let bossReset=false,odNowa=false;
     for(const f of foes)if(f.boss){
+      /* BOSS DWUETAPOWY: przegrana z KRÓLOWĄ cofa walkę do samego początku —
+         ul trzeba rozwalić od nowa. Znikamy drugi etap, a wejście na arenę
+         znów odpali `startBoss` (czyli UL z fazą 1). */
+      if(f.stage2){f.dead=true;odNowa=true;continue;}
       f.x=f.homeX;f.y=f.homeY;f.hp=f.maxHp;f.hp0=f.maxHp;
       f.ph2=false;f.stun=0;f.burn=0;f.aura=null;f.kb=0;f.leash=false;
+      if(f.hive){f.faza=1;f.at=2;}                       // ul od pierwszej fazy
       bossReset=true;
     }
-    if(bossReset)bossShots=[];
-    toast('😵 Cała ekipa na deskach... -5💎.'+(bossReset?'<br>⚔️ BOSS wraca na arenę z pełnym HP!':' Ale my się nie poddajemy!'));
+    if(bossReset||odNowa){
+      bossShots=[];miniBlasts=[];
+      for(const o of foes)if(o.swarm)o.dead=true;        // rój znika razem z resetem
+    }
+    toast('😵 Cała ekipa na deskach... -5💎.'+
+      (odNowa?'<br>🐝 KRÓLOWA wraca do ula! Cała walka OD NOWA — najpierw rozwal ul!'
+       :bossReset?'<br>⚔️ BOSS wraca na arenę z pełnym HP!':' Ale my się nie poddajemy!'),
+      odNowa?5200:3200);
     vsay(Math.random()<.5?'c_wywalilem':'c_niepoddajemy');   // „nawet w piasku się wywaliłem, ale co tam"
   }
 }
@@ -2025,8 +2243,8 @@ function updateFoes(dt){
       continue;
     }
     const d=Math.hypot(P.x-f.x,P.y-f.y);
-    const spd2=td.spd*(f.boss&&f.ph2?1.35:1)*(f.sub?2.1:1)*(f.haste>0?1.35:1);
-    if((d<86||f.boss||td.elite)&&d>2){f.dx=(P.x-f.x)/d*spd2;f.dy=(P.y-f.y)/d*spd2;}
+    const spd2=td.spd*(f.boss&&f.ph2?1.35:1)*(f.sub?2.1:1)*(f.haste>0?1.35:1)*(f.spdK||1);
+    if((d<86||f.boss||f.swarm||td.elite)&&d>2){f.dx=(P.x-f.x)/d*spd2;f.dy=(P.y-f.y)/d*spd2;}
     else{f.wt-=dt;
       if(f.wt<=0){f.wt=1.5+Math.random()*2;const a=Math.random()*7;
         f.dx=Math.cos(a)*20;f.dy=Math.sin(a)*20;}}
@@ -2187,6 +2405,8 @@ function updateFoes(dt){
           f.leash=true;
           f.hp=f.maxHp;f.hp0=f.maxHp;f.ph2=false;f.stun=0;f.burn=0;f.aura=null;f.kb=0;f.hold=0;
           bossShots=[];
+          /* ul zaczyna od pierwszej fazy, a wypuszczony rój wraca do środka */
+          if(f.hive){f.faza=1;f.at=2;for(const o of foes)if(o.swarm)o.dead=true;}
           addHit(f.x,f.y-30,'TCHÓRZ!','#f5c542');
           toast('🏃 Uciekłeś z areny! '+f.bn+' wraca na środek — walka OD NOWA!',3600);
         }
@@ -2195,13 +2415,16 @@ function updateFoes(dt){
         else{f.dx=0;f.dy=0;}
       }else{
       f.leash=false;
+      /* UL ma WŁASNE 4 fazy co 25% HP — generyczny szał w połowie tylko by je zagłuszył */
       if(!f.ph2&&f.hp<=f.maxHp/2){f.ph2=true;
-        addHit(f.x,f.y-30,'WŚCIEKŁOŚĆ!!!','#e04848');
-        fxRing(f.x,f.y-8,60,'#e04848',{life:.5,w:4});
-        fxSparks(f.x,f.y-10,'#e04848',16,150,{life:.6});
-        addShake(5,.4);addHitStop(.08);
-        toast('⚠️ '+f.bn+' WPADA W SZAŁ!');SFX.no();}
-      if(f.telT!==undefined){updateBossTelegraph(f,dt);}   // telegraf trwa — żadnego nowego ataku
+        if(!f.hive){
+          addHit(f.x,f.y-30,'WŚCIEKŁOŚĆ!!!','#e04848');
+          fxRing(f.x,f.y-8,60,'#e04848',{life:.5,w:4});
+          fxSparks(f.x,f.y-10,'#e04848',16,150,{life:.6});
+          addShake(5,.4);addHitStop(.08);
+          toast('⚠️ '+f.bn+' WPADA W SZAŁ!');SFX.no();}}
+      if(f.hive){hiveUpdate(f,dt);}                        // UL: stoi i wypuszcza rój
+      else if(f.telT!==undefined){updateBossTelegraph(f,dt);}   // telegraf trwa — żadnego nowego ataku
       else if(f.moves&&f.moves.length){
         /* boss z własnym zestawem ataków: losowanie bez powtórki tego samego pod rząd */
         f.at=(f.at||2.6)-dt;
@@ -2216,15 +2439,20 @@ function updateFoes(dt){
       f.at=(f.at||2.5)-dt;
       if(f.at<=0&&d<230){
         f.at=f.ph2?2:3.2;
-        if(f.batk==='charge'){ // Król Dzików: szarża na gracza
-          f.kb=.5;f.kbx=(P.x-f.x)/Math.max(1,d)*300;f.kby=(P.y-f.y)/Math.max(1,d)*300;
-          f.chDust=.5;fxDust(f.x,f.y+10,8);addShake(2.4,.25);
-          f.postHold=.5;                                     // po szarży przystaje
-          addHit(f.x,f.y-26,'SZARŻA!','#f5a032');SFX.boar();
+        if(f.batk==='charge'){ // Król Dzików / Pan Laweta: szarża na gracza
+          /* NAJPIERW przykuca i STOI (tell), dopiero potem wystrzeliwuje —
+             bez tego szarża leciała bez ostrzeżenia i nie dało się jej odczytać */
+          f.telT=f.ph2?.5:.7;f.telMv='szarza';
+          bossHold(f,f.telT);
+          fxRing(f.x,f.y+4,36,'#f5a032',{life:.35,w:3,ground:true});
+          addHit(f.x,f.y-30,'SZYKUJE SZARŻĘ!','#f5a032');
+          beep(130,.22,'sawtooth',.07,60);
         }else{ // Dres: kettle / Kraken: bryzg — pocisk w gracza
-          bossHold(f,f.ph2?.6:.85);                          // staje na czas zamachu
+          bossHold(f,f.ph2?.7:.95);                          // staje na czas zamachu
           const a=Math.atan2(P.y-f.y,P.x-f.x);
-          const sAtk=Math.round(FOE_TYPES[f.t].atk*.85);
+          /* WAŻNE: liczone z f.atk (skala do ekipy + poziom rewanżu), nie z bazy typu —
+             wcześniej boss na 5. poziomie strzelał obrażeniami jak na pierwszym */
+          const sAtk=Math.round(f.atk*1.0);
           bossShots.push({x:f.x,y:f.y-10,dx:Math.cos(a)*130,dy:Math.sin(a)*130,life:2.2,t:f.batk,atk:sAtk});
           if(f.ph2)for(const off of[-.5,.5])bossShots.push({x:f.x,y:f.y-10,
             dx:Math.cos(a+off)*130,dy:Math.sin(a+off)*130,life:2.2,t:f.batk,atk:sAtk});
@@ -2244,11 +2472,11 @@ function updateFoes(dt){
     if(td.flying){ // latające ignorują przeszkody (lecą nad wodą/murami)
       const fx=Math.max(8,Math.min(MW*16-8,nx)),fy=Math.max(8,Math.min(MH*16-8,ny));
       /* …ale NIE nad barierki areny bossa — mewy potrafiły wlatywać w środek walki */
-      if(f.boss||!inBossArena(fx,fy)){f.x=fx;f.y=fy;}
+      if(f.boss||f.swarm||!inBossArena(fx,fy)){f.x=fx;f.y=fy;}
       else{f.dx*=-1;f.dy*=-1;}
     }else{
-      if(!SOLID(at(Math.floor(nx/16),Math.floor(f.y/16)))&&(f.boss||!inBossArena(nx,f.y)))f.x=nx;else f.dx*=-1;
-      if(!SOLID(at(Math.floor(f.x/16),Math.floor(ny/16)))&&(f.boss||!inBossArena(f.x,ny)))f.y=ny;else f.dy*=-1;
+      if(!SOLID(at(Math.floor(nx/16),Math.floor(f.y/16)))&&(f.boss||f.swarm||!inBossArena(nx,f.y)))f.x=nx;else f.dx*=-1;
+      if(!SOLID(at(Math.floor(f.x/16),Math.floor(ny/16)))&&(f.boss||f.swarm||!inBossArena(f.x,ny)))f.y=ny;else f.dy*=-1;
     }
     if(!f.sub&&d<(f.boss?22:td.elite?16:13))hurtPlayer(f);
     /* SZARŻA: jeden czysty cios na wroga + odrzut, żeby Dych nie utknął w przeciwniku */
@@ -2270,7 +2498,7 @@ function updateFoes(dt){
       if(b.trT<=0){b.trT=.035;
         const tc=b.t==='ogien'?'#f5a032':b.t==='snieg'?'#bfe8f4':b.t==='laser'?'#e03028':
                  b.t==='flash'?'#ffffff':b.t==='kettle'?'#8f88b0':
-                 b.t==='fon'?'#6fd8e8':b.t==='konfet'?'#e88ac8':'#6fd8e8';
+                 b.t==='fon'?'#6fd8e8':b.t==='konfet'?'#e88ac8':b.t==='zadlo'?'#f5c542':'#6fd8e8';
         fxP({x:b.x,y:b.y,vx:(Math.random()-.5)*14,vy:(Math.random()-.5)*14,g:0,
           life:.26,life0:.26,sz:2,col:tc,add:true,shrink:true});}}
     if(Math.hypot(P.x-b.x,(P.y-8)-b.y)<11){b.life=0;hurtPlayer(b);
@@ -2358,7 +2586,7 @@ const CHARS={
     desc:'Drugi robot z YT. Na mieście kręci się, w głowie ma ogień.',how:'QUEST nad Polskim Morzem'},
   grazynka:{n:'Grażynka 3000',elId:'swojskosc',star:4,
     spd:80,batk:20,rng:27,atk:'melee',
-    spcN:'GORĄCY ROSÓŁ',spcCd:18,spcD:'leczy całe HP i parzy wrogów parą',
+    spcN:'GORĄCY ROSÓŁ',spcCd:18,spcD:'leczy 50% HP i parzy wrogów parą',
     hitTxt:['CHOCHLĄ!','A ZUPKA?','SIO!'],
     desc:'Robotka-kucharka, streamuje obiady. Chochla pierwszej klasy.',how:'🎁 Paczki od Fanów'},
   jarek:{n:'Jarek Zegarek',elId:'czas',star:4,
@@ -2409,6 +2637,7 @@ const ARTS={
   oscypekT:{n:'Oscypek Szczęścia',slot:0,star:4,st:{hp:90,atk:8},ic:'🧀'},
   kiel:{n:'Kieł Króla Dzików',slot:0,star:5,st:{atk:18,cd:20},ic:'🦷'},
   rogiK:{n:'Rogi Klaunicy z Festiwalu',slot:0,star:5,st:{atk:17,cd:22},ic:'🤡'},
+  koronaP:{n:'Korona Królowej Pszczół',slot:0,star:5,st:{atk:16,hp:80,cd:18},ic:'🐝'},
   sygnet:{n:'Sygnet z Bazaru',slot:1,star:2,st:{atk:8},ic:'💍'},
   pierscionek:{n:'Pierścionek z Tindera',slot:1,star:3,st:{cd:25},ic:'💖'},
   lancuchG:{n:'Łańcuch Grubości Palca',slot:1,star:4,st:{atk:14,hp:30},ic:'⛓️'},
@@ -2502,6 +2731,38 @@ const chDmg=chATK;
 const chHpMax=id=>{const d=chData(id);return 100+18*(d.lvl-1)+15*d.st+gearStats(id).hp;};
 const chDEF=id=>8+gearStats(id).def;
 const chCD=id=>150+gearStats(id).cd;   // CRIT DMG %
+
+/* --- SIŁA DRUŻYNY → SIŁA BOSSA ---------------------------------------
+   Bossowie skalują się do ŚREDNIEJ mocy ekipy (poziomy, gwiazdki, broń,
+   artefakty), żeby po podkręceniu postaci walka dalej była walką, a nie
+   spacerkiem po worku treningowym. Bazą jest świeży Edek: ATK 22, HP 100.
+     • HP bossa rośnie z NASZYM ATK  → walka trwa podobną liczbę ciosów
+     • ATK bossa rośnie z NASZYM HP  → cios zabiera podobny % paska
+   Wykładniki < 1 = skalowanie podprogowe: rozwój postaci NADAL się opłaca
+   (mocna ekipa bije bossa szybciej), ale przewaga nie jest miażdżąca. */
+const PP_BASE_ATK=22,PP_BASE_HP=100;
+function partyPower(){
+  const ids=(S.party||[]).filter(id=>CHARS[id]);
+  if(!ids.length)return{atk:PP_BASE_ATK,hp:PP_BASE_HP,n:1,kAtk:1,kHp:1,kTeam:1};
+  let a=0,h=0;
+  for(const id of ids){a+=chATK(id);h+=chHpMax(id);}
+  a/=ids.length;h/=ids.length;
+  return{atk:a,hp:h,n:ids.length,
+    kAtk:Math.max(1,a/PP_BASE_ATK),
+    kHp:Math.max(1,h/PP_BASE_HP),
+    /* każdy zmiennik to dodatkowy pasek HP i darmowa wymiana po nokaucie —
+       liczy się po stronie SIŁY CIOSU bossa, nie jego HP: bije zawsze tylko
+       jedna postać, więc większa ekipa nie zwiększa naszych obrażeń */
+    kTeam:1+.08*(ids.length-1)};
+}
+/* mnożniki dla bossa + sufity, żeby przy maksymalnym buildzie walka nie ciągnęła się w nieskończoność */
+function bossScale(){
+  const p=partyPower();
+  return{hp:Math.min(14,Math.pow(p.kAtk,.75)),
+         atk:Math.min(6,Math.pow(p.kHp,.7)*p.kTeam),pw:p};
+}
+/* globalne podbicie obrażeń bossów — ich ciosy mają BOLEĆ, bo każdy jest telegrafowany */
+const BOSS_ATK_UP=1.25;
 function equipGear(chId,slot,itemId){
   if(itemId)for(const oid of Object.keys(S.chars)){const g=gearOf(oid);
     if(g.w===itemId)g.w=null;
@@ -2720,8 +2981,13 @@ REGIONS.arena={n:'DOMENA',w:76,h:26,build:()=>{},spawn:[9*16,13*16],pks:[2,2],
   foesMax:0,foeTypes:['hejter'],zones:[[2,2,73,23]]};
 function mkDomFoe(t,x,y,room){
   const cfg=DOMAINS[DOM.cur],lvl=S.domLvl[DOM.cur]||0,td=FOE_TYPES[t];
-  const h=Math.round(td.hp*(1+.35*lvl));
-  return{t,x,y,room,hp:h,hp0:h,atk:td.atk+Math.round(lvl*1.6),
+  /* ELITY, MINI-BOSSOWIE i STRAŻNIK dostrajają się do siły ekipy tak samo jak
+     bossowie regionalni. Zwykła hałastra zostaje hałastrą — świat ma być do
+     przejścia, mocna ma być walka z tym, co pilnuje komnaty. */
+  const big=td.elite||td.mini||t==='straznik';
+  const sc=big?bossScale():{hp:1,atk:1};
+  const h=Math.round(td.hp*(1+.35*lvl)*sc.hp);
+  return{t,x,y,room,hp:h,hp0:h,atk:Math.round((td.atk+lvl*1.6)*sc.atk),
     dx:0,dy:0,wt:.4,stun:.6,kb:0,kbx:0,kby:0,flash:0};
 }
 function enterDomain(id){
@@ -3074,6 +3340,21 @@ const BOSSES={
     intro:[['Rybak Bogdan','Panie Edward! COŚ wyszło z morza i kradnie bursztyny!'],
            ['KRAKEN BAŁTYCKI','BLUB BLUB... WYŚWIETLENIA... ODDAĆ... MOJE...'],
            ['Edek','Zobaczcie, co mi los przyniesie. Macki kontra rolex!','v_los']]},
+  /* HORDA PSZCZÓŁ — boss DWUETAPOWY. Etap 1 to UL: stoi na środku pasieki i
+     wypuszcza rój; co 25% jego HP rój robi się liczniejszy i mocniejszy (4 fazy).
+     Po rozwaleniu ula z resztek wychodzi KRÓLOWA (`next`) z trzema atakami. */
+  horda:{r:'krakow',x:27,y:62,t:'ul',n:'HORDA PSZCZÓŁ',hive:true,
+    film:'ROZWALIŁEM UL POD KRAKOWEM I WYSZŁA KRÓLOWA (obłęd)',
+    next:{t:'krolowa',n:'KRÓLOWA PSZCZÓŁ',moves:['zadlo','rojnica','miodospad'],
+      intro:[['???','BZZZZZZZZZZ...'],
+             ['KRÓLOWA PSZCZÓŁ','ROZBIŁEŚ MÓJ UL, BLASZAKU. TERAZ GADASZ ZE MNĄ.'],
+             ['Edek','O matko, jaka wielka… Ludzie, tego nikt mi nie uwierzy bez nagrania!','c_koniecswiata'],
+             ['Edek','Nikt nie będzie zaczepiał tu moich ziomali. A mnie tym bardziej. Lecimy!','c_ziomali']]},
+    intro:[['Edek','Zobaczcie, jaka piękna pasieka. Bzyz bzyz. Tylko żeby mnie nie pogryzły, bo trzeba zebrać.','c_pszczolki'],
+           ['Edek','No i elegancko, miodek prosto z ula. Weźmiemy se troszeczkę na kanał.','c_maliny'],
+           ['UL','BZZZ… BZZZ… BZZZZZZZZ!!!'],
+           ['Edek','Ej ludzie, one wszystkie wyleciały! Odganiam się, odganiam…','c_odganiam'],
+           ['Edek','Spokojnie, spokojnie. Rozwalamy ten ul i po sprawie. Jedziemy z tym koksem!','c_spokoj']]},
   smok:{r:'krakow',x:104,y:65,t:'smok',n:'SMOK WAWELSKI',batk:'ogien',
     film:'OBUDZIŁEM SMOKA WAWELSKIEGO (Kraków ewakuowany?!)',
     intro:[['Przekupka','Panie Edwardzie! Smok się obudził i żąda... wyświetleń!'],
@@ -3085,8 +3366,8 @@ const BOSSES={
            ['PAN LAWETA 3000','DWA ROBOTY NA POBOCZU?! HAK JUŻ OPUSZCZONY. NA ZŁOM Z WAMI!'],
            ['Edek','Panie kierowco, panie kierowco! My jedziemy na Poland Rocka, nie na złomowisko!','c_paniekierowco']]},
   /* KLAUNICA Z FESTIWALU — scena 1:1 z shorta „ja nic takiego nie zrobiłem".
-     `auto` = wejście do areny samo odpala dialog (bez [E]), `moves` = 4 własne ataki. */
-  klaunica:{r:'morze',x:90,y:21,t:'klaunica',n:'KLAUNICA Z FESTIWALU',auto:true,
+     `moves` = 4 własne ataki z katalogu BOSS_MOVES (reszta bossów ma proste `batk`). */
+  klaunica:{r:'trasa',x:29,y:63,t:'klaunica',n:'KLAUNICA Z FESTIWALU',
     moves:['mamnagrane','jestdowod','narogi','niechcacy'],
     film:'DZIEWCZYNA Z FESTIWALU MIAŁA WSZYSTKO NAGRANE (musiałem się tłumaczyć)',
     intro:[['Klaunica','O matko jedyna.','k_matko'],
@@ -3116,28 +3397,77 @@ let bossCdT={};
 const bossOnMap=id=>foes.some(f=>f.bid===id);
 function startBoss(id){
   const b=BOSSES[id];
+  killRadio();                 // audycja Edward FM ustępuje miejsca scence bossa
   /* rewanż: nie odtwarzamy całej scenki po raz drugi (bossy `auto` wchodzą samym wejściem) */
   const lines=(b.intro2&&(S.bossLvl[id]||0)>0)?b.intro2:b.intro;
   say(lines.map(([who,t,v])=>({who,t,v})),()=>{
-    const lvl=S.bossLvl[id]||0,td=FOE_TYPES[b.t];
-    const maxHp=Math.round(td.hp*(1+.5*lvl));
-    foes.push({t:b.t,boss:true,bid:id,bn:b.n,batk:b.batk,moves:b.moves,
+    const lvl=S.bossLvl[id]||0,td=FOE_TYPES[b.t],sc=bossScale();
+    /* siła bossa = jego baza × poziom rewanżu × dopasowanie do mocy ekipy */
+    const maxHp=Math.round(td.hp*(1+.5*lvl)*sc.hp);
+    const atk=Math.round(td.atk*(1+.15*lvl)*sc.atk*BOSS_ATK_UP);
+    foes.push({t:b.t,boss:true,bid:id,bn:b.n,batk:b.batk,moves:b.moves,hive:b.hive,
       x:b.x*16+8,y:b.y*16+8,homeX:b.x*16+8,homeY:b.y*16+8,
-      hp:maxHp,maxHp,hp0:maxHp,atk:Math.round(td.atk*(1+.15*lvl)),
+      hp:maxHp,maxHp,hp0:maxHp,atk,
       dx:0,dy:0,wt:0,stun:0,kb:0,kbx:0,kby:0,flash:0,at:2});
-    /* bossowie wchodzący sami (bez [E]) materializują się z hukiem na środku areny */
-    if(b.auto){const ex=b.x*16+8,ey=b.y*16+8;
-      fxRing(ex,ey-8,58,'#e03050',{life:.5,w:4});
-      fxRing(ex,ey+4,44,'#f5c542',{life:.4,w:3,ground:true});
-      fxSparks(ex,ey-10,'#e03050',18,160,{life:.6});
-      fxStarFlash(ex,ey-12,'#fff7f2',14,{life:.3});
-      addShake(5,.4);burstConfetti();worldFlash=.5;}
-    toast('⚔️ BOSS: '+b.n+(lvl?' — POZIOM '+(lvl+1):'')+'!',3000);
+    /* boss BUDZI SIĘ z hukiem — wystarczy wejść na jego arenę */
+    const ex=b.x*16+8,ey=b.y*16+8;
+    fxRing(ex,ey-8,58,'#e03050',{life:.5,w:4});
+    fxRing(ex,ey+4,44,'#f5c542',{life:.4,w:3,ground:true});
+    fxSparks(ex,ey-10,'#e03050',18,160,{life:.6});
+    fxStarFlash(ex,ey-12,'#fff7f2',14,{life:.3});
+    addShake(5,.4);burstConfetti();worldFlash=.5;
+    /* podbicie ponad bazę pokazujemy graczowi — widzi, że boss dostroił się do ekipy */
+    toast('⚔️ BOSS: '+b.n+(lvl?' — POZIOM '+(lvl+1):'')+'!'+
+      (sc.hp>=1.15?'<br>Dostroił się do ekipy: ×'+sc.hp.toFixed(1)+' HP, ×'+sc.atk.toFixed(1)+' siła ciosu':''),3400);
     SFX.no();
+    initAudio().then(startBossMusic);   // motyw areny bossa
+  });
+}
+/* czy stoimy na arenie ŻYJĄCEGO bossa? To jest jedyny warunek grania motywu
+   areny — i jednocześnie blokada dla radia Edwarda (Metro/Dziki/67 nie mają
+   prawa lecieć w środku walki z bossem). */
+function bossOnArena(){
+  for(const f of foes){
+    if(!f.boss)continue;
+    const A=arenaOfBoss(f.bid);
+    if(!A)return Math.hypot(P.x-f.x,P.y-f.y)<420;   // boss bez areny: promień awaryjny
+    const tx=P.x/16,ty=P.y/16;
+    if(tx>=A.ai[0]-2&&tx<=A.ai[2]+3&&ty>=A.ai[1]-2&&ty<=A.ai[3]+3)return true;
+  }
+  return false;
+}
+/* która arena należy do tego bossa? (region może mieć dwie: `arena` + `arena2`,
+   a przy jednej arenie `bid` bywa pominięty — wtedy bierzemy tę bez `bid`) */
+function arenaOfBoss(id){
+  const b=BOSSES[id];if(!b)return null;
+  const list=arenasOf(REGIONS[b.r]);
+  return list.find(a=>a.bid===id)||list.find(a=>!a.bid)||null;
+}
+/* DRUGI ETAP BOSSA — z gruzów pierwszego wychodzi kolejna forma (ul → KRÓLOWA).
+   Ta sama tożsamość (`bid`), więc łup, film i poziom rewanżu liczą się raz. */
+function bossStage2(f,nx){
+  const td=FOE_TYPES[nx.t],lvl=S.bossLvl[f.bid]||0,sc=bossScale();
+  const ex=f.x,ey=f.y;
+  bossShots=[];
+  fxRing(ex,ey-8,80,'#f5c542',{life:.7,w:5});
+  fxRing(ex,ey+6,64,'#c8935a',{life:.5,w:3,ground:true});
+  fxSparks(ex,ey-10,'#f5c542',26,200,{life:.8});
+  addShake(6,.5);worldFlash=.6;SFX.no();
+  say(nx.intro.map(([who,t,v])=>({who,t,v})),()=>{
+    const maxHp=Math.round(td.hp*(1+.5*lvl)*sc.hp);
+    foes.push({t:nx.t,boss:true,stage2:true,bid:f.bid,bn:nx.n,moves:nx.moves,
+      x:ex,y:ey,homeX:f.homeX,homeY:f.homeY,
+      hp:maxHp,maxHp,hp0:maxHp,atk:Math.round(td.atk*(1+.15*lvl)*sc.atk*BOSS_ATK_UP),
+      dx:0,dy:0,wt:0,stun:0,kb:0,kbx:0,kby:0,flash:0,at:1.6});
+    fxStarFlash(ex,ey-12,'#fff7d6',16,{life:.35});
+    burstConfetti();addShake(5,.4);
+    toast('👑 '+nx.n+' WYCHODZI Z ULA!<br>Trzy ataki — ucz się ich albo giń.',3600);
+    initAudio().then(startBossMusic);
   });
 }
 const BOSS_DROP={krol:['art','kiel'],mdres:['weap','kettle'],kraken:['art','kolczykK'],
-  smok:['art','luska'],yeti:['weap','ciupaga'],laweta:['art','hakL'],klaunica:['art','rogiK']};
+  smok:['art','luska'],yeti:['weap','ciupaga'],laweta:['art','hakL'],klaunica:['art','rogiK'],
+  horda:['art','koronaP']};
 function bossDefeated(f){
   const id=f.bid,lvl=S.bossLvl[id]||0;
   const di=1+(lvl>=2?1:0),ch=6+lvl*2,dd=60+lvl*25;
@@ -3150,6 +3480,7 @@ function bossDefeated(f){
   }
   save();refreshHUD();
   bossShots=[];bossCdT[id]=90;
+  stopBossMusic();                 // motyw areny milknie razem z bossem
   worldFlash=.8;burstConfetti();burstConfetti();SFX.buy();
   addHit(f.x,f.y-20,'BOSS DOWN!','#f5c542');
   toast('👑 POKONANY: '+f.bn+'!<br>+'+di+'💠 +'+ch+'⚙️ +'+dd+'💎',4200);
@@ -3954,7 +4285,6 @@ function doAction(){
   else if(prompt.selfie)doSelfie();
   else if(prompt.forage)gatherForage(prompt.forage);
   else if(prompt.domain)enterDomain(prompt.domain);
-  else if(prompt.bossId)startBoss(prompt.bossId);
   else if(prompt.chest)domOpenChest();
   else if(prompt.crystal)domTakeCrystal(prompt.crystal);
   else if(prompt.exit)exitDomain();
@@ -4017,10 +4347,8 @@ function findPrompt(){
       if(dm.r!==REG)continue;
       if(Math.hypot(P.x-(dm.x*16+8),P.y-(dm.y*16+8))<24){prompt={domain:id,label:'🌀 Wejdź: '+dm.n};break;}
     }
-    if(!prompt)for(const[id,b]of Object.entries(BOSSES)){
-      if(b.r!==REG||b.auto||bossOnMap(id)||(bossCdT[id]>0))continue;   // `auto` = odpala się samo po wejściu na arenę
-      if(Math.hypot(P.x-(b.x*16+8),P.y-(b.y*16+8))<28){prompt={bossId:id,label:'⚔ WYZWIJ: '+b.n};break;}
-    }
+    /* bossów się już nie wyzywa na [E] — każdy budzi się sam po wejściu na arenę
+       (patrz pętla „KAŻDY BOSS BUDZI SIĘ SAM"), a boss stoi w środku swojej niecki */
   }
   if(!prompt&&REG==='arena'&&!POL.on){
     if(DOM.chest&&!DOM.chest.open&&Math.hypot(P.x-DOM.chest.x,P.y-DOM.chest.y)<24)prompt={chest:1,label:'🎁 Skrzynia!'};
@@ -5281,6 +5609,59 @@ function drawBoss(f,sx,sy){
     // telegraf szarży: pochyla się do przodu i sypie iskrami
     if(f.telT!==undefined){cx.fillStyle='rgba(224,48,80,.28)';
       cx.beginPath();cx.arc(0,-6,22+Math.sin(anim*22)*3,0,7);cx.fill();}
+  }else if(f.t==='ul'){ // UL — wielka skrzynia pasieczna, im niższa faza tym bardziej rozbita
+    const fz=f.faza||1,drga=f.flash>0?(Math.random()-.5)*2:0;
+    cx.translate(drga,0);
+    cx.fillStyle='rgba(0,0,0,.32)';cx.beginPath();cx.ellipse(0,26,24,6,0,0,7);cx.fill();
+    R(cx,-20,20,40,6,'#5a3a1e');R(cx,-22,24,44,3,'#42280f');        // podest
+    rr(cx,-18,-18,36,38,3,'#c8935a');                                // korpus
+    for(let i=0;i<5;i++)R(cx,-18,-14+i*8,36,2.6,'#a3743f');          // ramki
+    R(cx,-18,-18,3,38,'#e0b06e');                                    // światło na lewej krawędzi
+    cx.fillStyle='#8a5a2a';cx.beginPath();                            // daszek
+    cx.moveTo(-24,-16);cx.lineTo(0,-30);cx.lineTo(24,-16);cx.fill();
+    R(cx,-24,-17,48,3,'#6e4520');
+    R(cx,-9,12,18,5,'#3a2410');                                       // WYLOTEK — stąd sypie się rój
+    /* pęknięcia narastają z każdą fazą — widać, że ul się rozlatuje */
+    cx.strokeStyle='#5a3a1e';cx.lineWidth=1.6;
+    for(let i=0;i<(fz-1)*3;i++){const a=i*1.9;
+      cx.beginPath();cx.moveTo(Math.cos(a)*6,Math.sin(a)*6-4);
+      cx.lineTo(Math.cos(a)*17,Math.sin(a)*15-4);cx.stroke();}
+    /* rój krążący wokół ula — gęstnieje z fazą */
+    if(!reduceMotion)for(let i=0;i<fz*3;i++){
+      const a=anim*(2+fz*.35)+i*(6.28/(fz*3)),rx=28+Math.sin(anim*3+i)*5;
+      R(cx,Math.cos(a)*rx-1,Math.sin(a)*rx*.6-6,2.2,2.2,'#f5c542');}
+    if(fz>=3){cx.fillStyle='rgba(245,160,50,.18)';                    // aura wściekłości
+      cx.beginPath();cx.arc(0,-2,34+Math.sin(anim*9)*3,0,7);cx.fill();}
+  }else if(f.t==='krolowa'){ // KRÓLOWA PSZCZÓŁ — wielka, w koronie, na przezroczystych skrzydłach
+    const fl=P.x<f.x?-1:1,fly=Math.sin(anim*3)*2.5,wf=Math.sin(anim*22)*(reduceMotion?0:5);
+    cx.translate(0,fly);
+    cx.fillStyle='rgba(0,0,0,.28)';cx.beginPath();cx.ellipse(0,30-fly*.5,17,4.5,0,0,7);cx.fill();
+    // SKRZYDŁA (za korpusem)
+    cx.fillStyle='rgba(200,232,248,.5)';
+    for(const dx2 of[-1,1]){
+      cx.beginPath();cx.ellipse(dx2*15,-12-wf*.4,13,6,dx2*(.5+wf*.03),0,7);cx.fill();
+      cx.beginPath();cx.ellipse(dx2*12,-4-wf*.3,10,4.5,dx2*(.7+wf*.03),0,7);cx.fill();}
+    // ODWŁOK w pasy + ŻĄDŁO
+    for(let i=0;i<4;i++)rr(cx,-11,-2+i*6,22,6,2.4,i%2?'#1a1a24':'#f5c542');
+    cx.fillStyle='#12121a';cx.beginPath();
+    cx.moveTo(-4,22);cx.lineTo(4,22);cx.lineTo(0,32);cx.fill();       // żądło
+    // TUŁÓW futrzasty
+    rr(cx,-12,-16,24,16,5,'#c8935a');
+    for(let i=0;i<6;i++)R(cx,-12+i*4,-17,2,3,'#8a5a2a');
+    // GŁOWA + wielkie oczy + czułki
+    rr(cx,-9,-30,18,16,5,'#1a1a24');
+    cx.fillStyle='#2a2a3a';cx.beginPath();
+    cx.ellipse(-4.5,-24,3.6,5,-.2,0,7);cx.ellipse(4.5,-24,3.6,5,.2,0,7);cx.fill();
+    cx.fillStyle='#e04848';cx.beginPath();
+    cx.arc(-4.5+fl*.8,-24,1.7,0,7);cx.arc(4.5+fl*.8,-24,1.7,0,7);cx.fill();
+    cx.strokeStyle='#12121a';cx.lineWidth=1.6;
+    for(const dx2 of[-1,1]){cx.beginPath();cx.moveTo(dx2*5,-30);
+      cx.quadraticCurveTo(dx2*11,-40,dx2*8+Math.sin(anim*4)*2,-44);cx.stroke();}
+    // KORONA
+    R(cx,-8,-38,16,4,'#f5c542');
+    for(let i=0;i<3;i++){R(cx,-7+i*6,-43,3,5,'#f5c542');R(cx,-6.4+i*6,-42,1.8,1.8,'#e04848');}
+    if(f.telT!==undefined){cx.fillStyle='rgba(245,197,66,.26)';      // telegraf ŻĄDŁA
+      cx.beginPath();cx.arc(0,-8,26+Math.sin(anim*22)*3,0,7);cx.fill();}
   }else if(f.t==='laweciarz'){ // PAN LAWETA 3000 — pomarańczowa laweta z hakiem
     const fl=P.x<f.x;
     cx.fillStyle='rgba(0,0,0,.3)';cx.beginPath();cx.ellipse(0,20,26,5,0,0,7);cx.fill();
@@ -5853,7 +6234,23 @@ function drawMbRolexiarz(f,sx,sy,b){ // ROLEXIARZ PODRÓBA — złoty dres, zega
   if(Math.floor(anim*2)%2){cx.fillStyle='#fff7d6';            // błysk podróbki
     R(cx,c2+(P.x<f.x?-11:11),sy+8+b,1.6,1.6,'#fff7d6');}
 }
-const FOE_DRAW={pies:drawFoeDog,oburzona:drawFoeLady,zlyrobot:drawFoeRobot,
+/* PSZCZOŁA Z ROJU — mała, szybka, w paski; skrzydła rozmazane od bicia */
+function drawFoePszczola(f,sx,sy){
+  const fly=-7+Math.sin(anim*5+sx)*(reduceMotion?0:2),wf=Math.sin(anim*30)*(reduceMotion?0:2.2);
+  cx.fillStyle='rgba(200,232,248,.55)';                       // skrzydełka
+  cx.beginPath();cx.ellipse(sx+5.5,sy+2+fly-wf*.3,3.4,1.7,-.5,0,7);cx.fill();
+  cx.beginPath();cx.ellipse(sx+10.5,sy+2+fly-wf*.3,3.4,1.7,.5,0,7);cx.fill();
+  rr(cx,sx+3.4,sy+3.4+fly,9.2,7.2,3,'#12121a');               // ciemny obrys (łąka jest w kwiatach!)
+  rr(cx,sx+4,sy+4+fly,8,6,2.6,'#f5c542');                     // odwłok
+  R(cx,sx+6,sy+4+fly,1.8,6,'#1a1a24');R(cx,sx+9,sy+4+fly,1.8,6,'#1a1a24');
+  cx.fillStyle='#12121a';cx.beginPath();                      // żądło
+  cx.moveTo(sx+11.5,sy+6+fly);cx.lineTo(sx+15,sy+7+fly);cx.lineTo(sx+11.5,sy+8.5+fly);cx.fill();
+  rr(cx,sx+1.5,sy+3.6+fly,4,5,2,'#1a1a24');                   // łepek
+  R(cx,sx+2.4,sy+5+fly,1.4,1.4,'#e04848');                    // ślepko
+  cx.strokeStyle='#12121a';cx.lineWidth=.9;                   // czułki
+  cx.beginPath();cx.moveTo(sx+2.4,sy+3.6+fly);cx.lineTo(sx+.6,sy+.8+fly);cx.stroke();
+}
+const FOE_DRAW={pszczola:drawFoePszczola,pies:drawFoeDog,oburzona:drawFoeLady,zlyrobot:drawFoeRobot,
   dron:drawFoeDron,mewa:drawFoeMewa,krab:drawFoeKrab,kozica:drawFoeKozica,balwan:drawFoeBalwan,
   zmija:drawFoeZmija,wilk:drawFoeWilk,golab:drawFoeGolab,rywal:drawFoeRywal,zlomiarz:drawFoeZlomiarz,
   rycerz:drawFoeRycerz,odyniec:drawFoeOdyniec,utopiec:drawFoeUtopiec,
@@ -6201,11 +6598,11 @@ function updateWorld(dt){
   const[dx,dy]=moveVec();
   P.moving=dx!==0||dy!==0;
   /* SPRINT: tylko w ruchu, przy zdrowej nodze i gdy starczy wytrzymałości */
-  P.sprint=P.moving&&wantsSprint()&&!STAM.tired&&STAM.v>0&&!P.slow;
+  P.sprint=P.moving&&wantsSprint()&&!STAM.tired&&STAM.v>0&&!P.slow&&honeyT<=0;
   updateStamina(dt,P.sprint);
   if(P.moving){
     if(Math.abs(dx)>Math.abs(dy))P.dir=dx<0?1:2;else P.dir=dy<0?3:0;
-    let sp=P.speed*(S.ch==='edek'?(SHOE_SPD[S.equip.shoes]||1):1)*(P.slow?.55:1)*(BUFF.t>0?1+BUFF.spd:1)
+    let sp=P.speed*(S.ch==='edek'?(SHOE_SPD[S.equip.shoes]||1):1)*(P.slow?.55:1)*(honeyT>0?.6:1)*(BUFF.t>0?1+BUFF.spd:1)
            *(P.sprint?SPRINT_MULT:1);
     const nx=P.x+dx*sp*dt,ny=P.y+dy*sp*dt;
     if(canWalk(nx,P.y))P.x=nx;
@@ -6232,6 +6629,10 @@ function updateWorld(dt){
   /* na mapie widać TYLKO aktywną postać — reszta drużyny czeka „w kieszeni" (wymóg Dawida) */
   if(BUFF.t>0){BUFF.t-=dt;if(BUFF.t<=0)BUFF={atk:0,def:0,spd:0,t:0,n:''};}
   /* zatrucie: obrażenia co 0,7 s, ale nie zabija (min 1 HP) */
+  if(honeyT>0){honeyT-=dt;                       // lepkie kapki spod nóg
+    if(!reduceMotion&&Math.random()<.35)
+      fxP({x:P.x+(Math.random()-.5)*10,y:P.y+4,vx:0,vy:12,g:60,life:.4,life0:.4,
+        sz:1.8,col:'#f5a032',add:false,shrink:true});}
   if(poison.t>0){poison.t-=dt;poison.tick-=dt;
     if(poison.tick<=0){poison.tick=.7;
       PHP[S.ch]=Math.max(1,(PHP[S.ch]||1)-poison.dmg);
@@ -6265,14 +6666,21 @@ function updateWorld(dt){
     const pks=DOORS.find(d=>d.r===REG&&d.act==='pks');
     if(pks&&Math.hypot(P.x-(pks.x*16+8),P.y-(pks.y*16+8))<44)pksHeal();
   }
-  /* BOSSOWIE `auto`: samo wejście do areny odpala scenkę, a po niej boss staje na środku */
+  /* KAŻDY BOSS BUDZI SIĘ SAM: wystarczy wejść na jego arenę — żadnego [E].
+     Wchodzisz między barierki/mur, leci scenka i od razu jest walka. */
   if(scene==='world')for(const[id,b]of Object.entries(BOSSES)){
-    if(!b.auto||b.r!==REG||bossOnMap(id)||(bossCdT[id]>0))continue;
-    const A=arenasOf(REGIONS[REG]).find(a=>a.bid===id);
+    if(b.r!==REG||bossOnMap(id)||(bossCdT[id]>0))continue;
+    const A=arenaOfBoss(id);
     if(!A)continue;
     const tx=P.x/16,ty=P.y/16;
     if(tx>=A.ai[0]&&tx<=A.ai[2]+1&&ty>=A.ai[1]&&ty<=A.ai[3]+1){startBoss(id);break;}
   }
+  /* motyw areny gra DOKŁADNIE wtedy, gdy stoimy na arenie żyjącego bossa.
+     Wychodzisz (albo giniesz i lądujesz na spawnie) — cichnie. Wracasz i
+     przekraczasz bramę — rusza od nowa. Margines 2 kafle to histereza, żeby
+     muzyka nie migotała, gdy gracz tańczy na progu. */
+  if(bossOnArena()){killRadio();startBossMusic();}
+  else if(bossSrc)stopBossMusic();
   idleT-=dt;
   if(idleT<=0){
     if(scene==='world'&&REG!=='arena'&&!curVoice){
@@ -6619,6 +7027,18 @@ function drawWorld(){
       for(const a of[-.6,-.2,.2,.6]){cx.beginPath();cx.moveTo(sx+8,sy+14);
         cx.quadraticCurveTo(sx+8+a*10,sy+8,sx+8+a*16,sy+4);cx.stroke();}
       R(cx,sx+7.4,sy+11,1.4,3,'#2e6a34');}
+    else if(v===38){ // UL PASIEKI — drewniana skrzynka z daszkiem i wylotkiem
+      R(cx,sx,sy,16,16,baseCol());
+      cx.fillStyle='rgba(0,0,0,.25)';cx.beginPath();cx.ellipse(sx+8,sy+14,6,2.2,0,0,7);cx.fill();
+      R(cx,sx+3,sy+13,10,2,'#5a3a1e');                              // podstawka
+      rr(cx,sx+3,sy+2,10,11,1.4,'#c8935a');                         // korpus
+      for(let i=0;i<3;i++)R(cx,sx+3,sy+4.5+i*3,10,1,'#a3743f');     // ramki
+      cx.fillStyle='#8a5a2a';cx.beginPath();                        // daszek
+      cx.moveTo(sx+1,sy+3);cx.lineTo(sx+8,sy-2);cx.lineTo(sx+15,sy+3);cx.fill();
+      R(cx,sx+6,sy+10.4,4,1.8,'#3a2410');                           // WYLOTEK
+      /* pszczoły krążące nad ulem — po jednej na kafel, żeby nie zjeść klatek */
+      if(!reduceMotion){const a=anim*2.4+tx*1.7+ty;
+        R(cx,sx+8+Math.cos(a)*6,sy+4+Math.sin(a*1.3)*4,1.6,1.6,'#f5c542');}}
   }
   // łódka (Wisła / jezioro / Bałtyk)
   if(REGIONS[REG].boat){

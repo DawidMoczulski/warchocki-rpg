@@ -28,7 +28,9 @@ Po wejściu zrób **Ctrl+F5**, na ekranie tytułowym pojawi się plakietka
 | `?test=przyczepa` | przy Panu Mirku z kamperem (jazda przyczepą) |
 | `?test=policja` | pod bramkami — finałowa obława policji |
 | `?test=pole` | wszystko zrobione, gracz stoi na polu festiwalowym |
-| `?test=klaunica` | POLSKIE MORZE, tuż przed bramą STREFY IMPREZY — wejdź na arenę, żeby odpalić scenkę i walkę z KLAUNICĄ Z FESTIWALU |
+| `?test=klaunica` | TRASA NA POLAND ROCK, tuż przed bramą STREFY IMPREZY (pod polem namiotowym) — wejdź na arenę, żeby odpalić scenkę i walkę z KLAUNICĄ Z FESTIWALU |
+| `?test=horda` | KRAKÓW, tuż przed bramą PASIEKI (lewy dolny róg) — wejdź, żeby obudzić UL: 4 fazy roju, potem KRÓLOWA PSZCZÓŁ z 3 atakami |
+| `?test=pasieka` | KRAKÓW, tuż za kładką na Wiśle — stąd ścieżka prowadzi przez wieś pszczelarską do pasieki |
 | `?test=jezioro` | CHODZIEŻ, początek serii „Pływamy z Dych Dzikim" — gadaj z Sąsiadem Mietkiem |
 | `?test=plaza` | CHODZIEŻ, od razu na plaży nad Jeziorem Miejskim (dwa pierwsze zadania zrobione) |
 | `?test=torpeda` | CHODZIEŻ, przy Ratowniku Zbyszku — minigra SZALONY TORPEDA gotowa do odpalenia |
