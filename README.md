@@ -18,6 +18,15 @@ Fanowska parodia z prawdziwymi klipami głosowymi i autorską mechaniką w stylu
   łapiemy kampera z przyczepą i jedziemy na pole Poland Rocka (3 nowe minigry)
 - Szafa, ekwipunek, jedzenie z buffami, questy, minigry rytmiczne
 
+## Uwaga dla utrzymania
+
+Pliki `../warchocki-rpg.backup-v*.html` to **archiwalne monolity** z wklejoną
+starą kopią CSS i JS. Nie są synchronizowane z katalogiem `web/` i nie należy
+robić w nich „tych samych" zmian — wyprodukuje to trzecią, rozjechaną paletę.
+
+Paleta interfejsu żyje wyłącznie w `:root` w `css/style.css`; szczegóły
+i pułapki opisane w `TESTOWANIE.md`.
+
 ## Sterowanie
 
 | Akcja | Klawisz |

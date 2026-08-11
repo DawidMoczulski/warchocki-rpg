@@ -93,6 +93,42 @@ BANNER_ORDER;              // pełna kolejka: edek, dych, grazynka, jarek, zenek
 
 `banOffset` żyje tylko do odświeżenia strony i nie zapisuje się do `wrpg`.
 
+## Kolory — jak zmienić motyw
+
+Cała paleta interfejsu siedzi w jednym bloku `:root` na górze `css/style.css`.
+**Zmiana motywu to edycja tych ~40 wartości i nic więcej** — reguły CSS nie mają
+zahardkodowanych kolorów, a `js/game.js` czyta te same tokeny do obiektu `UI`.
+
+Trzy pułapki, w które łatwo wdepnąć:
+
+1. **Tokeny czytane przez JS muszą być dosłownym hexem.** `var()` i `color-mix()`
+   wracają z `getPropertyValue` nierozwinięte, a `canvas` takiego koloru nie
+   sparsuje — **nie rzuci błędu**, tylko po cichu narysuje poprzednim kolorem.
+   Most `UI` sprawdza to regexem i krzyczy w konsoli.
+2. **Nigdy nie rób globalnego find-replace hexa w `game.js`.** Samo `#f5c542`
+   występuje tam ~200 razy, z czego interfejs to ~27 — reszta to łańcuch Edka,
+   Rolex, iskry i wrogowie. Kolory żywiołów (`ELEMENTS`) i świata (`TCOL`,
+   `MAPCOL`) mają nad sobą komentarze-bariery.
+3. **Akcent trzymaj z dala od 165–230°** na kole barw — tam siedzą żywioły
+   CZAS (turkus) i BAŁTYK (granat). Inaczej orby Jarka i Bogdana zleją się z UI.
+
+### Porównywarka zrzutów
+
+`scratchpad/shots.js` robi 47 zrzutów (świat, HUD, orby każdej postaci osobno,
+wszystkie panele, stany hover) i porównuje je piksel po pikselu z bazą:
+
+```bash
+node shots.js base        # zrzuty odniesienia
+node shots.js po-zmianie  # zrzuty + raport różnic
+node shots.js po --only=hud   # tylko sceny z „hud" w nazwie
+```
+
+Determinizm wymaga czterech rzeczy naraz: zamrożenia pętli (`requestAnimationFrame`
+podmienione na pustą funkcję), wyłączenia animacji CSS wstrzykniętym arkuszem,
+wyczyszczenia świata (auta, przechodnie, cząsteczki) i **wyłączenia cache
+przeglądarki** — bez tego strona potrafi wciągnąć stary `game.js` i cały pomiar
+kłamie.
+
 ## Testy automatyczne (bez przeglądarki)
 
 Harness w Node uruchamia `game.js` w `vm` z atrapą DOM/canvas i sprawdza m.in.
