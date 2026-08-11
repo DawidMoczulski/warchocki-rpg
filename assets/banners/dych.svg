@@ -1,0 +1,153 @@
+<svg width="100%" viewBox="0 0 680 400" role="img" xmlns="http://www.w3.org/2000/svg">
+<style>
+@keyframes tw{0%,100%{opacity:.15;transform:scale(.6)}50%{opacity:1;transform:scale(1.15)}}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+@keyframes sway{0%,100%{transform:rotate(-1.7deg)}50%{transform:rotate(1.7deg)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes drift{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@keyframes waveArm{0%,62%,100%{transform:rotate(-4deg)}68%,94%{transform:rotate(-16deg)}}
+@keyframes waveFore{0%,60%,100%{transform:rotate(0deg)}70%,92%{transform:rotate(-150deg)}75%{transform:rotate(-124deg)}81%{transform:rotate(-156deg)}87%{transform:rotate(-128deg)}}
+.spk{transform-box:fill-box;transform-origin:center}
+.arm-r{transform-box:fill-box;transform-origin:16px 12px;transform:rotate(-4deg)}
+.forearm{transform-box:fill-box;transform-origin:16px 10px}
+.dizzy{transform-box:fill-box;transform-origin:center}
+@media (prefers-reduced-motion:no-preference){
+.spk{animation:tw 2.6s ease-in-out infinite}
+.bob{transform-box:view-box;animation:bob 4.5s ease-in-out infinite}
+.sway{transform-box:view-box;transform-origin:485px 383px;animation:sway 6s ease-in-out infinite}
+.rays{transform-box:view-box;transform-origin:485px 205px;animation:spin 90s linear infinite}
+.dizzy{animation:spin 4s linear infinite}
+.float{transform-box:view-box;transform-origin:center;animation:drift 5s ease-in-out infinite}
+.arm-r{animation:waveArm 9s ease-in-out infinite}
+.forearm{animation:waveFore 9s ease-in-out infinite}}
+</style>
+<title>Baner postaci Dych Dziki</title><desc>Baner do gry 2D w stylu gacha: bardzo wysoki, biało-srebrny robot w czarnej czapce stoi wyprostowany, kołysze się lekko i macha wolną ręką, w drugiej trzyma butelkę. Ciemnozielone tło z promieniami i iskrami, obok tytuł Dych Dziki i żywioł piwo.</desc>
+<defs><clipPath id="bgclip"><rect x="8" y="8" width="664" height="384" rx="18"/></clipPath></defs>
+
+<rect x="8" y="8" width="664" height="384" rx="18" fill="#0B241A"/>
+<g clip-path="url(#bgclip)">
+<rect x="8" y="8" width="664" height="384" fill="#0E2C1F"/>
+<g class="rays" opacity="0.5">
+<g transform="translate(485,205)">
+<polygon points="0,0 -18,-330 18,-330" fill="#17452F"/>
+<polygon points="0,0 -18,-330 18,-330" fill="#17452F" transform="rotate(36)"/>
+<polygon points="0,0 -18,-330 18,-330" fill="#17452F" transform="rotate(72)"/>
+<polygon points="0,0 -18,-330 18,-330" fill="#17452F" transform="rotate(108)"/>
+<polygon points="0,0 -18,-330 18,-330" fill="#17452F" transform="rotate(144)"/>
+<polygon points="0,0 -18,-330 18,-330" fill="#17452F" transform="rotate(180)"/>
+<polygon points="0,0 -18,-330 18,-330" fill="#17452F" transform="rotate(216)"/>
+<polygon points="0,0 -18,-330 18,-330" fill="#17452F" transform="rotate(252)"/>
+<polygon points="0,0 -18,-330 18,-330" fill="#17452F" transform="rotate(288)"/>
+<polygon points="0,0 -18,-330 18,-330" fill="#17452F" transform="rotate(324)"/>
+</g></g>
+<circle cx="485" cy="205" r="168" fill="#154634" opacity="0.85"/>
+<circle cx="485" cy="205" r="168" fill="none" stroke="#63A03F" stroke-width="1" opacity="0.35"/>
+<circle cx="485" cy="205" r="140" fill="none" stroke="#97C459" stroke-width="0.6" opacity="0.25"/>
+
+<ellipse cx="481" cy="385" rx="96" ry="12" fill="#06170F" opacity="0.75"/>
+<line x1="372" y1="385" x2="590" y2="385" stroke="#97C459" stroke-width="1" stroke-dasharray="4 8" opacity="0.45"/>
+
+<g class="sway"><g class="bob">
+<g transform="translate(485,52)">
+<rect x="-32" y="164" width="28" height="78" rx="13" fill="#DDE0DA"/>
+<circle cx="-18" cy="244" r="12" fill="#20242A"/>
+<rect x="-28" y="250" width="20" height="68" rx="9" fill="#E7E9E4"/>
+<rect x="-38" y="316" width="36" height="15" rx="7" fill="#20242A"/>
+<rect x="4" y="164" width="28" height="78" rx="13" fill="#C9CDC6"/>
+<circle cx="18" cy="244" r="12" fill="#20242A"/>
+<rect x="8" y="250" width="20" height="68" rx="9" fill="#D6D9D3"/>
+<rect x="2" y="316" width="36" height="15" rx="7" fill="#20242A"/>
+<rect x="-34" y="134" width="68" height="34" rx="14" fill="#E9EBE6"/>
+<rect x="-14" y="118" width="28" height="18" rx="6" fill="#20242A"/>
+<rect x="-38" y="38" width="76" height="84" rx="16" fill="#F2F3EF"/>
+<rect x="-44" y="32" width="88" height="22" rx="11" fill="#DCDFD9"/>
+<rect x="-30" y="58" width="60" height="42" rx="5" fill="#123C1E"/>
+<rect x="-30" y="58" width="60" height="42" rx="5" fill="none" stroke="#97C459" stroke-width="1"/>
+<text x="0" y="74" text-anchor="middle" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#C0DD97" letter-spacing="1">DYCH</text>
+<text x="0" y="90" text-anchor="middle" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#C0DD97" letter-spacing="1">DZIKI</text>
+<g transform="rotate(3 -46 46)">
+<circle cx="-46" cy="46" r="12" fill="#C9CDC6"/>
+<rect x="-57" y="50" width="22" height="58" rx="11" fill="#E7E9E4"/>
+<circle cx="-46" cy="112" r="10" fill="#20242A"/>
+<rect x="-56" y="116" width="20" height="56" rx="9" fill="#DDE0DA"/>
+<rect x="-51" y="168" width="7" height="28" fill="#1D5B33"/>
+<rect x="-61" y="192" width="26" height="46" rx="9" fill="#2E7D46"/>
+<rect x="-56" y="198" width="6" height="32" rx="3" fill="#5DCAA5" opacity="0.7"/>
+<rect x="-58" y="166" width="24" height="19" rx="8" fill="#C9CDC6"/>
+<rect x="-58" y="185" width="19" height="5" rx="2.5" fill="#C9CDC6"/>
+</g>
+<g class="arm-r">
+<circle cx="46" cy="46" r="12" fill="#DDE0DA"/>
+<rect x="35" y="50" width="22" height="58" rx="11" fill="#F2F3EF"/>
+<g class="forearm">
+<circle cx="46" cy="112" r="10" fill="#20242A"/>
+<rect x="36" y="116" width="20" height="56" rx="9" fill="#E7E9E4"/>
+<rect x="30" y="171" width="7" height="12" rx="3.5" fill="#B9BDB6"/>
+<rect x="34" y="167" width="24" height="21" rx="8" fill="#C9CDC6"/>
+<rect x="37" y="185" width="5" height="11" rx="2.5" fill="#C9CDC6"/>
+<rect x="44" y="186" width="5" height="12" rx="2.5" fill="#C9CDC6"/>
+<rect x="51" y="185" width="5" height="10" rx="2.5" fill="#C9CDC6"/>
+</g>
+</g>
+<rect x="-7" y="20" width="14" height="16" rx="4" fill="#20242A"/>
+<ellipse cx="0" cy="0" rx="19" ry="24" fill="#EDE7DF"/>
+<path d="M-20 -6q4 -24 20 -24t20 24q-6 -13 -20 -13t-20 13z" fill="#DCD5CB"/>
+<ellipse cx="-7" cy="2" rx="3.6" ry="4.6" fill="#2A2E2B"/>
+<ellipse cx="7" cy="2" rx="3.6" ry="4.6" fill="#2A2E2B"/>
+<path d="M-5 14q5 5 10 0" stroke="#2A2E2B" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+<path d="M-22 -8q2 -22 22 -22t22 20q-22 -9 -44 2z" fill="#191C20"/>
+<path d="M-22 -9q-13 1 -19 7q13 5 20 1z" fill="#191C20"/>
+<rect x="-3" y="-30" width="6" height="6" rx="3" fill="#2A2E2B"/>
+<g class="dizzy">
+<circle cx="0" cy="0" r="40" fill="none"/>
+<path d="M0 -37l2.2 6 6 2.2-6 2.2-2.2 6-2.2-6-6-2.2 6-2.2z" fill="#C0DD97"/>
+<path d="M29 14l1.9 5.2 5.2 1.9-5.2 1.9-1.9 5.2-1.9-5.2-5.2-1.9 5.2-1.9z" fill="#97C459" opacity="0.85"/>
+<path d="M-30 14l1.7 4.6 4.6 1.7-4.6 1.7-1.7 4.6-1.7-4.6-4.6-1.7 4.6-1.7z" fill="#C0DD97" opacity="0.7"/>
+</g>
+</g>
+</g></g>
+
+<g fill="#C0DD97">
+<path class="spk" style="animation-delay:0s" d="M356 128l3 8 8 3-8 3-3 8-3-8-8-3 8-3z"/>
+<path class="spk" style="animation-delay:.5s" d="M612 168l2.4 6.4 6.4 2.4-6.4 2.4-2.4 6.4-2.4-6.4-6.4-2.4 6.4-2.4z"/>
+<path class="spk" style="animation-delay:1.1s" d="M394 300l2 5.4 5.4 2-5.4 2-2 5.4-2-5.4-5.4-2 5.4-2z"/>
+<path class="spk" style="animation-delay:1.7s" d="M584 302l3 8 8 3-8 3-3 8-3-8-8-3 8-3z"/>
+<path class="spk" style="animation-delay:.8s" d="M404 58l2 5.4 5.4 2-5.4 2-2 5.4-2-5.4-5.4-2 5.4-2z"/>
+<path class="spk" style="animation-delay:2.1s" d="M632 250l2 5.4 5.4 2-5.4 2-2 5.4-2-5.4-5.4-2 5.4-2z"/>
+<path class="spk" style="animation-delay:1.4s" d="M340 216l2.4 6.4 6.4 2.4-6.4 2.4-2.4 6.4-2.4-6.4-6.4-2.4 6.4-2.4z"/>
+<path class="spk" style="animation-delay:.3s" d="M560 34l2 5.4 5.4 2-5.4 2-2 5.4-2-5.4-5.4-2 5.4-2z"/>
+<path class="spk" style="animation-delay:1.9s" d="M296 66l2 5.4 5.4 2-5.4 2-2 5.4-2-5.4-5.4-2 5.4-2z"/>
+<path class="spk" style="animation-delay:2.4s" d="M282 330l2 5.4 5.4 2-5.4 2-2 5.4-2-5.4-5.4-2 5.4-2z"/>
+</g>
+
+<g class="float" opacity="0.9">
+<circle cx="624" cy="96" r="3" fill="#97C459"/>
+<circle cx="322" cy="170" r="2.4" fill="#97C459"/>
+<circle cx="600" cy="340" r="2.6" fill="#97C459"/>
+</g>
+
+<rect x="44" y="86" width="3" height="120" rx="1.5" fill="#63A03F"/>
+<text x="62" y="104" font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#97C459" letter-spacing="3">WYDARZENIE · BANER POSTACI</text>
+<text x="60" y="158" font-family="system-ui,sans-serif" font-size="50" font-weight="500" fill="#F2F3EF" letter-spacing="1">Dych Dziki</text>
+<rect x="60" y="172" width="132" height="26" rx="13" fill="#1D5B33" stroke="#97C459" stroke-width="1"/>
+<path d="M74 179h11v11a3 3 0 0 1-3 3h-5a3 3 0 0 1-3-3zM85 181h4a2 2 0 0 1 0 5h-4" fill="none" stroke="#EF9F27" stroke-width="1.6" stroke-linejoin="round"/>
+<text x="96" y="190" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#EAF3DE">Żywioł: piwo</text>
+<text x="202" y="190" font-family="system-ui,sans-serif" font-size="13" fill="#8FA98A">Robot</text>
+<g fill="#EF9F27">
+<path d="M64 210l3.4 7 7.7 1.1-5.6 5.4 1.3 7.6-6.8-3.6-6.8 3.6 1.3-7.6-5.6-5.4 7.7-1.1z"/>
+<path d="M92 210l3.4 7 7.7 1.1-5.6 5.4 1.3 7.6-6.8-3.6-6.8 3.6 1.3-7.6-5.6-5.4 7.7-1.1z"/>
+<path d="M120 210l3.4 7 7.7 1.1-5.6 5.4 1.3 7.6-6.8-3.6-6.8 3.6 1.3-7.6-5.6-5.4 7.7-1.1z"/>
+<path d="M148 210l3.4 7 7.7 1.1-5.6 5.4 1.3 7.6-6.8-3.6-6.8 3.6 1.3-7.6-5.6-5.4 7.7-1.1z"/>
+<path d="M176 210l3.4 7 7.7 1.1-5.6 5.4 1.3 7.6-6.8-3.6-6.8 3.6 1.3-7.6-5.6-5.4 7.7-1.1z"/>
+</g>
+<rect x="58" y="248" width="236" height="46" rx="8" fill="#123C1E" opacity="0.7"/>
+<rect x="58" y="248" width="3" height="46" fill="#97C459"/>
+<text x="74" y="268" font-family="Georgia,serif" font-size="15" font-style="italic" fill="#DDE7CC">„Stoję idealnie prosto.</text>
+<text x="74" y="286" font-family="Georgia,serif" font-size="15" font-style="italic" fill="#DDE7CC">Problem ma chodnik."</text>
+<rect x="58" y="308" width="150" height="30" rx="15" fill="#3B6D11"/>
+<text x="133" y="328" text-anchor="middle" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#EAF3DE" letter-spacing="1">Losuj postać</text>
+<text x="222" y="328" font-family="system-ui,sans-serif" font-size="12" fill="#8FA98A">11.08 – 25.08</text>
+</g>
+<rect x="8" y="8" width="664" height="384" rx="18" fill="none" stroke="#63A03F" stroke-width="1.2" opacity="0.6"/>
+<path d="M20 44V28a8 8 0 0 1 8-8h16M660 44V28a8 8 0 0 0-8-8h-16M20 356v16a8 8 0 0 0 8 8h16M660 356v16a8 8 0 0 1-8 8h-16" fill="none" stroke="#97C459" stroke-width="1.6" opacity="0.75"/>
+</svg>

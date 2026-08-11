@@ -7,6 +7,12 @@ w menu Esc → STEROWANIE.
 **Regeneracja:** podejście do dowolnego **przystanku PKS** leczy całą drużynę do pełna
 (także padniętych) — zielone plusiki i podświetlenie pasków HP.
 
+**Życzenia (v15):** panel `⌚` zamiast paczek. Dwa banery naraz — POSTAĆ i BROŃ —
+z jedną promowaną postacią i jej sygnaturową bronią 5⭐. Waluta to **Złoty Rolex**
+(150💎 = 1 życzenie). Baner stoi **14 dni (2 tygodnie)**, panel pokazuje dni i zegar
+z tykającymi sekundami. Grafikę banera podmieniasz plikiem w `assets/banners/`
+— szczegóły w `assets/banners/README.md`.
+
 Plik do kopiowania „na przyszłość” — otwórz w edytorze i bierz stąd, czego trzeba.
 
 ## Skróty testowe w adresie (bez konsoli)
@@ -56,12 +62,26 @@ Chrome przy pierwszym wklejeniu do konsoli wymaga wpisania `allow pasting`.
 ```js
 const s = JSON.parse(localStorage.getItem('wrpg'));   // podejrzyj zapis
 s.dia = 9999;                                          // diamenty
+s.rolex = 200;                                         // Złote Rolexy = życzenia
+s.pity = 89;                                           // następne życzenie = gwarancja
 s.quests.policja = 0;                                  // 0 = nieodkryty, 1 = w toku, 2 = zrobiony
 localStorage.setItem('wrpg', JSON.stringify(s)); location.reload();
 ```
 
 Klucze zapisu: `quests`, `col` (znajdźki), `mile` (nagrane miejsca), `dych`, `party`,
-`chars` (poziomy), `dia`, `subs`, `region`, `px`/`py`, `domLvl`, `bossLvl`.
+`chars` (poziomy), `dia`, `rolex`, `pity`/`pityW` (gwarancje banerów), `subs`,
+`region`, `px`/`py`, `domLvl`, `bossLvl`.
+
+**Przeskok baneru bez czekania dwóch tygodni** (konsola, F12):
+
+```js
+banOffset = 14*86400;      // +1 baner (kolejny raz: 28*86400, 42*86400, ...)
+bannerChar();              // kto jest teraz promowany
+bannerLeft();              // ile sekund do zmiany
+BANNER_ORDER;              // pełna kolejka: edek, dych, grazynka, jarek, zenek, julka, bogdan
+```
+
+`banOffset` żyje tylko do odświeżenia strony i nie zapisuje się do `wrpg`.
 
 ## Testy automatyczne (bez przeglądarki)
 

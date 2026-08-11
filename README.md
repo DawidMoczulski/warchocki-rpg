@@ -12,7 +12,7 @@ Fanowska parodia z prawdziwymi klipami głosowymi i autorską mechaniką w stylu
 - **6 regionów Polski**: Warszawa, Chodzież, Polskie Morze, Kraków, Tatry, Trasa na Poland Rocka
 - **Domeny** z falami wrogów, strażnikami i muzyką bitewną
 - **6 bossów regionalnych** z arenami i fazami szału (z PANEM LAWETĄ 3000 włącznie)
-- **Gacha „Paczki od Fanów"** — postacie, bronie, artefakty (z systemem pity)
+- **Życzenia** — dwa banery naraz (postać + jej sygnaturowa broń 5★), waluta: Złote Rolexy (150💎), gwarancja na 90. życzeniu
 - **Kanał Edka** — nagrywaj filmiki, zbieraj wyświetlenia i subskrypcje
 - **Seria „SIEMA ODJAZD"** — 5 questów pod rząd: pakujemy graty, łapiemy stopa, ładujemy baterie na stacji,
   łapiemy kampera z przyczepą i jedziemy na pole Poland Rocka (3 nowe minigry)

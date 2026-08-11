@@ -1,7 +1,7 @@
 'use strict';
 /* =====================================================================
    WARCHOCKI RPG v6: WARCHOCKI IMPACT
-   7 grywalnych postaci (żywioły, unikalne ataki) • gacha „Paczki od Fanów”
+   7 grywalnych postaci (żywioły, unikalne ataki) • życzenia z banerów (Złote Rolexy)
    domeny (fale + skrzynie) • bossowie regionalni • ulepszanie postaci
    13 questów • 3 regiony • kanał Edka • prawdziwy głos z YT • Edward FM
    ===================================================================== */
@@ -55,7 +55,7 @@ const DEFAULT_SAVE={dia:25,owned:['was_klasyk','rolex_d'],equip:{mustache:'was_k
   quests:{},col:{},k:{},trip:0,legend:false,px:456,py:368,
   region:'wawa',ch:'edek',dych:0,subs:120,views:0,films:[],mile:{},visited:{wawa:1},
   chars:{edek:{lvl:1,asc:0,con:0,tal:{n:1,e:1,q:1}}},party:['edek'],cons:{},
-  mats:{sr:0,ch:0,di:0},pity:0,domLvl:{},bossLvl:{},
+  mats:{sr:0,ch:0,di:0},pity:0,pityW:0,rolex:0,wish:0,wishW:0,domLvl:{},bossLvl:{},
   gear:{},gearOwn:{kij:1},food:{picie:2},ingr:{}};
 let S=null;
 function loadSave(){
@@ -76,6 +76,13 @@ function loadSave(){
     if(!S.party||!S.party.length)S.party=['edek'];
     if(!S.mats)S.mats={sr:0,ch:0,di:0};
     if(S.pity===undefined)S.pity=0;
+    /* migracja v14 -> v15 (ZŁOTE ROLEXY + BANERY): waluta życzeń i drugi licznik
+       gwarancji (baner broni). Stary zapis dostaje rolexy za niewydane diamenty
+       — nikt nie traci tego, co uzbierał przed zmianą kursu. */
+    if(S.rolex===undefined){S.rolex=Math.min(10,Math.floor((S.dia||0)/300));}
+    if(S.pityW===undefined)S.pityW=0;
+    if(S.wish===undefined)S.wish=0;
+    if(S.wishW===undefined)S.wishW=0;
     if(!S.domLvl)S.domLvl={};
     if(!S.bossLvl)S.bossLvl={};
     // migracja v6 -> v7 (ekwipunek + jedzenie)
@@ -1109,6 +1116,10 @@ function inBossArena(x,y){
 }
 function insideArena(cfg,tx,ty){
   return arenasOf(cfg).some(A=>tx>=A.ai[0]-4&&tx<=A.ai[2]+4&&ty>=A.ai[1]-4&&ty<=A.ai[3]+4);}
+/* DIAMENTY SYPIĄ SIĘ OSZCZĘDNIE (v15): 1 ZŁOTY ROLEX = 150💎 = 1 życzenie, więc
+   każdy diament ma teraz realną wagę. Zwykły mruk daje 1-3💎 zamiast 3-10. */
+const DIA_DROP=.3;
+const diaDrop=n=>n>0?Math.max(1,Math.round(n*DIA_DROP)):0;
 /* ogrodzone pole festiwalowe na TRASIE: żadnych proceduralnych drzew/stawów w środku
    ani na płocie — inaczej generator zarasta pole i wycina dziury w ogrodzeniu */
 function insideFest(tx,ty){return REG==='trasa'&&tx>=4&&tx<=54&&ty>=31&&ty<=51;}
@@ -1899,10 +1910,17 @@ function killFoe(f){
   }
   const td=FOE_TYPES[f.t];
   fxDeath(f.x,f.y-10,td.c||'#8f88b0');
-  S.dia+=td.dia;save();refreshHUD();SFX.dia();
-  addHit(f.x,f.y-8,'+'+td.dia+'💎','#6fd8e8');
-  addViews(td.pts,false);
-  if(td.mini){ // mini-boss: gwarantowane materiały + fanfary
+  /* SŁUGUSY NA ARENIE BOSSA (rój pszczół, przyzwania) NIE SYPIĄ NICZYM.
+     Cała nagroda za walkę czeka na końcu, przy pokonanym bossie — inaczej
+     dałoby się farmić diamenty na samym roju, bez ryzyka. */
+  const sluga=f.swarm||f.summon||inBossArena(f.x,f.y);
+  if(!sluga){
+    const dd=diaDrop(td.dia);
+    if(dd){S.dia+=dd;SFX.dia();addHit(f.x,f.y-8,'+'+dd+'💎','#6fd8e8');}
+    addViews(td.pts,false);
+  }else addViews(Math.round(td.pts*.35),true);   // zasięgi lecą, surowce nie
+  save();refreshHUD();
+  if(td.mini&&!sluga){ // mini-boss: gwarantowane materiały + fanfary
     const mch=3+((Math.random()*2)|0),mdi=Math.random()<.5?1:0;
     S.mats.ch+=mch;if(mdi)S.mats.di+=mdi;save();refreshHUD();
     addHit(f.x,f.y-20,'+'+mch+'⚙️'+(mdi?' +1💠':''),'#b98cf0');
@@ -1919,11 +1937,13 @@ function killFoe(f){
   if(Math.random()<.3&&!curVoice&&S.ch==='edek')vsay(pickA(['c_kopytem','c_ziomali','c_etam']));
   if(S.ch==='dych'&&Math.random()<.4)dychSay();
   else if(Math.random()<.25)charSay();
-  // materiały do ulepszania postaci
-  if(Math.random()<.45){S.mats.sr++;addHit(f.x,f.y+2,'+1🔩','#c9c4dd');}
-  if(Math.random()<.1){S.mats.ch++;addHit(f.x,f.y+10,'+1⚙️','#6fd8e8');}
-  if(Math.random()<.06){const fid=pickA(['picie','paczek','ogorek','zapiekanka']);
-    S.food[fid]=(S.food[fid]||0)+1;addHit(f.x,f.y+18,FOOD[fid].ic,'#7bc950');}
+  // materiały do ulepszania postaci (na arenie bossa — nic, patrz wyżej)
+  if(!sluga){
+    if(Math.random()<.45){S.mats.sr++;addHit(f.x,f.y+2,'+1🔩','#c9c4dd');}
+    if(Math.random()<.1){S.mats.ch++;addHit(f.x,f.y+10,'+1⚙️','#6fd8e8');}
+    if(Math.random()<.06){const fid=pickA(['picie','paczek','ogorek','zapiekanka']);
+      S.food[fid]=(S.food[fid]||0)+1;addHit(f.x,f.y+18,FOOD[fid].ic,'#7bc950');}
+  }
   save();
   foeT=5+Math.random()*6;
 }
@@ -2576,7 +2596,7 @@ function updateFoes(dt){
 /* --- ŻYWIOŁY + REAKCJE (v7) --- */
 const ELEMENTS={
   elegancja:{ic:'💎',n:'ELEGANCJA',col:'#f5c542'},
-  dzikosc:{ic:'🐗',n:'DZIKOŚĆ',col:'#f5a032'},
+  piwo:{ic:'🍺',n:'PIWO',col:'#e8a838'},
   swojskosc:{ic:'🍲',n:'SWOJSKOŚĆ',col:'#7bc950'},
   czas:{ic:'⏱️',n:'CZAS',col:'#6fd8e8'},
   spaw:{ic:'🔥',n:'SPAW',col:'#e04848'},
@@ -2588,26 +2608,34 @@ const REACT={
   'baltyk|spaw':{n:'PARA!',col:'#ece9f4',mul:1.75,aoe:true},
   'baltyk|czas':{n:'SZRON!',col:'#bff0ff',mul:1.25,stun:2.5},
   'czas|spaw':{n:'HARTOWANIE!',col:'#ffb066',mul:2},
-  'dzikosc|spaw':{n:'DZIK NA GRILLU!',col:'#f5a032',mul:1.5,food:'kielbaska'},
-  'baltyk|dzikosc':{n:'BŁOTO!',col:'#8a6a42',mul:1.25,slow:4},
+  'piwo|spaw':{n:'DZIK NA GRILLU!',col:'#f5a032',mul:1.5,food:'kielbaska'},
+  'baltyk|piwo':{n:'BŁOTO!',col:'#8a6a42',mul:1.25,slow:4},
   'elegancja|serca':{n:'OŚWIADCZYNY!',col:'#ffd7ef',mul:1.2,charm:4},
   'elegancja|spaw':{n:'BLING!',col:'#fff7d6',mul:1.35,stun:2},
   'baltyk|swojskosc':{n:'ZUPA RYBNA!',col:'#7bc950',mul:1.25,heal:.15},
   'spaw|swojskosc':{n:'PRZYPALONE!',col:'#e04848',mul:1.3,burn:4},
-  'dzikosc|serca':{n:'DZIKA MIŁOŚĆ!',col:'#e88ac8',mul:1.2,charm:3},
-  'dzikosc|elegancja':{n:'SZOK KULTUROWY!',col:'#f5c542',mul:1.4,kb:2.2},
+  'piwo|serca':{n:'DZIKA MIŁOŚĆ!',col:'#e88ac8',mul:1.2,charm:3},
+  'piwo|elegancja':{n:'SZOK KULTUROWY!',col:'#f5c542',mul:1.4,kb:2.2},
   'czas|serca':{n:'NOSTALGIA...',col:'#c9c4dd',mul:1.2,stun:2},
   'czas|swojskosc':{n:'OBIAD U BABCI!',col:'#7bc950',mul:1.2,heal:.1,slow:3},
-  'czas|dzikosc':{n:'PRADAWNY INSTYNKT!',col:'#f5a032',mul:1.5},
+  'czas|piwo':{n:'PRADAWNY INSTYNKT!',col:'#f5a032',mul:1.5},
   'elegancja|swojskosc':{n:'NIEDZIELNY ROSÓŁ!',col:'#f5c542',mul:1.25,heal:.1},
   'baltyk|elegancja':{n:'PERŁA!',col:'#ece9f4',mul:1.45},
   'baltyk|serca':{n:'ŁZY SZCZĘŚCIA!',col:'#bff0ff',mul:1.3},
   'serca|spaw':{n:'GORĄCY ROMANS!',col:'#ff8aa8',mul:1.5},
   'serca|swojskosc':{n:'PRZEZ ŻOŁĄDEK DO SERCA!',col:'#e88ac8',mul:1.2,charm:3},
-  'dzikosc|swojskosc':{n:'SCHABOWY!',col:'#c9944a',mul:1.4,food:'schabowy'},
+  'piwo|swojskosc':{n:'SCHABOWY!',col:'#c9944a',mul:1.4,food:'schabowy'},
   'czas|elegancja':{n:'ZABYTEK!',col:'#f5c542',mul:1.45},
 };
 const reactKey=(a,b)=>[a,b].sort().join('|');
+/* Klucze REACT MUSZĄ być posortowane alfabetycznie, bo tak je składa `reactKey`.
+   Przy zmianie nazwy żywiołu (dzikosc → piwo) kolejność w parze potrafi się
+   odwrócić i reakcja po cichu przestaje działać — dlatego normalizujemy klucze
+   raz przy starcie zamiast pilnować ich ręcznie. */
+for(const k of Object.keys(REACT)){
+  const s=reactKey.apply(null,k.split('|'));
+  if(s!==k){REACT[s]=REACT[k];delete REACT[k];}
+}
 
 const CHARS={
   edek:{n:'Edward Warchocki',elId:'elegancja',star:5,
@@ -2616,37 +2644,37 @@ const CHARS={
     spcN:'BŁYSK ROLEXA',spcCd:12,spcD:'oślepia wszystkich wrogów na ekranie',
     hitTxt:['ŁUP!','BAM!','Z KOPYTA!'],
     desc:'Pierwszy polski robot-influencer. Rolex, wąs, zasięgi.',how:'START'},
-  dych:{n:'Dych Dziki',elId:'dzikosc',star:5,
+  dych:{n:'Dych Dziki',elId:'piwo',star:5,
     idleV:['d_siemanko','d_wariacie','d_mordeczko','d_lecimy'],
     spd:95,batk:30,rng:26,atk:'melee',
     spcN:'DZIKA SZARŻA',spcCd:5,spcD:'taranuje wszystko na swojej drodze',
     hitTxt:['DZIKO!','ŁUBUDU!','BZZT!'],
-    desc:'Drugi robot z YT. Na mieście kręci się, w głowie ma ogień.',how:'QUEST nad Polskim Morzem'},
+    desc:'Drugi robot z YT. Na mieście kręci się, w głowie ma ogień.',how:'⌚ Życzenia — własny baner'},
   grazynka:{n:'Grażynka 3000',elId:'swojskosc',star:4,
     spd:80,batk:20,rng:27,atk:'melee',
     spcN:'GORĄCY ROSÓŁ',spcCd:18,spcD:'leczy 50% HP i parzy wrogów parą',
     hitTxt:['CHOCHLĄ!','A ZUPKA?','SIO!'],
-    desc:'Robotka-kucharka, streamuje obiady. Chochla pierwszej klasy.',how:'🎁 Paczki od Fanów'},
+    desc:'Robotka-kucharka, streamuje obiady. Chochla pierwszej klasy.',how:'⌚ Życzenia — własny baner'},
   jarek:{n:'Jarek Zegarek',elId:'czas',star:4,
     spd:82,batk:21,rng:23,atk:'melee',slow:3,
     spcN:'STOP-KLATKA',spcCd:14,spcD:'zatrzymuje czas — wrogowie zwalniają na 6 s',
     hitTxt:['TIK!','TAK!','PUNKTUALNIE!'],
-    desc:'Jubiler od rolexa Edka. Czas działa dla niego.',how:'🎁 Paczki od Fanów'},
+    desc:'Jubiler od rolexa Edka. Czas działa dla niego.',how:'⌚ Życzenia — własny baner'},
   zenek:{n:'Zenek Spawacz',elId:'spaw',star:4,
     spd:78,batk:23,rng:21,atk:'melee',burn:3,
     spcN:'PALNIK 3000°C',spcCd:10,spcD:'stożek ognia — podpala wrogów',
     hitTxt:['PSSST!','BZZZT!','SPAW!'],
-    desc:'U niego każda blacha dostaje drugie życie.',how:'🎁 Paczki od Fanów'},
+    desc:'U niego każda blacha dostaje drugie życie.',how:'⌚ Życzenia — własny baner'},
   julka:{n:'Julka z Tindera',elId:'serca',star:4,
     spd:88,batk:19,rng:80,atk:'proj',
     spcN:'ZAUROCZENIE',spcCd:16,spcD:'3 wrogów zakochuje się i walczy po Twojej stronie',
     hitTxt:['CMOK!','MATCH!'],
-    desc:'Przyjaźń na zawsze. Serduszka lecą jak lajki.',how:'🎁 Paczki od Fanów'},
+    desc:'Przyjaźń na zawsze. Serduszka lecą jak lajki.',how:'⌚ Życzenia — własny baner'},
   bogdan:{n:'Rybak Bogdan',elId:'baltyk',star:4,
     spd:76,batk:26,rng:95,atk:'proj',
     spcN:'FALA BAŁTYCKA',spcCd:12,spcD:'fala zmiata i odrzuca wszystkich wrogów',
     hitTxt:['DORSZ!','PLASK!'],
-    desc:'Rzuca dorszem celniej niż niejeden bramkarz.',how:'🎁 Paczki od Fanów'},
+    desc:'Rzuca dorszem celniej niż niejeden bramkarz.',how:'⌚ Życzenia — własny baner'},
 };
 for(const c of Object.values(CHARS)){const e=ELEMENTS[c.elId];c.el=e.ic;c.elN=e.n;c.col=e.col;c.hitCol=e.col;}
 
@@ -2662,10 +2690,20 @@ const WEAPONS={
   mikrofon:{n:'Złoty Mikrofon Żabsona',star:4,atk:28,sub:{atk:6},ic:'🎤',desc:'Każdy cios wchodzi z flow.'},
   ciupaga:{n:'Ciupaga Bacy',star:4,atk:32,sub:{cd:30},ic:'🪓',desc:'Góralska precyzja.'},
   hejnal:{n:'Trąbka Hejnalisty',star:4,atk:29,sub:{hp:80},ic:'🎺',desc:'Urwana w połowie... ciosu.'},
+  /* --- 5★: WYŁĄCZNIE Z BANERU BRONI (nigdy z paczek/banera postaci) ---
+     Każda postać ma swoją sygnaturę — to ona trafia na baner razem z nią. */
   rolexM:{n:'ROLEX BOJOWY',star:5,atk:40,sub:{cd:50},ic:'⌚',desc:'Z diamentami. Za filmik na TikToku.'},
+  butelkaD:{n:'Butelka Dzikiego',star:5,atk:42,sub:{atk:8},ic:'🍾',desc:'Ciemnozielona, dwulitrowa. Dych nią nie pije — nią bierze z kopyta.'},
+  chochlaZ:{n:'Złota Chochla 5000',star:5,atk:36,sub:{hp:140},ic:'🥄',desc:'Rosół z niej stawia na nogi nawet blachę.'},
+  wahadloC:{n:'Wahadło Czasu',star:5,atk:39,sub:{cd:55},ic:'⏳',desc:'Tik. Tak. I już po hejterze.'},
+  palnikA:{n:'Palnik Atomowy',star:5,atk:43,sub:{def:16},ic:'⚡',desc:'Zenek mówi krótko: TEGO to już nie zgasisz.'},
+  lukA:{n:'Łuk Amora z Tindera',star:5,atk:37,sub:{cd:48},ic:'💘',desc:'Strzela serduszkami. Boli jak match z byłą.'},
   dorszM:{n:'Legendarny Dorsz-Miecz',star:5,atk:44,sub:{cd:40},ic:'🐟',desc:'Wykuty w smażalni, hartowany w Bałtyku.'},
-  wasP:{n:'Wąs Przeznaczenia',star:5,atk:38,sub:{hp:120},ic:'〰️',desc:'Widać go z kosmosu. Czuć jego moc.'},
+  wasP:{n:'Wąs Przeznaczenia',star:5,atk:38,sub:{hp:120},ic:'〰️',desc:'Widać go z kosmosu. Czuć jego moc. Nie promuje go żaden baner.'},
 };
+/* BROŃ SYGNATUROWA — baner broni zawsze pokazuje sygnaturę postaci z banera postaci */
+const SIG_WEAP={edek:'rolexM',dych:'butelkaD',grazynka:'chochlaZ',jarek:'wahadloC',
+  zenek:'palnikA',julka:'lukA',bogdan:'dorszM'};
 /* --- ARTEFAKTY: 3 sloty (0=TALIZMAN, 1=BIŻUTERIA, 2=GADŻET) --- */
 const ART_SLOTS=['🧿 TALIZMAN','💍 BIŻUTERIA','🎽 GADŻET'];
 const ARTS={
@@ -2765,7 +2803,7 @@ function gearStats(id){
   return{hp,atk,def,cd};
 }
 /* --- KONSTELACJE: 6 stopni, ostatni jest inny dla każdej postaci ---------
-   Duplikat z paczki = GWIAZDA FORTUNY (`S.cons[id]`), którą odpalasz kolejny
+   Duplikat z życzeń = GWIAZDA FORTUNY (`S.cons[id]`), którą odpalasz kolejny
    stopień. C1-C5 to wspólna drabinka (żeby dało się je uczciwie policzyć w
    statystykach), C6 to autorska sztuczka wpięta w `trySpecial`. */
 const CON_LADDER=[
@@ -2978,7 +3016,9 @@ function switchTo(id){
 }
 function switchChar(){
   if(S.party.length<2){
-    toast(S.chars.dych?'🎴 Dobierz drużynę w panelu POSTACIE!':'🔒 Dych Dziki czeka nad POLSKIM MORZEM (jedź PKS-em)!');
+    toast(Object.keys(S.chars).length>1
+      ?'🎴 Dobierz drużynę w panelu POSTACIE!'
+      :'🔒 Sam jesteś w ekipie! Ziomali wywishujesz z baneru — panel ⌚ ŻYCZENIA.');
     return;
   }
   /* [C] przeskakuje do następnej PRZYTOMNEJ postaci — pomijamy padniętych,
@@ -3554,7 +3594,11 @@ const BOSS_DROP={krol:['art','kiel'],mdres:['weap','kettle'],kraken:['art','kolc
 function bossDefeated(f){
   const id=f.bid,lvl=S.bossLvl[id]||0;
   const di=1+(lvl>=2?1:0),ch=6+lvl*2,dd=60+lvl*25;
-  S.mats.di+=di;S.mats.ch+=ch;S.dia+=dd;S.bossLvl[id]=lvl+1;
+  /* CAŁA nagroda za arenę jest TUTAJ — sługusy po drodze nie sypią niczym.
+     Pierwsze przejście daje ZŁOTEGO ROLEXA (darmowe życzenie), a potem co
+     trzecia powtórka — bossowie to jedyne powtarzalne źródło rolexów. */
+  const rx=(lvl===0||lvl%3===0)?1:0;
+  S.mats.di+=di;S.mats.ch+=ch;S.dia+=dd;S.rolex=(S.rolex||0)+rx;S.bossLvl[id]=lvl+1;
   const drop=BOSS_DROP[id];
   if(drop&&!S.gearOwn[drop[1]]){
     S.gearOwn[drop[1]]=1;
@@ -3566,23 +3610,70 @@ function bossDefeated(f){
   stopBossMusic();                 // motyw areny milknie razem z bossem
   worldFlash=.8;burstConfetti();burstConfetti();SFX.buy();
   addHit(f.x,f.y-20,'BOSS DOWN!','#f5c542');
-  toast('👑 POKONANY: '+f.bn+'!<br>+'+di+'💠 +'+ch+'⚙️ +'+dd+'💎',4200);
+  toast('👑 POKONANY: '+f.bn+'!<br>+'+di+'💠 +'+ch+'⚙️ +'+dd+'💎'+(rx?' +'+rx+'⌚ ZŁOTY ROLEX':''),4200);
   addViews(30000+lvl*15000,false);
   setTimeout(()=>postFilm(BOSSES[id].film,80000),1600);
   vsay(id==='klaunica'?pickA(['c_swietnie','c_donamiotu','v_elegancko']):'v_elegancko');
 }
 
 /* =====================================================================
-   GACHA: PACZKI OD FANÓW + ULEPSZANIE POSTACI
+   ŻYCZENIA: ZŁOTE ROLEXY + BANERY  (v15)
+   ---------------------------------------------------------------------
+   Koniec „paczek od fanów”. Są dwa banery, dokładnie jak w Genshinie:
+     • BANER POSTACI — w danej chwili promowana jest DOKŁADNIE JEDNA postać
+       (Dycha też trzeba teraz wywishować). Gwarancja pada na 90. życzeniu,
+       a od 70. szansa rośnie bardzo mocno — to „miękka gwarancja”.
+     • BANER BRONI  — sygnaturowa 5★ broń tej samej postaci. To JEDYNE
+       miejsce, w którym w ogóle wypada broń 5★; z banera postaci NIGDY.
+   Walutą jest ZŁOTY ROLEX: 150💎 za sztukę, 1 rolex = 1 życzenie.
+   Banery rotują co BANNER_LEN sekund realnego czasu, panel odlicza sekundy.
    ===================================================================== */
-const GACHA_POOL=['grazynka','jarek','zenek','julka','bogdan'];
-const PULL_COST=40,PULL10_COST=360,PITY_AT=10;
-function rollOne(){
-  S.pity++;
-  const isChar=S.pity>=PITY_AT||Math.random()<.15;
-  if(isChar){
+const ROLEX_COST=150;
+const BANNER_LEN=14*24*3600;                 // 14 dni (2 tygodnie) na jeden baner
+/* START ROTACJI: 11.08.2026, północ czasu polskiego (CEST = UTC+2). Od tego dnia
+   przez 14 dni stoi DYCH DZIKI, potem kolejka leci dalej po liście. */
+const BANNER_T0=Date.UTC(2026,7,10,22,0,0)/1000;
+const BANNER_ORDER=['dych','edek','grazynka','jarek','zenek','julka','bogdan'];
+const PITY_HARD=90,PITY_SOFT=70,CHAR_BASE=.03;     // baner postaci
+const WPITY_HARD=80,WPITY_SOFT=60,WEAP_BASE=.06;   // baner broni
+/* łupy z bossów — nie mają czego szukać w życzeniach */
+const BOSS_ONLY=['kiel','kettle','kolczykK','luska','ciupaga','hakL','rogiK','koronaP'];
+/* PRZESUNIĘCIE ZEGARA — tylko do testów. W konsoli `banOffset=14*86400` przeskakuje
+   na następny baner bez czekania dwóch tygodni. W grze zawsze 0. */
+let banOffset=0;
+const banNow=()=>Math.floor(Date.now()/1000)+banOffset;
+/* modulo dodatnie — gdyby ktoś miał zegar cofnięty przed start rotacji */
+const modP=(a,m)=>((a%m)+m)%m;
+const bannerSlot=()=>Math.floor((banNow()-BANNER_T0)/BANNER_LEN);
+const bannerAt=k=>BANNER_ORDER[modP(k,BANNER_ORDER.length)];
+const bannerChar=()=>bannerAt(bannerSlot());
+const bannerNext=()=>bannerAt(bannerSlot()+1);
+const bannerWeap=()=>SIG_WEAP[bannerChar()];
+const bannerLeft=()=>BANNER_LEN-modP(banNow()-BANNER_T0,BANNER_LEN);
+/* szansa na 5★: płasko do progu, potem stromo w górę, na twardej gwarancji 100% */
+const charChance=p=>p>=PITY_HARD?1:p>=PITY_SOFT?Math.min(1,CHAR_BASE+.09*(p-PITY_SOFT+1)):CHAR_BASE;
+const weapChance=p=>p>=WPITY_HARD?1:p>=WPITY_SOFT?Math.min(1,WEAP_BASE+.10*(p-WPITY_SOFT+1)):WEAP_BASE;
+
+/* KONSOLACJA — to, co wypada, kiedy 5★ nie trafi. Nigdy nie ma tu nic 5★. */
+function rollFiller(weapBan){
+  const r=Math.random();
+  if(r<(weapBan?.34:.22)){
+    const pool=Object.keys(WEAPONS).concat(Object.keys(ARTS))
+      .filter(k=>!S.gearOwn[k]&&!BOSS_ONLY.includes(k)
+        &&(WEAPONS[k]||ARTS[k]).star<5&&(!weapBan||!!WEAPONS[k]));
+    if(pool.length){const gid=pickA(pool);S.gearOwn[gid]=1;return{t:'gear',id:gid};}
+    S.mats.ch+=4;return{t:'ch',n:4};
+  }
+  if(r<.55){const n=5+((Math.random()*8)|0);S.mats.sr+=n;return{t:'sr',n};}
+  if(r<.82){const n=2+((Math.random()*4)|0);S.mats.ch+=n;return{t:'ch',n};}
+  if(r<.9){S.mats.di+=1;return{t:'di',n:1};}
+  const n=4+((Math.random()*7)|0);S.dia+=n;return{t:'dia',n};
+}
+function rollChar(){
+  S.pity++;S.wish=(S.wish||0)+1;
+  if(Math.random()<charChance(S.pity)){
     S.pity=0;
-    const id=pickA(GACHA_POOL);
+    const id=bannerChar();
     if(!S.chars[id]){
       S.chars[id]=newChar();
       if(S.party.length<3)S.party.push(id);
@@ -3591,71 +3682,211 @@ function rollOne(){
     /* DUPLIKAT = GWIAZDA FORTUNY: zasób na KONSTELACJĘ tej konkretnej postaci
        (dokładnie jak w Genshinie). Przy komplecie C6 zamienia się w materiały. */
     const d=S.chars[id];
-    if((d.con||0)>=6&&!(S.cons[id]>0)){S.mats.ch+=12;S.mats.di+=1;
+    if((d.con||0)>=6&&!(S.cons[id]>0)){S.mats.ch+=12;S.mats.di+=1;S.rolex=(S.rolex||0)+1;
       return{t:'char',id,dup:true,maxed:true};}
     S.cons[id]=(S.cons[id]||0)+1;S.mats.ch+=5;
     return{t:'char',id,dup:true};
   }
-  const r=Math.random();
-  if(r<.22){ // sprzęt: broń albo artefakt
-    const bossOnly=['kiel','kettle','kolczykK','luska','ciupaga','hakL','rogiK'];
-    const g5=['rolexM','wasP','dorszM'].filter(k=>!S.gearOwn[k]);
-    const pool=Object.keys(WEAPONS).concat(Object.keys(ARTS))
-      .filter(k=>!S.gearOwn[k]&&!bossOnly.includes(k)&&!g5.includes(k));
-    let gid=null;
-    if(g5.length&&Math.random()<.08)gid=pickA(g5);
-    else if(pool.length)gid=pickA(pool);
-    else if(g5.length)gid=pickA(g5);
-    if(gid){S.gearOwn[gid]=1;return{t:'gear',id:gid};}
-    S.mats.ch+=4;return{t:'ch',n:4};
-  }
-  if(r<.55){const n=5+((Math.random()*8)|0);S.mats.sr+=n;return{t:'sr',n};}
-  if(r<.82){const n=2+((Math.random()*4)|0);S.mats.ch+=n;return{t:'ch',n};}
-  if(r<.9){S.mats.di+=1;return{t:'di',n:1};}
-  const n=8+((Math.random()*13)|0);S.dia+=n;return{t:'dia',n};
+  return rollFiller(false);
 }
-function doPull(n){
-  const cost=n===10?PULL10_COST:PULL_COST;
-  if(S.dia<cost){SFX.no();toast('Za mało diamentów! Rób questy i domeny, byku 💎');return;}
-  S.dia-=cost;
-  const res=[];for(let i=0;i<n;i++)res.push(rollOne());
+function rollWeap(){
+  S.pityW=(S.pityW||0)+1;S.wishW=(S.wishW||0)+1;
+  if(Math.random()<weapChance(S.pityW)){
+    S.pityW=0;
+    const sig=bannerWeap();
+    let id=sig;
+    /* 25%: kapsuła wypluwa INNĄ broń 5★ zamiast promowanej — jak w Genshinie */
+    if(Math.random()<.25){
+      const inne=Object.keys(WEAPONS).filter(k=>WEAPONS[k].star>=5&&k!==sig);
+      if(inne.length)id=pickA(inne);
+    }
+    if(S.gearOwn[id]){S.mats.di+=2;S.mats.ch+=15;return{t:'gear5',id,dup:true};}
+    S.gearOwn[id]=1;return{t:'gear5',id};
+  }
+  return rollFiller(true);
+}
+function doWish(n,ban){
+  if((S.rolex||0)<n){SFX.no();
+    toast('Brakuje ZŁOTYCH ROLEXÓW ⌚<br>Jeden kosztuje '+ROLEX_COST+'💎 — dokup je niżej.');return;}
+  S.rolex-=n;
+  const res=[];for(let i=0;i<n;i++)res.push(ban==='weap'?rollWeap():rollChar());
   save();refreshHUD();
   if(res.some(r=>r.t==='char'&&r.nw)){burstConfetti();vsay('c_elegancko2');SFX.buy();}
+  else if(res.some(r=>r.t==='gear5'&&!r.dup)){burstConfetti();vsay('c_rolextiktok');SFX.buy();}
   else SFX.gacha();
   renderGacha(res);
+}
+function buyRolex(n){
+  const cost=ROLEX_COST*n;
+  if(S.dia<cost){SFX.no();toast('Za mało diamentów! Bossowie, questy i domeny, byku 💎');return;}
+  S.dia-=cost;S.rolex=(S.rolex||0)+n;save();refreshHUD();SFX.buy();
+  toast('⌚ +'+n+' ZŁOTY'+(n>1?'CH':'')+' ROLEX'+(n>1?'ÓW':'')+'! No i elegancko.');
+  renderGacha(null);
 }
 function gresHtml(r,i){
   const d='style="animation-delay:'+(i*.12)+'s"';
   if(r.t==='char'){
     const c=CHARS[r.id];
     if(r.nw)return'<div class="gres char" '+d+'><span class="gbig">'+c.el+'</span>⭐ NOWA POSTAĆ!<br><b>'+c.n+'</b></div>';
-    if(r.maxed)return'<div class="gres dup" '+d+'><span class="gbig">'+c.el+'</span>'+c.n+'<br>C6 KOMPLET → +12⚙️ +1💠</div>';
+    if(r.maxed)return'<div class="gres dup" '+d+'><span class="gbig">'+c.el+'</span>'+c.n+'<br>C6 KOMPLET → +12⚙️ +1💠 +1⌚</div>';
     return'<div class="gres dup" '+d+'><span class="gbig">⭐</span>'+c.n+'<br>+1 GWIAZDA FORTUNY<br><i style="font-size:8px">→ KONSTELACJE (+5⚙️)</i></div>';
+  }
+  if(r.t==='gear5'){
+    const it=WEAPONS[r.id];
+    if(r.dup)return'<div class="gres dup" '+d+'><span class="gbig">'+it.ic+'</span>'+it.n+'<br>MASZ JUŻ → +15⚙️ +2💠</div>';
+    return'<div class="gres char" '+d+'><span class="gbig">'+it.ic+'</span>🗡 BROŃ ⭐⭐⭐⭐⭐<br><b>'+it.n+'</b></div>';
   }
   if(r.t==='gear'){
     const it=WEAPONS[r.id]||ARTS[r.id];
     const kind=WEAPONS[r.id]?'🗡 BROŃ':ART_SLOTS[ARTS[r.id].slot];
-    const cls=it.star>=5?'char':'dup';
-    return'<div class="gres '+cls+'" '+d+'><span class="gbig">'+it.ic+'</span>'+kind+' '+'★'.repeat(it.star)+'<br><b>'+it.n+'</b></div>';
+    return'<div class="gres dup" '+d+'><span class="gbig">'+it.ic+'</span>'+kind+' '+'⭐'.repeat(it.star)+'<br><b>'+it.n+'</b></div>';
   }
   const map={sr:['🔩','śrubki'],ch:['⚙️','mikroczipy'],di:['💠','Diament do Rolexa'],dia:['💎','diamenty']};
   const[ic,nm]=map[r.t];
   return'<div class="gres" '+d+'><span class="gbig">'+ic+'</span>+'+r.n+' '+nm+'</div>';
 }
+/* ---- GRAFIKA BANERU ------------------------------------------------------
+   Najpierw próbujemy `assets/banners/<postać>.png` (albo `<postać>_w.png` dla
+   banera broni) — wystarczy wrzucić plik i podmienia się sam. Gdy pliku nie ma,
+   rysujemy zapasowy splash na canvasie: promienie żywiołu + postać w pikselach. */
+const BAN_IMG={};                            // klucz -> 2, jeśli pliku brak
+/* Kolejność prób: .svg (animowany, skaluje się bez utraty ostrości), potem .png.
+   Animacje CSS zaszyte W ŚRODKU pliku SVG działają także przez <img>. */
+const BAN_EXT=['svg','png'];
+const banKey=(id,wep,e)=>id+(wep?'_w':'')+'.'+e;
+const banFileList=(id,wep)=>BAN_EXT.map(e=>banKey(id,wep,e)).filter(k=>BAN_IMG[k]!==2);
+const banFile=k=>'assets/banners/'+k;
+function drawBannerArt(id,wep){
+  const cv=$('banCv');if(!cv||!cv.getContext)return;
+  const g=cv.getContext('2d');g.imageSmoothingEnabled=false;
+  const c=CHARS[id],el=ELEMENTS[c.elId],W2=cv.width,H2=cv.height;
+  const gr=g.createLinearGradient(0,0,0,H2);
+  gr.addColorStop(0,'#140f28');gr.addColorStop(.55,'#241a44');gr.addColorStop(1,el.col);
+  g.fillStyle=gr;g.fillRect(0,0,W2,H2);
+  g.save();g.globalAlpha=.13;g.fillStyle='#fff7d6';           // promienie z centrum
+  for(let i=0;i<14;i++){g.save();g.translate(W2*.5,H2*.66);g.rotate(i*.449+anim*.08);
+    g.beginPath();g.moveTo(0,0);g.lineTo(900,-40);g.lineTo(900,40);g.closePath();g.fill();g.restore();}
+  g.restore();
+  g.save();g.globalAlpha=.5;g.strokeStyle=el.col;g.lineWidth=5;   // krąg pod nogami
+  g.beginPath();g.ellipse(W2*.5,H2-34,124,36,0,0,7);g.stroke();g.restore();
+  if(wep){                                                    // baner broni: broń na wierzchu
+    g.save();g.translate(W2*.5+120,H2-34);g.scale(6.6,6.6);g.translate(-8,-26);
+    g.globalAlpha=.75;drawCharBody(g,id,0,0,0,0);g.restore();
+    const w=WEAPONS[bannerWeap()];
+    g.save();g.globalAlpha=.22;g.fillStyle='#f5c542';
+    g.beginPath();g.arc(W2*.34,H2*.5,112,0,7);g.fill();g.restore();
+    g.font='140px serif';g.textAlign='center';g.textBaseline='middle';
+    g.fillText(w.ic,W2*.34,H2*.5);
+    g.textAlign='left';g.textBaseline='alphabetic';
+  }else{
+    g.save();g.translate(W2*.5,H2-34);g.scale(9,9);g.translate(-8,-26);
+    drawCharBody(g,id,0,0,0,Math.floor(anim*1.6)%2);g.restore();
+  }
+  g.save();g.globalAlpha=.55;g.fillStyle='#fff7d6';            // iskierki
+  for(let i=0;i<24;i++){const a=(i*2.4+anim*.5)%6.28,r=80+((i*61)%240);
+    g.fillRect(W2*.5+Math.cos(a)*r*1.4,H2*.55+Math.sin(a)*r*.6,4,4);}
+  g.restore();
+}
+/* ---- PANEL ŻYCZEŃ -------------------------------------------------------- */
+let gachaTab='char',gachaTick=0;
+const pad2=n=>('0'+n).slice(-2);
+/* baner stoi 2 tygodnie, więc same sekundy byłyby nieczytelne — pokazujemy dni
+   i zegar, ale sekundy tykają co tyknięcie, tak jak w prawdziwej gachy */
+const fmtLeft=s=>(s>=86400?Math.floor(s/86400)+(Math.floor(s/86400)===1?' DZIEŃ ':' DNI '):'')
+  +pad2(Math.floor(s%86400/3600))+':'+pad2(Math.floor(s%3600/60))+':'+pad2(s%60);
 function renderGacha(res){
-  $('gachaDia').textContent='💎 '+S.dia;
-  const owned=GACHA_POOL.filter(id=>S.chars[id]).length;
-  let html='<p style="font-size:11px;line-height:1.9;margin:6px 0">Fani wysyłają Edkowi paczki!<br>W środku: <b style="color:var(--gold)">nowe postacie</b> ('+owned+'/'+GACHA_POOL.length+'), 🗡 <b style="color:var(--gold)">bronie i artefakty</b>, 🔩⚙️💠 materiały.</p>'+
-    '<p class="pity">GWARANTOWANA POSTAĆ za '+(PITY_AT-S.pity)+' paczek!<br>duplikat = ⭐ GWIAZDA FORTUNY → KONSTELACJA tej postaci</p>'+
+  const wep=gachaTab==='weap';
+  const id=bannerChar(),c=CHARS[id],w=WEAPONS[bannerWeap()];
+  $('gachaDia').innerHTML='💎 '+S.dia+' · <b style="color:var(--gold)">⌚'+(S.rolex||0)+'</b>';
+  const pity=wep?(S.pityW||0):(S.pity||0);
+  const hard=wep?WPITY_HARD:PITY_HARD,soft=wep?WPITY_SOFT:PITY_SOFT;
+  const doSoft=Math.max(0,soft-pity),doHard=hard-pity;
+  const d=S.chars[id],mam=!!d,con=d?(d.con||0):0;
+  const pliki=banFileList(id,wep);          // .svg → .png → (brak) rysowany fallback
+  const stan=wep
+    ?(S.gearOwn[bannerWeap()]?'<b style="color:var(--green)">MASZ JUŻ TĘ BROŃ</b>':'<b style="color:var(--gold)">JESZCZE JEJ NIE MASZ</b>')
+    :(mam?'<b style="color:var(--green)">MASZ — C'+con+'</b>'+(S.cons[id]?'<br><b style="color:var(--cyan)">'+S.cons[id]+'⭐ GWIAZD FORTUNY do wydania</b>':'')
+        :'<b style="color:var(--gold)">JESZCZE JEJ NIE MASZ</b>');
+  let html=
+    '<div class="banTabs">'+
+      '<button class="banTab'+(wep?'':' on')+'" data-ban="char">🎴 POSTAĆ</button>'+
+      '<button class="banTab'+(wep?' on':'')+'" data-ban="weap">🗡 BROŃ</button>'+
+    '</div>'+
+    '<div class="banArt">'+
+      '<canvas id="banCv" width="680" height="400"></canvas>'+
+      (pliki.length?'<img id="banImg" src="'+banFile(pliki[0])+'" alt="">':'')+
+      '<div class="banTag">'+(wep?'🗡 SYGNATURA':'🎴 PROMOWANA')+'</div>'+
+    '</div>'+
+    '<div class="banName">'+
+      '<span class="banStar">'+'⭐'.repeat(wep?w.star:c.star)+'</span>'+
+      '<b>'+(wep?w.ic+' '+w.n:c.el+' '+c.n)+'</b>'+
+      '<i>'+(wep?'ATK +'+w.atk+' · '+w.desc:c.elN+' · '+c.desc)+'</i>'+
+      '<span class="banHave">'+stan+'</span>'+
+    '</div>'+
+    '<div class="banTime">⏳ KONIEC BANERU ZA<br><b id="banSec">'+fmtLeft(bannerLeft())+'</b><br>'+
+      '<i id="banClock">'+bannerLeft()+' sekund · baner trwa 14 dni</i><br>'+
+      '<i>potem wchodzi: '+CHARS[bannerNext()].el+' '+CHARS[bannerNext()].n+'</i></div>'+
+    '<p class="pity">'+
+      (doSoft>0
+        ?'SZANSA MOCNO ROŚNIE od '+soft+'. życzenia — zostało '+doSoft
+        :'<b style="color:var(--gold)">MIĘKKA GWARANCJA AKTYWNA</b> — szansa '+Math.round(( wep?weapChance(pity+1):charChance(pity+1))*100)+'%')+
+      '<br>GWARANCJA na '+hard+'. życzeniu — zostało <b>'+doHard+'</b>'+
+      (wep?'<br>75% szans na sygnaturę, 25% na inną broń 5⭐'
+          :'<br>duplikat = ⭐ GWIAZDA FORTUNY → KONSTELACJA tej postaci')+
+    '</p>'+
     '<div class="btnrow">'+
-    '<button class="bigbtn px" style="font-size:12px" id="pull1">🎁 OTWÓRZ 1 (40💎)</button>'+
-    '<button class="bigbtn px" style="font-size:12px" id="pull10">🎁 OTWÓRZ 10 (360💎)</button></div>'+
+      '<button class="bigbtn px" style="font-size:12px" id="wish1">⌚ ŻYCZENIE ×1</button>'+
+      '<button class="bigbtn px" style="font-size:12px" id="wish10">⌚ ŻYCZENIE ×10</button></div>'+
+    '<div class="rolexShop"><b>⌚ ZŁOTY ROLEX</b> — waluta życzeń, '+ROLEX_COST+'💎 za sztukę.<br>'+
+      '<span>Masz: <b>'+(S.rolex||0)+'</b> · 1 rolex = 1 życzenie</span>'+
+      '<div class="btnrow" style="margin-top:8px">'+
+      '<button class="chbtn" id="buyR1">KUP 1 ('+ROLEX_COST+'💎)</button>'+
+      '<button class="chbtn" id="buyR10">KUP 10 ('+ROLEX_COST*10+'💎)</button></div></div>'+
     '<div id="gachaRes">'+(res?res.map(gresHtml).join(''):'')+'</div>';
   $('gachaBody').innerHTML=html;
-  $('pull1').addEventListener('click',()=>{initAudio();doPull(1);});
-  $('pull10').addEventListener('click',()=>{initAudio();doPull(10);});
+  /* brak pliku → zapamiętujemy to i próbujemy następnego rozszerzenia,
+     a jak skończą się wszystkie, zostaje rysowany fallback pod spodem */
+  const im=$('banImg');
+  if(im){let n=0;
+    im.addEventListener('error',()=>{
+      BAN_IMG[pliki[n]]=2;n++;
+      if(n<pliki.length)im.src=banFile(pliki[n]);
+      else im.style.display='none';
+    });
+    /* własna grafika ma już imię, gwiazdki i żywioł wymalowane — nie dublujemy
+       ich pod spodem, zostaje tylko to, czego obrazek nie wie (stan posiadania) */
+    const zdjPowtorke=()=>{const n2=document.querySelector('.banName');
+      if(n2)n2.classList.add('withArt');};
+    if(im.complete&&im.naturalWidth)zdjPowtorke();
+    im.addEventListener('load',zdjPowtorke);}
+  drawBannerArt(id,wep);
+  $('gachaBody').querySelectorAll('[data-ban]').forEach(b=>b.addEventListener('click',()=>{
+    if(gachaTab===b.dataset.ban)return;
+    gachaTab=b.dataset.ban;SFX.open();renderGacha(null);}));
+  $('wish1').addEventListener('click',()=>{initAudio();doWish(1,gachaTab);});
+  $('wish10').addEventListener('click',()=>{initAudio();doWish(10,gachaTab);});
+  $('buyR1').addEventListener('click',()=>{initAudio();buyRolex(1);});
+  $('buyR10').addEventListener('click',()=>{initAudio();buyRolex(10);});
+  /* po życzeniu zjeżdżamy do łupów — baner jest wysoki i wyniki lądują pod spodem */
+  if(res&&res.length)setTimeout(()=>{const r=$('gachaRes');
+    if(r&&r.scrollIntoView)r.scrollIntoView({behavior:'smooth',block:'end'});},80);
 }
-function openGacha(){SFX.open();renderGacha(null);$('gacha').classList.remove('hidden');}
+/* odliczanie do zmiany baneru — sekundy, tak jak w prawdziwej gachy */
+function gachaTimer(){
+  if(gachaTick){clearInterval(gachaTick);gachaTick=0;}
+  let slot=bannerSlot();
+  gachaTick=setInterval(()=>{
+    if(!$('gacha')||$('gacha').classList.contains('hidden')){clearInterval(gachaTick);gachaTick=0;return;}
+    if(bannerSlot()!==slot){slot=bannerSlot();renderGacha(null);
+      toast('🎴 NOWY BANER: '+CHARS[bannerChar()].el+' '+CHARS[bannerChar()].n+'!',3600);return;}
+    const el=$('banSec');if(!el)return;
+    el.textContent=fmtLeft(bannerLeft());
+    const m=$('banClock');if(m)m.textContent=bannerLeft()+' sekund · baner trwa 14 dni';
+    drawBannerArt(bannerChar(),gachaTab==='weap');
+  },500);
+}
+function openGacha(){SFX.open();gachaTab='char';renderGacha(null);
+  $('gacha').classList.remove('hidden');gachaTimer();}
 
 /* --- BUDOWANIE POSTACI: poziom 1-90, wzniesienia, talenty, konstelacje --- */
 const MAXLVL=90;
@@ -3852,7 +4083,7 @@ function cook(r){
 /* ---------------- MENU GRY (Esc): kafle + edycja sterowania ---------------- */
 const MENU_TILES=[
   {ic:'🎴',n:'Postacie',fn:openChars},
-  {ic:'🎁',n:'Paczki',fn:openGacha},
+  {ic:'⌚',n:'Życzenia',fn:openGacha},
   {ic:'🎒',n:'Plecak',fn:openBag},
   {ic:'🧥',n:'Szafa',fn:()=>openFit(false)},
   {ic:'📜',n:'Questy',fn:openQuests},
@@ -3931,7 +4162,7 @@ const BUILD_TABS=[
   {k:'weap',ic:'🗡', n:'BROŃ',          s:'co trzyma w łapach'},
   {k:'tal', ic:'⚡', n:'TALENTY',       s:'ciosy · [E] · [Q]'},
   {k:'art', ic:'🧿', n:'ARTEFAKTY',     s:'3 sloty bonusów'},
-  {k:'con', ic:'⭐', n:'KONSTELACJE',   s:'duplikaty z paczek'},
+  {k:'con', ic:'⭐', n:'KONSTELACJE',   s:'duplikaty z życzeń'},
 ];
 let buildTab='lvl',buildIdle=0,buildT=0,buildRAF=0,buildFx=[],buildShow=-1;
 /* każde kliknięcie w panelu budzi postać z pokazu i resetuje licznik bezczynności */
@@ -4042,7 +4273,7 @@ function paneWeap(id){
   h+=gearRow(id,'w','',{k:'',ic:'✊',n:'GOŁE PIĘŚCI',d:'bez bonusu',on:!g.w});
   const list=Object.keys(S.gearOwn).filter(k=>WEAPONS[k])
     .sort((x,y)=>WEAPONS[y].star-WEAPONS[x].star||WEAPONS[y].atk-WEAPONS[x].atk);
-  if(!list.length)h+='<p style="color:var(--mut)">Pusto! Broń kupisz na bazarze albo wypadnie z 🎁 paczek.</p>';
+  if(!list.length)h+='<p style="color:var(--mut)">Pusto! Broń kupisz na bazarze albo wywishujesz z baneru ⌚.</p>';
   for(const k of list){const w=WEAPONS[k],ho=gearHolder(k);
     h+=gearRow(id,'w',k,{k,ic:w.ic,n:w.n+' '+'★'.repeat(w.star),
       d:'ATK +'+w.atk+(w.sub?' · '+statTxt(w.sub):''),on:g.w===k,ho:ho&&ho!==id?CHARS[ho].n:null});}
@@ -4555,7 +4786,8 @@ function toast(msg,ms){
   clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),ms||2400);
 }
 function refreshHUD(){
-  $('dia').textContent='💎 '+S.dia;$('fitDia').textContent='💎 '+S.dia;
+  $('dia').textContent='💎 '+S.dia+((S.rolex||0)?'  ⌚ '+S.rolex:'');
+  $('fitDia').textContent='💎 '+S.dia;
   $('subs').textContent='👥 '+fmtN(S.subs);
   $('btnChar').textContent=CHARS[S.ch]?CHARS[S.ch].el:'🤖';
   check67(S.dia);
@@ -4875,9 +5107,11 @@ function talkTo(n){
           L(n.n,'Dzięki za info wariacie! Widziałem wszystko na czujnikach — z kopyta ich brałeś!','d_wariacie'),
           L('Edek','Miasto to nie chlew. A kto zaczepia moich ziomali, ten ma problem.','c_problemy'),
           L(n.n,'Od dziś wbijam z Tobą na każdy rejon, byku. Dwa roboty to już gang!','d_lecimy'),
-          L(n.n,'DYCH DZIKI melduje się do szarży. No i elegancko... znaczy: no i DZIKO!'),
-        ],()=>{S.dych=1;S.chars.dych=newChar();addToParty('dych');resetFollowers();save();completeQuest('dych');
-          setTimeout(()=>toast('🦾 DYCH DZIKI W KOLEKCJI I W DRUŻYNIE!<br>Przełączanie: C / 1-2-3 · panel: 🎴',4200),4200);
+          L(n.n,'Tylko wiesz jak jest — żeby ze mną grać, musisz mnie wywishować z baneru. Taki mam kontrakt z fabryką.'),
+          L('Edek','Kontrakt to kontrakt. Poczekam na Twój baner i wyciągnę Cię za wąsy.','c_elegancko2'),
+          L(n.n,'To masz na start całą moją działkę z reklam. Kupisz sobie ZŁOTE ROLEXY i lecisz z życzeniami!'),
+        ],()=>{S.dych=1;S.dia+=900;S.rolex=(S.rolex||0)+3;save();refreshHUD();SFX.dia();completeQuest('dych');
+          setTimeout(()=>toast('💎 DZIAŁKA DYCHA: +900💎 i +3 ⌚ ZŁOTE ROLEXY!<br>Dycha wywishujesz z baneru — panel 🎴 ŻYCZENIA',5400),4200);
           setTimeout(()=>{if(!curVoice)vsay('d_song');},9000);});
         else say([L(n.n,'BZZT... czujniki pokazują jeszcze '+(3-(S.k.dych||0))+' dresiarzy na plaży!')]);
       }
@@ -9520,7 +9754,7 @@ function bootWorld(){
       {who:'Edek',t:'Cała Polska czeka: 18 questów, 6 regionów, hejterzy do pogonienia i mój kanał do wykręcenia. Tapujcie serduszka!',v:'c_serduszka'},
       {who:'Edek',t:'A na krajowej łapiemy z Dychem stopa na POLAND ROCKA. Plan jest prosty: łapiemy stopa i lecimy rozkręcić imprezę!',v:'c_planprosty'},
       {who:'Edek',t:'Cios to SPACJA albo X. Jak hejter podskoczy — z kopyta go!',v:'c_kopytem'},
-      {who:'Edek',t:'Fani wysyłają mi PACZKI 🎁 — w środku nowe postacie do ekipy! Drużyna to max trójka, przełączasz klawiszami 1-2-3.'},
+      {who:'Edek',t:'Ziomali ściągasz ŻYCZENIAMI ⌚ — za ZŁOTE ROLEXY, z baneru. Drużyna to max trójka, przełączasz klawiszami 1-2-3.'},
       {who:'Edek',t:'Na mapach są DOMENY 🌀 z falami hejterów i skrzyniami, a gdzieś czają się BOSSOWIE ⚔️. Materiały z nich ulepszają postacie. No i elegancko.',v:'c_elegancko2'},
     ]);
   }
