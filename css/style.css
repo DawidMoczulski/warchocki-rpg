@@ -99,6 +99,18 @@ h1.px{margin:0;font-size:clamp(20px,4.6vw,36px);color:var(--gold);
   box-shadow:0 5px 0 var(--gold-dim),0 10px 22px rgba(0,0,0,.5)}
 .bigbtn:hover{filter:brightness(1.08)}
 .bigbtn:active{transform:translateY(3px);box-shadow:0 1px 0 var(--gold-dim)}
+/* ŚNIEŻNY przycisk (losowanie życzeń): biały jak śnieg, po najechaniu
+   leciutko jasnofioletowa poświata zamiast złota */
+.bigbtn.snow{background:linear-gradient(180deg,#ffffff,#e8ebf6);color:#2a2340;
+  box-shadow:0 5px 0 #a9aec6,0 10px 22px rgba(0,0,0,.5);
+  transition:background .18s,box-shadow .18s}
+.bigbtn.snow:hover{filter:none;background:linear-gradient(180deg,#ffffff,#f0e9ff);
+  box-shadow:0 5px 0 #a290cc,0 0 18px rgba(185,140,240,.5),0 10px 22px rgba(0,0,0,.5)}
+.bigbtn.snow:active{transform:translateY(3px);box-shadow:0 1px 0 #a290cc}
+/* stylizowana ikonka Złotego Rolexa — skaluje się z tekstem, w którym stoi */
+.rlx{width:1em;height:1em;display:inline-block;vertical-align:-.14em;
+  filter:drop-shadow(0 0 3px rgba(245,197,66,.5))}
+.mtile .mic .rlx{width:1em;height:1em}
 .ghostbtn{font-family:'Press Start 2P',monospace;font-size:clamp(10px,2vw,13px);background:transparent;
   color:var(--pearl);border:2px solid var(--edge);border-radius:10px;padding:12px 17px;cursor:pointer;
   transition:border-color .15s,color .15s}
@@ -203,6 +215,8 @@ h1.px{margin:0;font-size:clamp(20px,4.6vw,36px);color:var(--gold);
 .rolexShop b{color:var(--gold)}
 .rolexShop span{color:var(--mut)}
 .rolexShop .btnrow{display:flex;gap:8px}
+.rolexShop .chbtn{transition:border-color .18s,color .18s,box-shadow .18s}
+.rolexShop .chbtn:hover{border-color:#b98cf0;color:#e6dcff;box-shadow:0 0 14px rgba(185,140,240,.35)}
 #gachaRes{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:14px}
 .gres{background:linear-gradient(170deg,var(--panel2),#221c3e);border:2px solid var(--edge);border-radius:10px;
   padding:11px;min-width:112px;font-size:10px;line-height:1.8;animation:gpop .4s backwards}

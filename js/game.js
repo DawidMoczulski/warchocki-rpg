@@ -2651,32 +2651,32 @@ const CHARS={
     spd:95,batk:30,rng:26,atk:'melee',
     spcN:'DZIKA SZARŻA',spcCd:5,spcD:'taranuje wszystko na swojej drodze',
     hitTxt:['DZIKO!','ŁUBUDU!','BZZT!'],
-    desc:'Drugi robot z YT. Na mieście kręci się, w głowie ma ogień.',how:'⌚ Życzenia — własny baner'},
+    desc:'Drugi robot z YT. Na mieście kręci się, w głowie ma ogień.',how:'Życzenia — własny baner'},
   grazynka:{n:'Grażynka 3000',elId:'swojskosc',star:5,
     spd:80,batk:20,rng:27,atk:'melee',
     spcN:'GORĄCY ROSÓŁ',spcCd:18,spcD:'leczy 50% HP i parzy wrogów parą',
     hitTxt:['CHOCHLĄ!','A ZUPKA?','SIO!'],
-    desc:'Robotka-kucharka, streamuje obiady. Chochla pierwszej klasy.',how:'⌚ Życzenia — własny baner'},
+    desc:'Robotka-kucharka, streamuje obiady. Chochla pierwszej klasy.',how:'Życzenia — własny baner'},
   jarek:{n:'Jarek Zegarek',elId:'czas',star:4,
     spd:82,batk:21,rng:23,atk:'melee',slow:3,
     spcN:'STOP-KLATKA',spcCd:14,spcD:'zatrzymuje czas — wrogowie zwalniają na 6 s',
     hitTxt:['TIK!','TAK!','PUNKTUALNIE!'],
-    desc:'Jubiler od rolexa Edka. Czas działa dla niego.',how:'⌚ Życzenia — własny baner'},
+    desc:'Jubiler od rolexa Edka. Czas działa dla niego.',how:'Życzenia — własny baner'},
   zenek:{n:'Zenek Spawacz',elId:'spaw',star:5,
     spd:78,batk:23,rng:21,atk:'melee',burn:3,
     spcN:'PALNIK 3000°C',spcCd:10,spcD:'stożek ognia — podpala wrogów',
     hitTxt:['PSSST!','BZZZT!','SPAW!'],
-    desc:'U niego każda blacha dostaje drugie życie.',how:'⌚ Życzenia — własny baner'},
+    desc:'U niego każda blacha dostaje drugie życie.',how:'Życzenia — własny baner'},
   julka:{n:'Julka z Tindera',elId:'serca',star:5,
     spd:88,batk:19,rng:80,atk:'proj',
     spcN:'ZAUROCZENIE',spcCd:16,spcD:'3 wrogów zakochuje się i walczy po Twojej stronie',
     hitTxt:['CMOK!','MATCH!'],
-    desc:'Przyjaźń na zawsze. Serduszka lecą jak lajki.',how:'⌚ Życzenia — własny baner'},
+    desc:'Przyjaźń na zawsze. Serduszka lecą jak lajki.',how:'Życzenia — własny baner'},
   bogdan:{n:'Rybak Bogdan',elId:'baltyk',star:4,
     spd:76,batk:26,rng:95,atk:'proj',
     spcN:'FALA BAŁTYCKA',spcCd:12,spcD:'fala zmiata i odrzuca wszystkich wrogów',
     hitTxt:['DORSZ!','PLASK!'],
-    desc:'Rzuca dorszem celniej niż niejeden bramkarz.',how:'⌚ Życzenia — własny baner'},
+    desc:'Rzuca dorszem celniej niż niejeden bramkarz.',how:'Życzenia — własny baner'},
 };
 for(const c of Object.values(CHARS)){const e=ELEMENTS[c.elId];c.el=e.ic;c.elN=e.n;c.col=e.col;c.hitCol=e.col;}
 
@@ -3020,7 +3020,7 @@ function switchChar(){
   if(S.party.length<2){
     toast(Object.keys(S.chars).length>1
       ?'🎴 Dobierz drużynę w panelu POSTACIE!'
-      :'🔒 Sam jesteś w ekipie! Ziomali wywishujesz z baneru — panel ⌚ ŻYCZENIA.');
+      :'🔒 Sam jesteś w ekipie! Ziomali wywishujesz z baneru — panel ŻYCZENIA.');
     return;
   }
   /* [C] przeskakuje do następnej PRZYTOMNEJ postaci — pomijamy padniętych,
@@ -3612,7 +3612,7 @@ function bossDefeated(f){
   stopBossMusic();                 // motyw areny milknie razem z bossem
   worldFlash=.8;burstConfetti();burstConfetti();SFX.buy();
   addHit(f.x,f.y-20,'BOSS DOWN!','#f5c542');
-  toast('👑 POKONANY: '+f.bn+'!<br>+'+di+'💠 +'+ch+'⚙️ +'+dd+'💎'+(rx?' +'+rx+'⌚ ZŁOTY ROLEX':''),4200);
+  toast('👑 POKONANY: '+f.bn+'!<br>+'+di+'💠 +'+ch+'⚙️ +'+dd+'💎'+(rx?' +'+rx+' '+RLX+' ZŁOTY ROLEX':''),4200);
   addViews(30000+lvl*15000,false);
   setTimeout(()=>postFilm(BOSSES[id].film,80000),1600);
   vsay(id==='klaunica'?pickA(['c_swietnie','c_donamiotu','v_elegancko']):'v_elegancko');
@@ -3631,6 +3631,14 @@ function bossDefeated(f){
    Banery rotują co BANNER_LEN sekund realnego czasu, panel odlicza sekundy.
    ===================================================================== */
 const ROLEX_COST=150;
+/* IKONA ZŁOTEGO ROLEXA — stylizowana, nie rysunek zegarka: złota ośmiokątna
+   koperta, ciemny środek i brylantowa iskra (ukłon w stronę „rolexa z
+   diamentami"). Inline SVG, więc skaluje się z tekstem i wszędzie wygląda
+   tak samo — emoji ⌚ na każdym systemie rysowało co innego. */
+const RLX='<svg class="rlx" viewBox="0 0 16 16" aria-hidden="true">'+
+  '<polygon points="5,1 11,1 15,5 15,11 11,15 5,15 1,11 1,5" fill="#f5c542"/>'+
+  '<polygon points="5.7,2.6 10.3,2.6 13.4,5.7 13.4,10.3 10.3,13.4 5.7,13.4 2.6,10.3 2.6,5.7" fill="#6b4f12"/>'+
+  '<path d="M8 4.2l1 2.3 2.3 1-2.3 1-1 2.3-1-2.3-2.3-1 2.3-1z" fill="#fff7d6"/></svg>';
 const BANNER_LEN=14*24*3600;                 // 14 dni (2 tygodnie) na jeden baner
 /* START ROTACJI: 11.08.2026, północ czasu polskiego (CEST = UTC+2). Od tego dnia
    przez 14 dni stoi DYCH DZIKI, potem kolejka leci dalej po liście. */
@@ -3741,7 +3749,7 @@ function rollWeap(){
 }
 function doWish(n,ban){
   if((S.rolex||0)<n){SFX.no();
-    toast('Brakuje ZŁOTYCH ROLEXÓW ⌚<br>Jeden kosztuje '+ROLEX_COST+'💎 — dokup je niżej.');return;}
+    toast('Brakuje ZŁOTYCH ROLEXÓW '+RLX+'<br>Jeden kosztuje '+ROLEX_COST+'💎 — dokup je niżej.');return;}
   S.rolex-=n;
   const res=[];for(let i=0;i<n;i++)res.push(ban==='weap'?rollWeap():rollChar());
   save();refreshHUD();
@@ -3755,7 +3763,7 @@ function buyRolex(n){
   const cost=ROLEX_COST*n;
   if(S.dia<cost){SFX.no();toast('Za mało diamentów! Bossowie, questy i domeny, byku 💎');return;}
   S.dia-=cost;S.rolex=(S.rolex||0)+n;save();refreshHUD();SFX.buy();
-  toast('⌚ +'+n+' ZŁOTY'+(n>1?'CH':'')+' ROLEX'+(n>1?'ÓW':'')+'! No i elegancko.');
+  toast(RLX+' +'+n+' ZŁOTY'+(n>1?'CH':'')+' ROLEX'+(n>1?'ÓW':'')+'! No i elegancko.');
   renderGacha(null);
 }
 function gresHtml(r,i){
@@ -3763,7 +3771,7 @@ function gresHtml(r,i){
   if(r.t==='char'){
     const c=CHARS[r.id];
     if(r.nw)return'<div class="gres char" '+d+'><span class="gbig">'+c.el+'</span>⭐ NOWA POSTAĆ!<br><b>'+c.n+'</b></div>';
-    if(r.maxed)return'<div class="gres dup" '+d+'><span class="gbig">'+c.el+'</span>'+c.n+'<br>C6 KOMPLET → +12⚙️ +1💠 +1⌚</div>';
+    if(r.maxed)return'<div class="gres dup" '+d+'><span class="gbig">'+c.el+'</span>'+c.n+'<br>C6 KOMPLET → +12⚙️ +1💠 +1'+RLX+'</div>';
     return'<div class="gres dup" '+d+'><span class="gbig">⭐</span>'+c.n+'<br>+1 GWIAZDA FORTUNY<br><i style="font-size:8px">→ KONSTELACJE (+5⚙️)</i></div>';
   }
   if(r.t==='char4'){
@@ -3838,7 +3846,7 @@ const fmtLeft=s=>(s>=86400?Math.floor(s/86400)+(Math.floor(s/86400)===1?' DZIEŃ
 function renderGacha(res){
   const wep=gachaTab==='weap';
   const id=bannerChar(),c=CHARS[id],w=WEAPONS[bannerWeap()];
-  $('gachaDia').innerHTML='💎 '+S.dia+' · <b style="color:var(--gold)">⌚'+(S.rolex||0)+'</b>';
+  $('gachaDia').innerHTML='💎 '+S.dia+' · <b style="color:var(--gold)">'+RLX+' '+(S.rolex||0)+'</b>';
   const pity=wep?(S.pityW||0):(S.pity||0);
   const hard=wep?WPITY_HARD:PITY_HARD,soft=wep?WPITY_SOFT:PITY_SOFT;
   const doSoft=Math.max(0,soft-pity),doHard=hard-pity;
@@ -3880,9 +3888,9 @@ function renderGacha(res){
            '<br>duplikat = ⭐ GWIAZDA FORTUNY → KONSTELACJA tej postaci')+
     '</p>'+
     '<div class="btnrow">'+
-      '<button class="bigbtn px" style="font-size:12px" id="wish1">⌚ ŻYCZENIE ×1</button>'+
-      '<button class="bigbtn px" style="font-size:12px" id="wish10">⌚ ŻYCZENIE ×10</button></div>'+
-    '<div class="rolexShop"><b>⌚ ZŁOTY ROLEX</b> — waluta życzeń, '+ROLEX_COST+'💎 za sztukę.<br>'+
+      '<button class="bigbtn px snow" style="font-size:12px" id="wish1">'+RLX+' LOSUJ ×1</button>'+
+      '<button class="bigbtn px snow" style="font-size:12px" id="wish10">'+RLX+' LOSUJ ×10</button></div>'+
+    '<div class="rolexShop"><b>'+RLX+' ZŁOTY ROLEX</b> — waluta życzeń, '+ROLEX_COST+'💎 za sztukę.<br>'+
       '<span>Masz: <b>'+(S.rolex||0)+'</b> · 1 rolex = 1 życzenie</span>'+
       '<div class="btnrow" style="margin-top:8px">'+
       '<button class="chbtn" id="buyR1">KUP 1 ('+ROLEX_COST+'💎)</button>'+
@@ -4128,7 +4136,7 @@ function cook(r){
 /* ---------------- MENU GRY (Esc): kafle + edycja sterowania ---------------- */
 const MENU_TILES=[
   {ic:'🎴',n:'Postacie',fn:openChars},
-  {ic:'⌚',n:'Życzenia',fn:openGacha},
+  {ic:RLX,n:'Życzenia',fn:openGacha},
   {ic:'🎒',n:'Plecak',fn:openBag},
   {ic:'🧥',n:'Szafa',fn:()=>openFit(false)},
   {ic:'📜',n:'Questy',fn:openQuests},
@@ -4318,7 +4326,7 @@ function paneWeap(id){
   h+=gearRow(id,'w','',{k:'',ic:'✊',n:'GOŁE PIĘŚCI',d:'bez bonusu',on:!g.w});
   const list=Object.keys(S.gearOwn).filter(k=>WEAPONS[k])
     .sort((x,y)=>WEAPONS[y].star-WEAPONS[x].star||WEAPONS[y].atk-WEAPONS[x].atk);
-  if(!list.length)h+='<p style="color:var(--mut)">Pusto! Broń kupisz na bazarze albo wywishujesz z baneru ⌚.</p>';
+  if(!list.length)h+='<p style="color:var(--mut)">Pusto! Broń kupisz na bazarze albo wylosujesz z baneru '+RLX+'.</p>';
   for(const k of list){const w=WEAPONS[k],ho=gearHolder(k);
     h+=gearRow(id,'w',k,{k,ic:w.ic,n:w.n+' '+'★'.repeat(w.star),
       d:'ATK +'+w.atk+(w.sub?' · '+statTxt(w.sub):''),on:g.w===k,ho:ho&&ho!==id?CHARS[ho].n:null});}
@@ -4831,7 +4839,7 @@ function toast(msg,ms){
   clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),ms||2400);
 }
 function refreshHUD(){
-  $('dia').textContent='💎 '+S.dia+((S.rolex||0)?'  ⌚ '+S.rolex:'');
+  $('dia').innerHTML='💎 '+S.dia+((S.rolex||0)?' &nbsp;'+RLX+' '+S.rolex:'');
   $('fitDia').textContent='💎 '+S.dia;
   $('subs').textContent='👥 '+fmtN(S.subs);
   $('btnChar').textContent=CHARS[S.ch]?CHARS[S.ch].el:'🤖';
@@ -5156,7 +5164,7 @@ function talkTo(n){
           L('Edek','Kontrakt to kontrakt. Poczekam na Twój baner i wyciągnę Cię za wąsy.','c_elegancko2'),
           L(n.n,'To masz na start całą moją działkę z reklam. Kupisz sobie ZŁOTE ROLEXY i lecisz z życzeniami!'),
         ],()=>{S.dych=1;S.dia+=900;S.rolex=(S.rolex||0)+3;save();refreshHUD();SFX.dia();completeQuest('dych');
-          setTimeout(()=>toast('💎 DZIAŁKA DYCHA: +900💎 i +3 ⌚ ZŁOTE ROLEXY!<br>Dycha wywishujesz z baneru — panel 🎴 ŻYCZENIA',5400),4200);
+          setTimeout(()=>toast('💎 DZIAŁKA DYCHA: +900💎 i +3 '+RLX+' ZŁOTE ROLEXY!<br>Dycha wywishujesz z baneru — panel ŻYCZENIA',5400),4200);
           setTimeout(()=>{if(!curVoice)vsay('d_song');},9000);});
         else say([L(n.n,'BZZT... czujniki pokazują jeszcze '+(3-(S.k.dych||0))+' dresiarzy na plaży!')]);
       }
@@ -9825,7 +9833,7 @@ function bootWorld(){
       {who:'Edek',t:'Cała Polska czeka: 18 questów, 6 regionów, hejterzy do pogonienia i mój kanał do wykręcenia. Tapujcie serduszka!',v:'c_serduszka'},
       {who:'Edek',t:'A na krajowej łapiemy z Dychem stopa na POLAND ROCKA. Plan jest prosty: łapiemy stopa i lecimy rozkręcić imprezę!',v:'c_planprosty'},
       {who:'Edek',t:'Cios to SPACJA albo X. Jak hejter podskoczy — z kopyta go!',v:'c_kopytem'},
-      {who:'Edek',t:'Ziomali ściągasz ŻYCZENIAMI ⌚ — za ZŁOTE ROLEXY, z baneru. Drużyna to max trójka, przełączasz klawiszami 1-2-3.'},
+      {who:'Edek',t:'Ziomali ściągasz ŻYCZENIAMI — za ZŁOTE ROLEXY, z baneru. Drużyna to max trójka, przełączasz klawiszami 1-2-3.'},
       {who:'Edek',t:'Na mapach są DOMENY 🌀 z falami hejterów i skrzyniami, a gdzieś czają się BOSSOWIE ⚔️. Materiały z nich ulepszają postacie. No i elegancko.',v:'c_elegancko2'},
     ]);
   }
