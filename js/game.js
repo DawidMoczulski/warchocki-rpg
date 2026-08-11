@@ -55,7 +55,7 @@ const DEFAULT_SAVE={dia:25,owned:['was_klasyk','rolex_d'],equip:{mustache:'was_k
   quests:{},col:{},k:{},trip:0,legend:false,px:456,py:368,
   region:'wawa',ch:'edek',dych:0,subs:120,views:0,films:[],mile:{},visited:{wawa:1},
   chars:{edek:{lvl:1,asc:0,con:0,tal:{n:1,e:1,q:1}}},party:['edek'],cons:{},
-  mats:{sr:0,ch:0,di:0},pity:0,pityW:0,rolex:0,wish:0,wishW:0,domLvl:{},bossLvl:{},
+  mats:{sr:0,ch:0,di:0},pity:0,pityW:0,pity4:0,pity4W:0,rolex:0,wish:0,wishW:0,domLvl:{},bossLvl:{},
   gear:{},gearOwn:{kij:1},food:{picie:2},ingr:{}};
 let S=null;
 function loadSave(){
@@ -81,6 +81,8 @@ function loadSave(){
        — nikt nie traci tego, co uzbierał przed zmianą kursu. */
     if(S.rolex===undefined){S.rolex=Math.min(10,Math.floor((S.dia||0)/300));}
     if(S.pityW===undefined)S.pityW=0;
+    if(S.pity4===undefined)S.pity4=0;
+    if(S.pity4W===undefined)S.pity4W=0;
     if(S.wish===undefined)S.wish=0;
     if(S.wishW===undefined)S.wishW=0;
     if(!S.domLvl)S.domLvl={};
@@ -2650,7 +2652,7 @@ const CHARS={
     spcN:'DZIKA SZARŻA',spcCd:5,spcD:'taranuje wszystko na swojej drodze',
     hitTxt:['DZIKO!','ŁUBUDU!','BZZT!'],
     desc:'Drugi robot z YT. Na mieście kręci się, w głowie ma ogień.',how:'⌚ Życzenia — własny baner'},
-  grazynka:{n:'Grażynka 3000',elId:'swojskosc',star:4,
+  grazynka:{n:'Grażynka 3000',elId:'swojskosc',star:5,
     spd:80,batk:20,rng:27,atk:'melee',
     spcN:'GORĄCY ROSÓŁ',spcCd:18,spcD:'leczy 50% HP i parzy wrogów parą',
     hitTxt:['CHOCHLĄ!','A ZUPKA?','SIO!'],
@@ -2660,12 +2662,12 @@ const CHARS={
     spcN:'STOP-KLATKA',spcCd:14,spcD:'zatrzymuje czas — wrogowie zwalniają na 6 s',
     hitTxt:['TIK!','TAK!','PUNKTUALNIE!'],
     desc:'Jubiler od rolexa Edka. Czas działa dla niego.',how:'⌚ Życzenia — własny baner'},
-  zenek:{n:'Zenek Spawacz',elId:'spaw',star:4,
+  zenek:{n:'Zenek Spawacz',elId:'spaw',star:5,
     spd:78,batk:23,rng:21,atk:'melee',burn:3,
     spcN:'PALNIK 3000°C',spcCd:10,spcD:'stożek ognia — podpala wrogów',
     hitTxt:['PSSST!','BZZZT!','SPAW!'],
     desc:'U niego każda blacha dostaje drugie życie.',how:'⌚ Życzenia — własny baner'},
-  julka:{n:'Julka z Tindera',elId:'serca',star:4,
+  julka:{n:'Julka z Tindera',elId:'serca',star:5,
     spd:88,batk:19,rng:80,atk:'proj',
     spcN:'ZAUROCZENIE',spcCd:16,spcD:'3 wrogów zakochuje się i walczy po Twojej stronie',
     hitTxt:['CMOK!','MATCH!'],
@@ -3633,9 +3635,14 @@ const BANNER_LEN=14*24*3600;                 // 14 dni (2 tygodnie) na jeden ban
 /* START ROTACJI: 11.08.2026, północ czasu polskiego (CEST = UTC+2). Od tego dnia
    przez 14 dni stoi DYCH DZIKI, potem kolejka leci dalej po liście. */
 const BANNER_T0=Date.UTC(2026,7,10,22,0,0)/1000;
-const BANNER_ORDER=['dych','edek','grazynka','jarek','zenek','julka','bogdan'];
+/* Na banerze staje zawsze postać 5⭐ — 4⭐ (Jarek, Bogdan) chodzą z gwarancji */
+const BANNER_ORDER=['dych','edek','grazynka','zenek','julka'];
+const CHAR4=['jarek','bogdan'];
 const PITY_HARD=90,PITY_SOFT=70,CHAR_BASE=.03;     // baner postaci
 const WPITY_HARD=80,WPITY_SOFT=60,WEAP_BASE=.06;   // baner broni
+/* GWARANCJA 4⭐: co najwyżej co 15 życzeń wypada coś 4⭐ — postać ALBO broń.
+   To jest ta „ludzka" ścieżka: nawet bez szczęścia do 5⭐ gracz zbierze ekipę. */
+const P4_AT=15,STAR4_BASE=.08;
 /* łupy z bossów — nie mają czego szukać w życzeniach */
 const BOSS_ONLY=['kiel','kettle','kolczykK','luska','ciupaga','hakL','rogiK','koronaP'];
 /* PRZESUNIĘCIE ZEGARA — tylko do testów. W konsoli `banOffset=14*86400` przeskakuje
@@ -3654,13 +3661,38 @@ const bannerLeft=()=>BANNER_LEN-modP(banNow()-BANNER_T0,BANNER_LEN);
 const charChance=p=>p>=PITY_HARD?1:p>=PITY_SOFT?Math.min(1,CHAR_BASE+.09*(p-PITY_SOFT+1)):CHAR_BASE;
 const weapChance=p=>p>=WPITY_HARD?1:p>=WPITY_SOFT?Math.min(1,WEAP_BASE+.10*(p-WPITY_SOFT+1)):WEAP_BASE;
 
-/* KONSOLACJA — to, co wypada, kiedy 5★ nie trafi. Nigdy nie ma tu nic 5★. */
+/* pula 4⭐: broń i artefakty (na banerze broni — same bronie) */
+const gear4Pool=weapBan=>Object.keys(WEAPONS).concat(Object.keys(ARTS))
+  .filter(k=>!S.gearOwn[k]&&!BOSS_ONLY.includes(k)
+    &&(WEAPONS[k]||ARTS[k]).star===4&&(!weapBan||!!WEAPONS[k]));
+/* TRAFIENIE 4⭐ — pół na pół postać albo sprzęt. Postać zawsze z puli CHAR4;
+   duplikat leci na konstelacje, tak samo jak przy 5⭐. */
+function roll4(weapBan){
+  const pool=gear4Pool(weapBan);
+  if(!weapBan&&(Math.random()<.5||!pool.length)){
+    const id=pickA(CHAR4);
+    if(!S.chars[id]){
+      S.chars[id]=newChar();
+      if(S.party.length<3)S.party.push(id);
+      return{t:'char4',id,nw:true};
+    }
+    const d=S.chars[id];
+    if((d.con||0)>=6&&!(S.cons[id]>0)){S.mats.ch+=8;S.mats.di+=1;
+      return{t:'char4',id,dup:true,maxed:true};}
+    S.cons[id]=(S.cons[id]||0)+1;S.mats.ch+=4;
+    return{t:'char4',id,dup:true};
+  }
+  if(pool.length){const gid=pickA(pool);S.gearOwn[gid]=1;return{t:'gear',id:gid,s4:true};}
+  S.mats.ch+=10;return{t:'ch',n:10};      // komplet 4⭐ zebrany — idą materiały
+}
+/* KONSOLACJA — to, co wypada, kiedy nie trafi ani 5⭐, ani 4⭐: sprzęt 1-3⭐
+   i materiały. Nic 4⭐ ani 5⭐ tu nie wpadnie, bo to osobne szuflady. */
 function rollFiller(weapBan){
   const r=Math.random();
   if(r<(weapBan?.34:.22)){
     const pool=Object.keys(WEAPONS).concat(Object.keys(ARTS))
       .filter(k=>!S.gearOwn[k]&&!BOSS_ONLY.includes(k)
-        &&(WEAPONS[k]||ARTS[k]).star<5&&(!weapBan||!!WEAPONS[k]));
+        &&(WEAPONS[k]||ARTS[k]).star<4&&(!weapBan||!!WEAPONS[k]));
     if(pool.length){const gid=pickA(pool);S.gearOwn[gid]=1;return{t:'gear',id:gid};}
     S.mats.ch+=4;return{t:'ch',n:4};
   }
@@ -3670,9 +3702,9 @@ function rollFiller(weapBan){
   const n=4+((Math.random()*7)|0);S.dia+=n;return{t:'dia',n};
 }
 function rollChar(){
-  S.pity++;S.wish=(S.wish||0)+1;
+  S.pity++;S.pity4=(S.pity4||0)+1;S.wish=(S.wish||0)+1;
   if(Math.random()<charChance(S.pity)){
-    S.pity=0;
+    S.pity=0;S.pity4=0;                  // 5⭐ zeruje też licznik 4⭐
     const id=bannerChar();
     if(!S.chars[id]){
       S.chars[id]=newChar();
@@ -3687,12 +3719,13 @@ function rollChar(){
     S.cons[id]=(S.cons[id]||0)+1;S.mats.ch+=5;
     return{t:'char',id,dup:true};
   }
+  if(S.pity4>=P4_AT||Math.random()<STAR4_BASE){S.pity4=0;return roll4(false);}
   return rollFiller(false);
 }
 function rollWeap(){
-  S.pityW=(S.pityW||0)+1;S.wishW=(S.wishW||0)+1;
+  S.pityW=(S.pityW||0)+1;S.pity4W=(S.pity4W||0)+1;S.wishW=(S.wishW||0)+1;
   if(Math.random()<weapChance(S.pityW)){
-    S.pityW=0;
+    S.pityW=0;S.pity4W=0;
     const sig=bannerWeap();
     let id=sig;
     /* 25%: kapsuła wypluwa INNĄ broń 5★ zamiast promowanej — jak w Genshinie */
@@ -3703,6 +3736,7 @@ function rollWeap(){
     if(S.gearOwn[id]){S.mats.di+=2;S.mats.ch+=15;return{t:'gear5',id,dup:true};}
     S.gearOwn[id]=1;return{t:'gear5',id};
   }
+  if(S.pity4W>=P4_AT||Math.random()<STAR4_BASE){S.pity4W=0;return roll4(true);}
   return rollFiller(true);
 }
 function doWish(n,ban){
@@ -3713,6 +3747,7 @@ function doWish(n,ban){
   save();refreshHUD();
   if(res.some(r=>r.t==='char'&&r.nw)){burstConfetti();vsay('c_elegancko2');SFX.buy();}
   else if(res.some(r=>r.t==='gear5'&&!r.dup)){burstConfetti();vsay('c_rolextiktok');SFX.buy();}
+  else if(res.some(r=>r.t==='char4'&&r.nw)){burstConfetti();SFX.buy();}
   else SFX.gacha();
   renderGacha(res);
 }
@@ -3731,6 +3766,12 @@ function gresHtml(r,i){
     if(r.maxed)return'<div class="gres dup" '+d+'><span class="gbig">'+c.el+'</span>'+c.n+'<br>C6 KOMPLET → +12⚙️ +1💠 +1⌚</div>';
     return'<div class="gres dup" '+d+'><span class="gbig">⭐</span>'+c.n+'<br>+1 GWIAZDA FORTUNY<br><i style="font-size:8px">→ KONSTELACJE (+5⚙️)</i></div>';
   }
+  if(r.t==='char4'){
+    const c=CHARS[r.id];
+    if(r.nw)return'<div class="gres s4" '+d+'><span class="gbig">'+c.el+'</span>⭐⭐⭐⭐ NOWA POSTAĆ!<br><b>'+c.n+'</b></div>';
+    if(r.maxed)return'<div class="gres dup" '+d+'><span class="gbig">'+c.el+'</span>'+c.n+'<br>C6 KOMPLET → +8⚙️ +1💠</div>';
+    return'<div class="gres s4" '+d+'><span class="gbig">⭐</span>'+c.n+'<br>+1 GWIAZDA FORTUNY<br><i style="font-size:8px">→ KONSTELACJE (+4⚙️)</i></div>';
+  }
   if(r.t==='gear5'){
     const it=WEAPONS[r.id];
     if(r.dup)return'<div class="gres dup" '+d+'><span class="gbig">'+it.ic+'</span>'+it.n+'<br>MASZ JUŻ → +15⚙️ +2💠</div>';
@@ -3739,7 +3780,7 @@ function gresHtml(r,i){
   if(r.t==='gear'){
     const it=WEAPONS[r.id]||ARTS[r.id];
     const kind=WEAPONS[r.id]?'🗡 BROŃ':ART_SLOTS[ARTS[r.id].slot];
-    return'<div class="gres dup" '+d+'><span class="gbig">'+it.ic+'</span>'+kind+' '+'⭐'.repeat(it.star)+'<br><b>'+it.n+'</b></div>';
+    return'<div class="gres '+(r.s4?'s4':'dup')+'" '+d+'><span class="gbig">'+it.ic+'</span>'+kind+' '+'⭐'.repeat(it.star)+'<br><b>'+it.n+'</b></div>';
   }
   const map={sr:['🔩','śrubki'],ch:['⚙️','mikroczipy'],di:['💠','Diament do Rolexa'],dia:['💎','diamenty']};
   const[ic,nm]=map[r.t];
@@ -3801,6 +3842,7 @@ function renderGacha(res){
   const pity=wep?(S.pityW||0):(S.pity||0);
   const hard=wep?WPITY_HARD:PITY_HARD,soft=wep?WPITY_SOFT:PITY_SOFT;
   const doSoft=Math.max(0,soft-pity),doHard=hard-pity;
+  const do4=P4_AT-(wep?(S.pity4W||0):(S.pity4||0));
   const d=S.chars[id],mam=!!d,con=d?(d.con||0):0;
   const pliki=banFileList(id,wep);          // .svg → .png → (brak) rysowany fallback
   const stan=wep
@@ -3830,9 +3872,12 @@ function renderGacha(res){
       (doSoft>0
         ?'SZANSA MOCNO ROŚNIE od '+soft+'. życzenia — zostało '+doSoft
         :'<b style="color:var(--gold)">MIĘKKA GWARANCJA AKTYWNA</b> — szansa '+Math.round(( wep?weapChance(pity+1):charChance(pity+1))*100)+'%')+
-      '<br>GWARANCJA na '+hard+'. życzeniu — zostało <b>'+doHard+'</b>'+
+      '<br>GWARANCJA 5⭐ na '+hard+'. życzeniu — zostało <b>'+doHard+'</b>'+
+      '<br><b class="s4txt">GWARANCJA 4⭐ za '+do4+'</b> — '+
+        (wep?'broń 4⭐':'postać 4⭐ albo broń')+
       (wep?'<br>75% szans na sygnaturę, 25% na inną broń 5⭐'
-          :'<br>duplikat = ⭐ GWIAZDA FORTUNY → KONSTELACJA tej postaci')+
+          :'<br>postacie 4⭐: '+CHAR4.map(k=>CHARS[k].el+' '+CHARS[k].n.split(' ')[0]).join(' · ')+
+           '<br>duplikat = ⭐ GWIAZDA FORTUNY → KONSTELACJA tej postaci')+
     '</p>'+
     '<div class="btnrow">'+
       '<button class="bigbtn px" style="font-size:12px" id="wish1">⌚ ŻYCZENIE ×1</button>'+
@@ -7187,12 +7232,27 @@ function updateWorld(dt){
   P.sprint=P.moving&&wantsSprint()&&!STAM.tired&&STAM.v>0&&!P.slow&&honeyT<=0;
   updateStamina(dt,P.sprint);
   if(P.moving){
-    if(Math.abs(dx)>Math.abs(dy))P.dir=dx<0?1:2;else P.dir=dy<0?3:0;
+    /* BIEG NA UKOS. Wcześniej na dokładnej przekątnej wygrywała oś PIONOWA, więc
+       lecąc w prawo-górę postać patrzyła sztywno do góry — stąd „kwadratowy"
+       ruch. Teraz na remisie wygrywa POZIOM (widok z profilu czyta się lepiej),
+       a `P.diag` mówi rysowaniu, czy lecimy skosem w górę (-1) czy w dół (+1). */
+    const naUkos=dx!==0&&dy!==0;
+    if(Math.abs(dx)>=Math.abs(dy))P.dir=dx<0?1:2;else P.dir=dy<0?3:0;
+    P.diag=naUkos?(dy<0?-1:1):0;
     let sp=P.speed*(S.ch==='edek'?(SHOE_SPD[S.equip.shoes]||1):1)*(P.slow?.55:1)*(honeyT>0?.6:1)*(BUFF.t>0?1+BUFF.spd:1)
            *(P.sprint?SPRINT_MULT:1);
     const nx=P.x+dx*sp*dt,ny=P.y+dy*sp*dt;
-    if(canWalk(nx,P.y))P.x=nx;
-    if(canWalk(P.x,ny))P.y=ny;
+    const wolnoX=canWalk(nx,P.y),wolnoY=canWalk(P.x,ny);
+    if(wolnoX)P.x=nx;
+    if(wolnoY)P.y=ny;
+    /* ŚLIZG PO ŚCIANIE: biegnąc skosem w mur jedna oś jest zablokowana, a druga
+       dostawała tylko składową 0,707 — bieg wzdłuż ściany zauważalnie zwalniał.
+       Teraz wolna oś dobiera resztę do pełnej prędkości. */
+    if(naUkos&&wolnoX!==wolnoY){
+      const reszta=sp*dt*(1-Math.SQRT1_2);
+      if(wolnoX){const ex=P.x+Math.sign(dx)*reszta;if(canWalk(ex,P.y))P.x=ex;}
+      else{const ey=P.y+Math.sign(dy)*reszta;if(canWalk(P.x,ey))P.y=ey;}
+    }
     P.frame+=dt*(P.sprint?13:8);
     /* pęd biegu: kurz spod nóg i lekkie powidoki */
     if(P.sprint&&!reduceMotion){
@@ -7210,6 +7270,12 @@ function updateWorld(dt){
       toast('🔧 NOWY CEL: warsztat Zenka (kuleje się powoli!)');
     }
   }
+  else P.diag=0;
+  /* PRZECHYŁ: sylwetka wchodzi w kierunek biegu i wraca płynnie po zatrzymaniu.
+     Dzięki temu zmiana kierunku nie jest skokiem o 90°, tylko ma rozpęd. */
+  const cel=P.moving?(dx?Math.sign(dx):0)*(P.sprint?.13:.075):0;
+  P.lean=(P.lean||0)+(cel-(P.lean||0))*Math.min(1,dt*9);
+  if(Math.abs(P.lean)<.002)P.lean=0;
   }
   P.x=Math.max(20,Math.min(MW*16-20,P.x));P.y=Math.max(20,Math.min(MH*16-20,P.y));
   /* na mapie widać TYLKO aktywną postać — reszta drużyny czeka „w kieszeni" (wymóg Dawida) */
@@ -7821,9 +7887,14 @@ function drawWorld(){
       if(atkDir===0||atkDir===3){sY=1+s;sX=1-s*.7;}else{sX=1+s;sY=1-s*.7;}
     }
     if(hurtT>1.05&&!reduceMotion){const hk=(hurtT-1.05)/.15;sX*=1+.22*hk;sY*=1-.26*hk;}
-    if(sX===1&&sY===1){drawCharBody(cx,ch,x-8-camX,y-20-camY,dir,fr);return;}
-    cx.save();cx.translate(x-camX,y+4-camY);cx.scale(sX,sY);
-    drawCharBody(cx,ch,-8,-24,dir,fr);cx.restore();
+    /* BIEG NA UKOS: przechył w stronę pędu + drobne uniesienie/opuszczenie
+       sylwetki, żeby było widać, czy lecimy skosem w górę czy w dół */
+    const ln=reduceMotion?0:(P.lean||0),dg=reduceMotion?0:(P.diag||0)*1.6;
+    if(sX===1&&sY===1&&!ln&&!dg){drawCharBody(cx,ch,x-8-camX,y-20-camY,dir,fr);return;}
+    cx.save();cx.translate(x-camX,y+4-camY);
+    if(ln)cx.rotate(ln);
+    cx.scale(sX,sY);
+    drawCharBody(cx,ch,-8,-24+dg,dir,fr);cx.restore();
   };
   const lunge=atkAnim>0?(atkAnim/.22)*4:0;   // wypad w kierunku ciosu
   /* powidoki (szarża Dycha) — pod bohaterem */

@@ -208,6 +208,8 @@ h1.px{margin:0;font-size:clamp(20px,4.6vw,36px);color:var(--gold);
   padding:11px;min-width:112px;font-size:10px;line-height:1.8;animation:gpop .4s backwards}
 .gres.char{border-color:var(--gold);color:var(--gold);box-shadow:0 0 20px rgba(245,197,66,.45)}
 .gres.dup{border-color:var(--cyan)}
+.gres.s4{border-color:#b98cf0;color:#d9c2ff;box-shadow:0 0 14px rgba(185,140,240,.35)}
+#gachaBody .pity .s4txt{color:#b98cf0}
 @keyframes gpop{0%{transform:scale(.3) rotate(-8deg);opacity:0}70%{transform:scale(1.12)}100%{transform:scale(1)}}
 @media (prefers-reduced-motion:reduce){.gres{animation:none}}
 .gbig{font-size:26px;display:block;margin-bottom:6px}

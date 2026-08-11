@@ -8,10 +8,18 @@ w menu Esc → STEROWANIE.
 (także padniętych) — zielone plusiki i podświetlenie pasków HP.
 
 **Życzenia (v15):** panel `⌚` zamiast paczek. Dwa banery naraz — POSTAĆ i BROŃ —
-z jedną promowaną postacią i jej sygnaturową bronią 5⭐. Waluta to **Złoty Rolex**
+z jedną promowaną postacią 5⭐ i jej sygnaturową bronią 5⭐. Waluta to **Złoty Rolex**
 (150💎 = 1 życzenie). Baner stoi **14 dni (2 tygodnie)**, panel pokazuje dni i zegar
 z tykającymi sekundami. Grafikę banera podmieniasz plikiem w `assets/banners/`
 — szczegóły w `assets/banners/README.md`.
+
+**Gwiazdki postaci (v15.3):** 5⭐ = Edek, Dych, Grażynka, Zenek, Julka (te stają
+na banerach). 4⭐ = **Jarek Zegarek i Rybak Bogdan** — wchodzą z gwarancji
+**co najwyżej co 15 życzeń**, która daje postać 4⭐ ALBO broń/artefakt 4⭐
+(pół na pół). Dzięki temu ekipę da się zebrać bez trafiania 5⭐.
+
+**Ruch na ukos (v15.3):** przy skosie sylwetka patrzy w bok (nie sztywno w górę),
+ma przechył w stronę pędu, a bieg wzdłuż ściany nie zwalnia.
 
 Plik do kopiowania „na przyszłość” — otwórz w edytorze i bierz stąd, czego trzeba.
 
@@ -63,13 +71,15 @@ Chrome przy pierwszym wklejeniu do konsoli wymaga wpisania `allow pasting`.
 const s = JSON.parse(localStorage.getItem('wrpg'));   // podejrzyj zapis
 s.dia = 9999;                                          // diamenty
 s.rolex = 200;                                         // Złote Rolexy = życzenia
-s.pity = 89;                                           // następne życzenie = gwarancja
+s.pity = 89;                                           // następne życzenie = gwarancja 5⭐
+s.pity4 = 14;                                          // następne życzenie = gwarancja 4⭐
 s.quests.policja = 0;                                  // 0 = nieodkryty, 1 = w toku, 2 = zrobiony
 localStorage.setItem('wrpg', JSON.stringify(s)); location.reload();
 ```
 
 Klucze zapisu: `quests`, `col` (znajdźki), `mile` (nagrane miejsca), `dych`, `party`,
-`chars` (poziomy), `dia`, `rolex`, `pity`/`pityW` (gwarancje banerów), `subs`,
+`chars` (poziomy), `dia`, `rolex`, `pity`/`pityW` (gwarancje 5⭐),
+`pity4`/`pity4W` (gwarancje 4⭐), `subs`,
 `region`, `px`/`py`, `domLvl`, `bossLvl`.
 
 **Przeskok baneru bez czekania dwóch tygodni** (konsola, F12):
