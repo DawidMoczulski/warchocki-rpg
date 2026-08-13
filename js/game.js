@@ -1891,7 +1891,7 @@ function dealDmg(f,chId,mult,opts){
   /* WIZUALNY IMPAKT: gwiazda + iskry żywiołu lecące OD napastnika */
   const hitAng=Math.atan2(f.y-oy,f.x-ox);
   if(!opts.light)fxImpact(f.x,f.y-10,eCol,crit||!!f.boss,hitAng);
-  if(BURSTS[chId]&&!opts.noEnergy)gainBurst(chId,dmg);   // energia SUPER-HITU z żywiołu postaci
+  if(CHARS[chId].burst&&!opts.noEnergy)gainBurst(chId,dmg);   // energia SUPER-HITU z żywiołu postaci
   if(armored)fxSparks(f.x,f.y-8,'#e8e4f0',5,160,{life:.35,g:420,ang:hitAng-.6,spread:1.4,sz:1.3});
   if(Math.random()<.3)addHit(f.x,f.y-30,pickA(c.hitTxt),c.hitCol);
   SFX.hit();
@@ -1994,100 +1994,9 @@ function killFoe(f){
 function trySpecial(){
   if(scene!=='world'||spcT>0)return;
   const c=CHARS[S.ch];
+  if(!c.skill)return;
   spcT=chSkillCd(S.ch);       // talent [E] + konstelacja C2 skracają ładowanie
-  const skM=chSkillMul(S.ch); // mnożnik obrażeń umiejętności
-  switch(S.ch){
-    case 'edek':{ // BŁYSK ROLEXA — stun na cały ekran
-      worldFlash=.55;
-      fxRing(P.x,P.y-8,150,'#f5c542',{life:.55,w:4});
-      fxRing(P.x,P.y-8,110,'#ffffff',{life:.4,w:2});
-      for(let i=0;i<(reduceMotion?6:16);i++)
-        fxStarFlash(camX+Math.random()*W,camY+Math.random()*H,'#f5c542',3+Math.random()*5,
-          {life:.4+Math.random()*.5,spin:6});
-      addShake(2.4,.3);
-      for(const f of foes){
-        const sx=f.x-camX,sy=f.y-camY;
-        if(sx>-10&&sx<W+10&&sy>-10&&sy<H+10){f.stun=2.6;
-          /* C6 ROLEX Z DIAMENTAMI: błysk nie tylko oślepia, ale i przypiera */
-          if(hasCon('edek',6))dealDmg(f,'edek',1.4*skM,{ox:P.x,oy:P.y});
-          fxStarFlash(f.x,f.y-20,'#fff7d6',6,{life:.5});}
-      }
-      toast('⌚ BŁYSK ROLEXA! Hejterzy oślepieni!');
-      if(!curVoice)vsay('c_rolexlewa');SFX.dia();break;}
-    case 'dych':{ // DZIKA SZARŻA
-      dashT=.28;dashDir=P.dir;
-      /* C6 DZIKO, MORDECZKO: druga szarża zaraz po pierwszej */
-      if(hasCon('dych',6))setTimeout(()=>{if(scene==='world'){dashT=.28;dashDir=P.dir;
-        addHit(P.x,P.y-18,'JESZCZE RAZ!','#7bc950');fxDust(P.x,P.y+4,8);}},340);
-      addHit(P.x,P.y-18,'SZARŻA!','#f5a032');
-      fxDust(P.x,P.y+4,8);
-      fxRing(P.x,P.y,20,'#f5a032',{life:.25,w:2,ground:true});
-      addShake(2,.28);
-      beep(90,.3,'sawtooth',.09,45);break;}
-    case 'grazynka':{ // GORĄCY ROSÓŁ — leczy 50% HP + para parzy
-      const gmax=chHpMax(S.ch),ghl=Math.round(gmax*.5);
-      PHP[S.ch]=Math.min(gmax,PHP[S.ch]+ghl);worldFlash=.3;
-      addDmgNum(P.x,P.y-26,'+'+ghl,'#7bc950');
-      /* C6 ROSÓŁ DLA WSZYSTKICH: talerz leci na całą ekipę */
-      if(hasCon('grazynka',6)){healParty(.5);
-        addHit(P.x,P.y-40,'DLA CAŁEJ EKIPY!','#7bc950');}
-      for(const f of foes)if(Math.hypot(f.x-P.x,f.y-P.y)<64)dealDmg(f,'grazynka',1.25*skM);
-      for(let i=0;i<14;i++)smoke.push({x:P.x+(Math.random()-.5)*40,y:P.y-(Math.random()*20),r:2,life:1.6});
-      fxRing(P.x,P.y+2,66,'#7bc950',{life:.5,w:3,ground:true});
-      for(let i=0;i<(reduceMotion?5:12);i++) // złote i zielone drobinki lecą w górę
-        fxP({x:P.x+(Math.random()-.5)*30,y:P.y-4-Math.random()*10,vx:(Math.random()-.5)*16,
-          vy:-30-Math.random()*35,g:-20,life:.9,life0:.9,sz:1.8,
-          col:Math.random()<.5?'#7bc950':'#f5c542',add:true,shrink:true});
-      toast('🍲 GORĄCY ROSÓŁ! +50% HP, hejterzy sparzeni!');
-      SFX.buy();break;}
-    case 'jarek':{ // STOP-KLATKA — globalne spowolnienie
-      slowAll=hasCon('jarek',6)?10:6;worldFlash=.3;   // C6: zegarek na gwarancji
-      fxRing(P.x,P.y-8,130,'#6fd8e8',{life:.6,w:3});
-      fxRing(P.x,P.y-8,90,'#ffffff',{life:.45,w:1.6});
-      fxRing(P.x,P.y-8,50,'#6fd8e8',{life:.3,w:1.6});
-      for(const f of foes){f.stun=Math.max(f.stun,1);
-        fxSparks(f.x,f.y-14,'#6fd8e8',4,40,{life:.6,g:0,up:0,sz:1.3});}
-      addShake(1.6,.2);
-      toast('⏱️ STOP-KLATKA! Czas płynie tylko dla Ciebie!');
-      beep(1568,.4,'triangle',.08,180);break;}
-    case 'zenek':{ // PALNIK — stożek ognia w kierunku patrzenia
-      const dv=DV[P.dir];
-      flameT=.45;flameDir=P.dir;   // strumień ognia rysowany przez chwilę (updateWorld)
-      for(const f of foes){
-        const rx=f.x-P.x,ry=f.y-P.y,d=Math.hypot(rx,ry);
-        if(d<76&&rx*dv[0]+ry*dv[1]>d*.35){dealDmg(f,'zenek',1.5*skM);
-          f.burn=Math.max(f.burn||0,hasCon('zenek',6)?6:3);   // C6 SPAW NA ZIMNO
-          f.burnDmg=Math.round(chATK('zenek')*.25*skM);}
-      }
-      addShake(2,.3);
-      toast('🔥 PALNIK 3000°C! PSSSST!');
-      beep(140,.5,'sawtooth',.1,60);break;}
-    case 'julka':{ // ZAUROCZENIE — 3 najbliżsi walczą po naszej stronie
-      const elity=hasCon('julka',6);   // C6 SERDUSZKA DLA KAŻDEGO
-      const near=foes.filter(f=>!f.boss&&(elity||!FOE_TYPES[f.t].elite)).sort((a,b)=>Math.hypot(a.x-P.x,a.y-P.y)-Math.hypot(b.x-P.x,b.y-P.y)).slice(0,3);
-      for(const f of near){f.charm=6;addHit(f.x,f.y-18,'💘','#e88ac8');
-        fxHearts(f.x,f.y-16,6);fxRing(f.x,f.y-8,18,'#e88ac8',{life:.35,w:2});}
-      fxHearts(P.x,P.y-20,4);
-      toast('💘 ZAUROCZENIE! '+near.length+' hejterów walczy dla Ciebie!');
-      beep(1046,.1,'triangle',.08);setTimeout(()=>beep(1318,.18,'triangle',.08),110);break;}
-    case 'bogdan':{ // FALA BAŁTYCKA — obrażenia + mega odrzut
-      worldFlash=.25;
-      fxRing(P.x,P.y+2,95,'#4a8ac8',{life:.55,w:5,ground:true});
-      fxRing(P.x,P.y+2,70,'#bfe8f4',{life:.42,w:3,ground:true});
-      for(let i=0;i<(reduceMotion?8:22);i++){ // bryzgi piany na krawędzi fali
-        const a=Math.random()*6.28;
-        fxP({x:P.x+Math.cos(a)*26,y:P.y+Math.sin(a)*14,vx:Math.cos(a)*120,vy:Math.sin(a)*70-50,
-          g:260,life:.55,life0:.55,sz:1.8,col:Math.random()<.5?'#bfe8f4':'#ffffff',add:true,shrink:true});
-      }
-      addShake(3.6,.35);
-      for(const f of foes)if(Math.hypot(f.x-P.x,f.y-P.y)<95){
-        dealDmg(f,'bogdan',(hasCon('bogdan',6)?2.2:1.1)*skM,{kb:0});f.kb=.5;   // C6 SZTORM 12
-        const d=Math.max(1,Math.hypot(f.x-P.x,f.y-P.y));
-        f.kbx=(f.x-P.x)/d*300;f.kby=(f.y-P.y)/d*300;
-      }
-      toast('🌊 FALA BAŁTYCKA! Hejterzy zmyci!');
-      beep(70,.6,'sawtooth',.1,35);break;}
-  }
+  c.skill(chSkillMul(S.ch));  // mnożnik obrażeń umiejętności
 }
 /* =====================================================================
    SUPER-HIT EDKA [Q] — jak burst w Genshinie:
@@ -2095,14 +2004,6 @@ function trySpecial(){
    przerywnik (tańczący Edek + hook piosenki), potem taneczna seria
    wybuchów wokół Edka, w rytmie kawałka (147,7 BPM).
    ===================================================================== */
-const BURSTS={
-  edek:{jingle:'burst_byku',col:'#f5c542',bar:'#f5c542',
-    ready:'[Q] 💥 EDWARDEM BYKU!',
-    full:'💥 SUPER-HIT GOTOWY! Wciśnij [Q], byku!',cut:1.35},
-  dych:{jingle:'d_song',col:'#2f6b33',bar:'#7bc950',
-    ready:'[Q] 💥 DZIKI DYCH!',
-    full:'💥 SUPER-HIT GOTOWY! Wciśnij [Q], mordeczko!',cut:1.5},
-};
 let burstE={};               // energia 0..100, per postać
 let burstChar='edek';        // czyj burst właśnie leci
 let burstCut=0,burstCut0=1.35; // czas/długość przerywnika
@@ -2113,8 +2014,8 @@ function gainBurst(chId,dmg){
   const was=burstE[chId]||0;
   burstE[chId]=Math.min(100,was+6+dmg*.05);
   if(was<100&&burstE[chId]>=100){
-    toast(BURSTS[chId].full);
-    fxRing(P.x,P.y-8,26,BURSTS[chId].bar,{life:.4,w:2});
+    toast(CHARS[chId].burst.full);
+    fxRing(P.x,P.y-8,26,CHARS[chId].burst.bar,{life:.4,w:2});
     SFX.dia();
   }
 }
@@ -2132,7 +2033,7 @@ function playBurstJingle(key){
 }
 function tryBurst(){
   if(scene!=='world'||burstCut>0||burstDance>0)return;
-  const B=BURSTS[S.ch];
+  const B=CHARS[S.ch].burst;
   if(!B){toast('💥 SUPER-HIT mają na razie Edward i Dych, byku!');SFX.no();return;}
   if((burstE[S.ch]||0)<100){
     toast('💥 SUPER-HIT: '+Math.floor(burstE[S.ch]||0)+'% — bij hejterów żywiołem '+CHARS[S.ch].el+'!');
@@ -2685,39 +2586,163 @@ for(const k of Object.keys(REACT)){
 }
 
 const CHARS={
-  edek:{n:'Edward Warchocki',elId:'elegancja',star:5,
+  edek:{
+    burst:{jingle:'burst_byku',col:'#f5c542',bar:'#f5c542',
+    ready:'[Q] 💥 EDWARDEM BYKU!',
+    full:'💥 SUPER-HIT GOTOWY! Wciśnij [Q], byku!',cut:1.35},
+    c6:{n:'ROLEX Z DIAMENTAMI',d:'BŁYSK ROLEXA nie tylko oślepia — teraz też przypiera hejterów obrażeniami'},
+    sig:'rolexM',
+    /* [E] — UMIEJĘTNOŚĆ. `skM` to mnożnik obrażeń z talentu i konstelacji. */
+    skill(skM){// BŁYSK ROLEXA — stun na cały ekran
+      worldFlash=.55;
+      fxRing(P.x,P.y-8,150,'#f5c542',{life:.55,w:4});
+      fxRing(P.x,P.y-8,110,'#ffffff',{life:.4,w:2});
+      for(let i=0;i<(reduceMotion?6:16);i++)
+        fxStarFlash(camX+Math.random()*W,camY+Math.random()*H,'#f5c542',3+Math.random()*5,
+          {life:.4+Math.random()*.5,spin:6});
+      addShake(2.4,.3);
+      for(const f of foes){
+        const sx=f.x-camX,sy=f.y-camY;
+        if(sx>-10&&sx<W+10&&sy>-10&&sy<H+10){f.stun=2.6;
+          /* C6 ROLEX Z DIAMENTAMI: błysk nie tylko oślepia, ale i przypiera */
+          if(hasCon('edek',6))dealDmg(f,'edek',1.4*skM,{ox:P.x,oy:P.y});
+          fxStarFlash(f.x,f.y-20,'#fff7d6',6,{life:.5});}
+      }
+      toast('⌚ BŁYSK ROLEXA! Hejterzy oślepieni!');
+      if(!curVoice)vsay('c_rolexlewa');SFX.dia();
+    },n:'Edward Warchocki',elId:'elegancja',star:5,
     idleV:['c_rolexlewa','c_elegancko2','c_kamera','v_elegancko','c_ziomali'],
     spd:85,batk:22,rng:23,atk:'melee',
     spcN:'BŁYSK ROLEXA',spcCd:12,spcD:'oślepia wszystkich wrogów na ekranie',
     hitTxt:['ŁUP!','BAM!','Z KOPYTA!'],
     desc:'Pierwszy polski robot-influencer. Rolex, wąs, zasięgi.',how:'START'},
-  dych:{n:'Dych Dziki',elId:'piwo',star:5,
+  dych:{
+    burst:{jingle:'d_song',col:'#2f6b33',bar:'#7bc950',
+    ready:'[Q] 💥 DZIKI DYCH!',
+    full:'💥 SUPER-HIT GOTOWY! Wciśnij [Q], mordeczko!',cut:1.5},
+    c6:{n:'DZIKO, MORDECZKO',  d:'DZIKA SZARŻA leci dwa razy pod rząd'},
+    sig:'butelkaD',
+    /* [E] — UMIEJĘTNOŚĆ. `skM` to mnożnik obrażeń z talentu i konstelacji. */
+    skill(skM){// DZIKA SZARŻA
+      dashT=.28;dashDir=P.dir;
+      /* C6 DZIKO, MORDECZKO: druga szarża zaraz po pierwszej */
+      if(hasCon('dych',6))setTimeout(()=>{if(scene==='world'){dashT=.28;dashDir=P.dir;
+        addHit(P.x,P.y-18,'JESZCZE RAZ!','#7bc950');fxDust(P.x,P.y+4,8);}},340);
+      addHit(P.x,P.y-18,'SZARŻA!','#f5a032');
+      fxDust(P.x,P.y+4,8);
+      fxRing(P.x,P.y,20,'#f5a032',{life:.25,w:2,ground:true});
+      addShake(2,.28);
+      beep(90,.3,'sawtooth',.09,45);
+    },n:'Dych Dziki',elId:'piwo',star:5,
     idleV:['d_siemanko','d_wariacie','d_mordeczko','d_lecimy'],
     spd:95,batk:30,rng:26,atk:'melee',
     spcN:'DZIKA SZARŻA',spcCd:5,spcD:'taranuje wszystko na swojej drodze',
     hitTxt:['DZIKO!','ŁUBUDU!','BZZT!'],
     desc:'Drugi robot z YT. Na mieście kręci się, w głowie ma ogień.',how:'Życzenia — własny baner'},
-  grazynka:{n:'Grażynka 3000',elId:'swojskosc',star:5,
+  grazynka:{
+    c6:{n:'ROSÓŁ DLA WSZYSTKICH',d:'GORĄCY ROSÓŁ leczy CAŁĄ ekipę, nie tylko Grażynkę'},
+    sig:'chochlaZ',
+    /* [E] — UMIEJĘTNOŚĆ. `skM` to mnożnik obrażeń z talentu i konstelacji. */
+    skill(skM){// GORĄCY ROSÓŁ — leczy 50% HP + para parzy
+      const gmax=chHpMax(S.ch),ghl=Math.round(gmax*.5);
+      PHP[S.ch]=Math.min(gmax,PHP[S.ch]+ghl);worldFlash=.3;
+      addDmgNum(P.x,P.y-26,'+'+ghl,'#7bc950');
+      /* C6 ROSÓŁ DLA WSZYSTKICH: talerz leci na całą ekipę */
+      if(hasCon('grazynka',6)){healParty(.5);
+        addHit(P.x,P.y-40,'DLA CAŁEJ EKIPY!','#7bc950');}
+      for(const f of foes)if(Math.hypot(f.x-P.x,f.y-P.y)<64)dealDmg(f,'grazynka',1.25*skM);
+      for(let i=0;i<14;i++)smoke.push({x:P.x+(Math.random()-.5)*40,y:P.y-(Math.random()*20),r:2,life:1.6});
+      fxRing(P.x,P.y+2,66,'#7bc950',{life:.5,w:3,ground:true});
+      for(let i=0;i<(reduceMotion?5:12);i++) // złote i zielone drobinki lecą w górę
+        fxP({x:P.x+(Math.random()-.5)*30,y:P.y-4-Math.random()*10,vx:(Math.random()-.5)*16,
+          vy:-30-Math.random()*35,g:-20,life:.9,life0:.9,sz:1.8,
+          col:Math.random()<.5?'#7bc950':'#f5c542',add:true,shrink:true});
+      toast('🍲 GORĄCY ROSÓŁ! +50% HP, hejterzy sparzeni!');
+      SFX.buy();
+    },n:'Grażynka 3000',elId:'swojskosc',star:5,
     spd:80,batk:20,rng:27,atk:'melee',
     spcN:'GORĄCY ROSÓŁ',spcCd:18,spcD:'leczy 50% HP i parzy wrogów parą',
     hitTxt:['CHOCHLĄ!','A ZUPKA?','SIO!'],
     desc:'Robotka-kucharka, streamuje obiady. Chochla pierwszej klasy.',how:'Życzenia — własny baner'},
-  jarek:{n:'Jarek Zegarek',elId:'czas',star:4,
+  jarek:{
+    c6:{n:'ZEGAREK NA GWARANCJI',d:'STOP-KLATKA trwa 10 s zamiast 6'},
+    sig:'wahadloC',
+    /* [E] — UMIEJĘTNOŚĆ. `skM` to mnożnik obrażeń z talentu i konstelacji. */
+    skill(skM){// STOP-KLATKA — globalne spowolnienie
+      slowAll=hasCon('jarek',6)?10:6;worldFlash=.3;   // C6: zegarek na gwarancji
+      fxRing(P.x,P.y-8,130,'#6fd8e8',{life:.6,w:3});
+      fxRing(P.x,P.y-8,90,'#ffffff',{life:.45,w:1.6});
+      fxRing(P.x,P.y-8,50,'#6fd8e8',{life:.3,w:1.6});
+      for(const f of foes){f.stun=Math.max(f.stun,1);
+        fxSparks(f.x,f.y-14,'#6fd8e8',4,40,{life:.6,g:0,up:0,sz:1.3});}
+      addShake(1.6,.2);
+      toast('⏱️ STOP-KLATKA! Czas płynie tylko dla Ciebie!');
+      beep(1568,.4,'triangle',.08,180);
+    },n:'Jarek Zegarek',elId:'czas',star:4,
     spd:82,batk:21,rng:23,atk:'melee',slow:3,
     spcN:'STOP-KLATKA',spcCd:14,spcD:'zatrzymuje czas — wrogowie zwalniają na 6 s',
     hitTxt:['TIK!','TAK!','PUNKTUALNIE!'],
     desc:'Jubiler od rolexa Edka. Czas działa dla niego.',how:'Życzenia — własny baner'},
-  zenek:{n:'Zenek Spawacz',elId:'spaw',star:5,
+  zenek:{
+    c6:{n:'SPAW NA ZIMNO',     d:'PALNIK podpala dwa razy dłużej'},
+    sig:'palnikA',
+    /* [E] — UMIEJĘTNOŚĆ. `skM` to mnożnik obrażeń z talentu i konstelacji. */
+    skill(skM){// PALNIK — stożek ognia w kierunku patrzenia
+      const dv=DV[P.dir];
+      flameT=.45;flameDir=P.dir;   // strumień ognia rysowany przez chwilę (updateWorld)
+      for(const f of foes){
+        const rx=f.x-P.x,ry=f.y-P.y,d=Math.hypot(rx,ry);
+        if(d<76&&rx*dv[0]+ry*dv[1]>d*.35){dealDmg(f,'zenek',1.5*skM);
+          f.burn=Math.max(f.burn||0,hasCon('zenek',6)?6:3);   // C6 SPAW NA ZIMNO
+          f.burnDmg=Math.round(chATK('zenek')*.25*skM);}
+      }
+      addShake(2,.3);
+      toast('🔥 PALNIK 3000°C! PSSSST!');
+      beep(140,.5,'sawtooth',.1,60);
+    },n:'Zenek Spawacz',elId:'spaw',star:5,
     spd:78,batk:23,rng:21,atk:'melee',burn:3,
     spcN:'PALNIK 3000°C',spcCd:10,spcD:'stożek ognia — podpala wrogów',
     hitTxt:['PSSST!','BZZZT!','SPAW!'],
     desc:'U niego każda blacha dostaje drugie życie.',how:'Życzenia — własny baner'},
-  julka:{n:'Julka z Tindera',elId:'serca',star:5,
+  julka:{
+    c6:{n:'SERDUSZKA DLA KAŻDEGO',d:'ZAUROCZENIE łapie także elity i mini-bossów'},
+    sig:'lukA',
+    /* [E] — UMIEJĘTNOŚĆ. `skM` to mnożnik obrażeń z talentu i konstelacji. */
+    skill(skM){// ZAUROCZENIE — 3 najbliżsi walczą po naszej stronie
+      const elity=hasCon('julka',6);   // C6 SERDUSZKA DLA KAŻDEGO
+      const near=foes.filter(f=>!f.boss&&(elity||!FOE_TYPES[f.t].elite)).sort((a,b)=>Math.hypot(a.x-P.x,a.y-P.y)-Math.hypot(b.x-P.x,b.y-P.y)).slice(0,3);
+      for(const f of near){f.charm=6;addHit(f.x,f.y-18,'💘','#e88ac8');
+        fxHearts(f.x,f.y-16,6);fxRing(f.x,f.y-8,18,'#e88ac8',{life:.35,w:2});}
+      fxHearts(P.x,P.y-20,4);
+      toast('💘 ZAUROCZENIE! '+near.length+' hejterów walczy dla Ciebie!');
+      beep(1046,.1,'triangle',.08);setTimeout(()=>beep(1318,.18,'triangle',.08),110);
+    },n:'Julka z Tindera',elId:'serca',star:5,
     spd:88,batk:19,rng:80,atk:'proj',
     spcN:'ZAUROCZENIE',spcCd:16,spcD:'3 wrogów zakochuje się i walczy po Twojej stronie',
     hitTxt:['CMOK!','MATCH!'],
     desc:'Przyjaźń na zawsze. Serduszka lecą jak lajki.',how:'Życzenia — własny baner'},
-  bogdan:{n:'Rybak Bogdan',elId:'baltyk',star:4,
+  bogdan:{
+    c6:{n:'SZTORM 12 W SKALI', d:'FALA BAŁTYCKA zadaje obrażenia, nie tylko odrzuca'},
+    sig:'dorszM',
+    /* [E] — UMIEJĘTNOŚĆ. `skM` to mnożnik obrażeń z talentu i konstelacji. */
+    skill(skM){// FALA BAŁTYCKA — obrażenia + mega odrzut
+      worldFlash=.25;
+      fxRing(P.x,P.y+2,95,'#4a8ac8',{life:.55,w:5,ground:true});
+      fxRing(P.x,P.y+2,70,'#bfe8f4',{life:.42,w:3,ground:true});
+      for(let i=0;i<(reduceMotion?8:22);i++){ // bryzgi piany na krawędzi fali
+        const a=Math.random()*6.28;
+        fxP({x:P.x+Math.cos(a)*26,y:P.y+Math.sin(a)*14,vx:Math.cos(a)*120,vy:Math.sin(a)*70-50,
+          g:260,life:.55,life0:.55,sz:1.8,col:Math.random()<.5?'#bfe8f4':'#ffffff',add:true,shrink:true});
+      }
+      addShake(3.6,.35);
+      for(const f of foes)if(Math.hypot(f.x-P.x,f.y-P.y)<95){
+        dealDmg(f,'bogdan',(hasCon('bogdan',6)?2.2:1.1)*skM,{kb:0});f.kb=.5;   // C6 SZTORM 12
+        const d=Math.max(1,Math.hypot(f.x-P.x,f.y-P.y));
+        f.kbx=(f.x-P.x)/d*300;f.kby=(f.y-P.y)/d*300;
+      }
+      toast('🌊 FALA BAŁTYCKA! Hejterzy zmyci!');
+      beep(70,.6,'sawtooth',.1,35);
+    },n:'Rybak Bogdan',elId:'baltyk',star:4,
     spd:76,batk:26,rng:95,atk:'proj',
     spcN:'FALA BAŁTYCKA',spcCd:12,spcD:'fala zmiata i odrzuca wszystkich wrogów',
     hitTxt:['DORSZ!','PLASK!'],
@@ -2749,8 +2774,6 @@ const WEAPONS={
   wasP:{n:'Wąs Przeznaczenia',star:5,atk:38,sub:{hp:120},ic:'〰️',desc:'Widać go z kosmosu. Czuć jego moc. Nie promuje go żaden baner.'},
 };
 /* BROŃ SYGNATUROWA — baner broni zawsze pokazuje sygnaturę postaci z banera postaci */
-const SIG_WEAP={edek:'rolexM',dych:'butelkaD',grazynka:'chochlaZ',jarek:'wahadloC',
-  zenek:'palnikA',julka:'lukA',bogdan:'dorszM'};
 /* --- ARTEFAKTY: 3 sloty (0=TALIZMAN, 1=BIŻUTERIA, 2=GADŻET) --- */
 const ART_SLOTS=['🧿 TALIZMAN','💍 BIŻUTERIA','🎽 GADŻET'];
 const ARTS={
@@ -2860,15 +2883,6 @@ const CON_LADDER=[
   {n:'TWARDSZA BLACHA',   d:'+15% HP'},
   {n:'WIRALOWY HIT',      d:'+20% obrażeń SUPER-HITU [Q]'},
 ];
-const CON6={
-  edek:    {n:'ROLEX Z DIAMENTAMI',d:'BŁYSK ROLEXA nie tylko oślepia — teraz też przypiera hejterów obrażeniami'},
-  dych:    {n:'DZIKO, MORDECZKO',  d:'DZIKA SZARŻA leci dwa razy pod rząd'},
-  grazynka:{n:'ROSÓŁ DLA WSZYSTKICH',d:'GORĄCY ROSÓŁ leczy CAŁĄ ekipę, nie tylko Grażynkę'},
-  jarek:   {n:'ZEGAREK NA GWARANCJI',d:'STOP-KLATKA trwa 10 s zamiast 6'},
-  zenek:   {n:'SPAW NA ZIMNO',     d:'PALNIK podpala dwa razy dłużej'},
-  julka:   {n:'SERDUSZKA DLA KAŻDEGO',d:'ZAUROCZENIE łapie także elity i mini-bossów'},
-  bogdan:  {n:'SZTORM 12 W SKALI', d:'FALA BAŁTYCKA zadaje obrażenia, nie tylko odrzuca'},
-};
 const conOf=id=>Math.min(6,chData(id).con||0);
 const hasCon=(id,n)=>conOf(id)>=n;
 /* --- TALENTY: 3 na postać (ciosy / [E] / [Q]), poziomy 1-10 ------------- */
@@ -3495,17 +3509,17 @@ function drawPoliceHUD(){
    BOSSOWIE REGIONALNI
    ===================================================================== */
 const BOSSES={
-  krol:{r:'wawa',x:112,y:73,t:'krol',n:'KRÓL DZIKÓW',batk:'charge',
+  krol:{drop:['art','kiel'],r:'wawa',x:112,y:73,t:'krol',n:'KRÓL DZIKÓW',batk:'charge',
     film:'WALCZĘ Z KRÓLEM DZIKÓW! (prawie mnie stratował)',
     intro:[['Edek','Te dziki mają swojego króla?! Miasto to nie chlew, byku!','c_problemy'],
            ['KRÓL DZIKÓW','CHRUM CHRUM!!! TO MÓJ PARK, BLASZAKU!'],
            ['Edek','Uciekajcie stąd, dziki! Zbierajcie się, no już!','c_uciekajcie']]},
-  seba:{r:'chodziez',x:80,y:57,t:'mdres',n:'MEGA DRES SEBASTIAN OSTATECZNY',batk:'kettle',
+  seba:{drop:['weap','kettle'],r:'chodziez',x:80,y:57,t:'mdres',n:'MEGA DRES SEBASTIAN OSTATECZNY',batk:'kettle',
     film:'MEGA DRES CHCIAŁ MI ZABRAĆ ROLEXA (poszło z kopyta)',
     intro:[['Sebastian Ostateczny','Patrzcie, robot-celebryta. Oddawaj rolexa i kanał, blaszko!'],
            ['Edek','Jestem Warchockim Edwardem, byku. Rolex zostaje na lewej.','c_rolexlewa'],
            ['Sebastian Ostateczny','TO TERAZ ZOBACZYSZ KETTLE Z CHODZIEŻY!']]},
-  kraken:{r:'morze',x:96,y:49,t:'kraken',n:'KRAKEN BAŁTYCKI',batk:'bryzg',
+  kraken:{drop:['art','kolczykK'],r:'morze',x:96,y:49,t:'kraken',n:'KRAKEN BAŁTYCKI',batk:'bryzg',
     film:'KRAKEN W BAŁTYKU?! (nagrałem wszystko)',
     intro:[['Rybak Bogdan','Panie Edward! COŚ wyszło z morza i kradnie bursztyny!'],
            ['KRAKEN BAŁTYCKI','BLUB BLUB... WYŚWIETLENIA... ODDAĆ... MOJE...'],
@@ -3513,7 +3527,7 @@ const BOSSES={
   /* HORDA PSZCZÓŁ — boss DWUETAPOWY. Etap 1 to UL: stoi na środku pasieki i
      wypuszcza rój; co 25% jego HP rój robi się liczniejszy i mocniejszy (4 fazy).
      Po rozwaleniu ula z resztek wychodzi KRÓLOWA (`next`) z trzema atakami. */
-  horda:{r:'krakow',x:27,y:62,t:'ul',n:'HORDA PSZCZÓŁ',hive:true,
+  horda:{drop:['art','koronaP'],r:'krakow',x:27,y:62,t:'ul',n:'HORDA PSZCZÓŁ',hive:true,
     film:'ROZWALIŁEM UL POD KRAKOWEM I WYSZŁA KRÓLOWA (obłęd)',
     next:{t:'krolowa',n:'KRÓLOWA PSZCZÓŁ',moves:['zadlo','rojnica','miodospad'],
       intro:[['???','BZZZZZZZZZZ...'],
@@ -3525,19 +3539,19 @@ const BOSSES={
            ['UL','BZZZ… BZZZ… BZZZZZZZZ!!!'],
            ['Edek','Ej ludzie, one wszystkie wyleciały! Odganiam się, odganiam…','c_odganiam'],
            ['Edek','Spokojnie, spokojnie. Rozwalamy ten ul i po sprawie. Jedziemy z tym koksem!','c_spokoj']]},
-  smok:{r:'krakow',x:104,y:65,t:'smok',n:'SMOK WAWELSKI',batk:'ogien',
+  smok:{drop:['art','luska'],r:'krakow',x:104,y:65,t:'smok',n:'SMOK WAWELSKI',batk:'ogien',
     film:'OBUDZIŁEM SMOKA WAWELSKIEGO (Kraków ewakuowany?!)',
     intro:[['Przekupka','Panie Edwardzie! Smok się obudził i żąda... wyświetleń!'],
            ['SMOK WAWELSKI','TYSIĄC LAT SPAŁEM. A TERAZ JAKIŚ BLASZAK MA WIĘCEJ FANÓW ODE MNIE?!'],
            ['Edek','Człowieku, ja mam rolexa z diamentami. A ty? Ogień z paszczy. Wyrównajmy rachunki.','c_rolextiktok']]},
-  laweta:{r:'trasa',x:96,y:61,t:'laweciarz',n:'PAN LAWETA 3000',batk:'charge',
+  laweta:{drop:['art','hakL'],r:'trasa',x:96,y:61,t:'laweciarz',n:'PAN LAWETA 3000',batk:'charge',
     film:'AUTO LAWETA CHCIAŁA MNIE ZABRAĆ NA ZŁOM (a my na Poland Rocka!)',
     intro:[['Edek','Dych Dziki człowieku, patrz tam! Auto laweta leci, pewnie po nas. Wsiadamy czy co?','c_laweta'],
            ['PAN LAWETA 3000','DWA ROBOTY NA POBOCZU?! HAK JUŻ OPUSZCZONY. NA ZŁOM Z WAMI!'],
            ['Edek','Panie kierowco, panie kierowco! My jedziemy na Poland Rocka, nie na złomowisko!','c_paniekierowco']]},
   /* KLAUNICA Z FESTIWALU — scena 1:1 z shorta „ja nic takiego nie zrobiłem".
      `moves` = 4 własne ataki z katalogu BOSS_MOVES (reszta bossów ma proste `batk`). */
-  klaunica:{r:'trasa',x:29,y:63,t:'klaunica',n:'KLAUNICA Z FESTIWALU',
+  klaunica:{drop:['art','rogiK'],r:'trasa',x:29,y:63,t:'klaunica',n:'KLAUNICA Z FESTIWALU',
     moves:['mamnagrane','jestdowod','narogi','niechcacy'],
     film:'DZIEWCZYNA Z FESTIWALU MIAŁA WSZYSTKO NAGRANE (musiałem się tłumaczyć)',
     intro:[['Klaunica','O matko jedyna.','k_matko'],
@@ -3557,7 +3571,7 @@ const BOSSES={
     intro2:[['Klaunica','Wróciłeś? Nagranie dalej mam. Jest dowód, że to zrobiłeś, Edward.','k_jestdowod'],
             ['Edek','Chyba ci się z kimś innym pomyliłem.','c_pomylilem'],
             ['Klaunica','No to jedziemy jeszcze raz, blaszaku.']]},
-  yeti:{r:'tatry',x:96,y:57,t:'yeti',n:'YETI Z GIEWONTU',batk:'snieg',
+  yeti:{drop:['weap','ciupaga'],r:'tatry',x:96,y:57,t:'yeti',n:'YETI Z GIEWONTU',batk:'snieg',
     film:'YETI ISTNIEJE!!! (nagranie z Giewontu, nie klikbajt)',
     intro:[['Baca','Edek, cosik po graniach chodzi i porywa oscypki! Jak nic — YETI!'],
            ['YETI','GRRR! MOJE GÓRY! MOJA CISZA! ZABIERAJ TE KAMERY!'],
@@ -3635,9 +3649,6 @@ function bossStage2(f,nx){
     initAudio().then(startBossMusic);
   });
 }
-const BOSS_DROP={krol:['art','kiel'],mdres:['weap','kettle'],kraken:['art','kolczykK'],
-  smok:['art','luska'],yeti:['weap','ciupaga'],laweta:['art','hakL'],klaunica:['art','rogiK'],
-  horda:['art','koronaP']};
 function bossDefeated(f){
   const id=f.bid,lvl=S.bossLvl[id]||0;
   const di=1+(lvl>=2?1:0),ch=6+lvl*2,dd=60+lvl*25;
@@ -3646,7 +3657,7 @@ function bossDefeated(f){
      trzecia powtórka — bossowie to jedyne powtarzalne źródło rolexów. */
   const rx=(lvl===0||lvl%3===0)?1:0;
   S.mats.di+=di;S.mats.ch+=ch;S.dia+=dd;S.rolex=(S.rolex||0)+rx;S.bossLvl[id]=lvl+1;
-  const drop=BOSS_DROP[id];
+  const drop=BOSSES[id]&&BOSSES[id].drop;
   if(drop&&!S.gearOwn[drop[1]]){
     S.gearOwn[drop[1]]=1;
     const it=drop[0]==='weap'?WEAPONS[drop[1]]:ARTS[drop[1]];
@@ -3708,7 +3719,7 @@ const bannerSlot=()=>Math.floor((banNow()-BANNER_T0)/BANNER_LEN);
 const bannerAt=k=>BANNER_ORDER[modP(k,BANNER_ORDER.length)];
 const bannerChar=()=>bannerAt(bannerSlot());
 const bannerNext=()=>bannerAt(bannerSlot()+1);
-const bannerWeap=()=>SIG_WEAP[bannerChar()];
+const bannerWeap=()=>CHARS[bannerChar()].sig;
 const bannerLeft=()=>BANNER_LEN-modP(banNow()-BANNER_T0,BANNER_LEN);
 /* szansa na 5★: płasko do progu, potem stromo w górę, na twardej gwarancji 100% */
 const charChance=p=>p>=PITY_HARD?1:p>=PITY_SOFT?Math.min(1,CHAR_BASE+.09*(p-PITY_SOFT+1)):CHAR_BASE;
@@ -4057,7 +4068,7 @@ function tryCon(id){
   S.cons[id]--;d.con=c+1;save();SFX.lvl();burstConfetti();
   if(id===S.ch)applyChar();
   PHP[id]=chHpMax(id);
-  const info=d.con<=5?CON_LADDER[d.con-1]:CON6[id];
+  const info=d.con<=5?CON_LADDER[d.con-1]:CHARS[id].c6;
   toast('⭐ KONSTELACJA C'+d.con+' — '+info.n+'!<br>'+info.d,4600);
   if(!curVoice)vsay('c_elegancko2');
 }
@@ -4426,7 +4437,7 @@ function paneCon(id){
     '<p style="color:var(--acc);font-size:10px">⭐ Gwiazdy Fortuny '+c.n.split(" ")[0]+': <b>'+mam+'</b>'+
     ' &nbsp;·&nbsp; stopień <b>C'+con+'</b>/6</p>';
   for(let i=1;i<=6;i++){
-    const info=i<=5?CON_LADDER[i-1]:CON6[id];
+    const info=i<=5?CON_LADDER[i-1]:CHARS[id].c6;
     const got=con>=i,nx=con===i-1;
     h+='<div class="conNode'+(got?' got':nx?' next':'')+'">'+
       '<span class="cdot">'+(got?'★':'C'+i)+'</span>'+
@@ -6139,9 +6150,14 @@ function drawHumanChar(c,id,x,y,dir,f){
   c.restore();
 }
 /* dispatcher: rysuj dowolną postać z CHARS */
+/* Rysowanie sylwetki idzie przez wpis postaci: CHARS[id].draw. Postacie
+   „ludzkie" (HUMAN_CFG) dostają wspólną rysowalkę i nie muszą nic deklarować. */
+CHARS.dych.draw=(c,x,y,dir,f)=>drawDychBody(c,x,y,dir,f);
+CHARS.grazynka.draw=(c,x,y,dir,f)=>drawGrazynkaBody(c,x,y,dir,f);
+CHARS.edek.draw=(c,x,y,dir,f)=>drawEdekBody(c,x,y,dir,f,1,S?S.equip:DEFAULT_SAVE.equip);
 function drawCharBody(c,id,x,y,dir,f){
-  if(id==='dych')drawDychBody(c,x,y,dir,f);
-  else if(id==='grazynka')drawGrazynkaBody(c,x,y,dir,f);
+  const C=CHARS[id];
+  if(C&&C.draw)C.draw(c,x,y,dir,f);
   else if(HUMAN_CFG[id])drawHumanChar(c,id,x,y,dir,f);
   else drawEdekBody(c,x,y,dir,f,1,S?S.equip:DEFAULT_SAVE.equip);
 }
@@ -6174,222 +6190,242 @@ function drawChest(sx,sy,open){
   cx.restore();
 }
 /* BOSSOWIE — duże sprite'y */
+/* =====================================================================
+   SYLWETKI BOSSÓW — rejestr, dokładnie jak FOE_DRAW dla zwykłych wrogów.
+   Klucz to typ z FOE_TYPES; funkcja dostaje kontekst i przeciwnika,
+   rysuje w układzie już przesuniętym na jego pozycję.
+
+   Nowy boss = wpis tutaj + wpis w BOSSES + typ w FOE_TYPES.
+   Bez dopisywania gałęzi do wspólnej funkcji.
+   ===================================================================== */
+const BOSS_DRAW={
+  kraken(g,f){// KRAKEN BAŁTYCKI — zielony łeb + macki
+    g.fillStyle='#2a6a5a';
+    for(let i=0;i<6;i++){ // macki
+      const a=i/6*6.28+anim*.8;
+      g.beginPath();g.moveTo(0,2);
+      const mx=Math.cos(a)*18,my=6+Math.sin(a)*6;
+      g.quadraticCurveTo(mx*.6,my+Math.sin(anim*6+i)*5,mx,my+Math.sin(anim*4+i)*4);
+      g.lineWidth=5;g.strokeStyle='#2a6a5a';g.stroke();
+      g.fillStyle='#3a8a72';g.beginPath();
+      g.arc(mx,my+Math.sin(anim*4+i)*4,3,0,7);g.fill();
+    }
+    g.fillStyle='#2a6a5a';g.beginPath();g.ellipse(0,-8,13,15,0,0,7);g.fill();
+    g.fillStyle='#3a8a72';g.beginPath();g.ellipse(-4,-12,5,7,0,0,7);g.fill();
+    // ślepia
+    g.fillStyle='#fff7d6';g.beginPath();g.arc(-5,-8,3.4,0,7);g.arc(5,-8,3.4,0,7);g.fill();
+    g.fillStyle='#c02020';g.beginPath();g.arc(-4.4,-8,1.7,0,7);g.arc(5.6,-8,1.7,0,7);g.fill();
+    R(g,-4,-1,8,1.4,'#16324a');
+  },
+  krol(g,f){// KRÓL DZIKÓW — wielki dzik w koronie
+    g.save();g.scale(2.2,2.2);g.translate(-9,-9);
+    drawBoarTop(g,{dx:P.x<f.x?-1:1,t:anim},0,0);
+    g.restore();
+    R(g,-8,-26,16,7,'#f5c542');
+    for(let i=0;i<3;i++){R(g,-7+i*6,-31,3,5,'#f5c542');R(g,-6.4+i*6,-30,1.8,1.8,'#e04848');}
+    R(g,P.x<f.x?-16:11,-6,5,3,'#c02020'); // czerwone ślepia
+  },
+  mdres(g,f){// MEGA DRES — dres 2×, czerwony kaptur, kettlebell
+    g.save();g.scale(2,2);g.translate(-8,-20);
+    const td=FOE_TYPES.mdres;
+    R(g,4,18,3,6,'#1a1a24');R(g,9,18,3,6,'#1a1a24');
+    rr(g,2,8,12,11,2,td.c);
+    R(g,2.8,9,1.4,9,'#c8384a');R(g,11.8,9,1.4,9,'#c8384a'); // czerwone lampasy
+    rr(g,4,0,8,8,2.4,td.skin);
+    rr(g,3,-2,10,5,2,td.hood);R(g,3,2,1.5,5,td.hood);R(g,11.5,2,1.5,5,td.hood);
+    R(g,5.5,3,2,1.5,'#c02020');R(g,8.5,3,2,1.5,'#c02020');
+    g.restore();
+    // kettlebell w łapie
+    rr(g,12,2,11,10,4,'#2a2a34');
+    g.strokeStyle='#2a2a34';g.lineWidth=3;
+    g.beginPath();g.arc(17.5,0,4,Math.PI,0);g.stroke();
+  },
+  smok(g,f){// SMOK WAWELSKI — zielony, zieje ogniem
+    const fl=P.x<f.x;
+    // ogon
+    g.strokeStyle='#3a7a4a';g.lineWidth=6;g.beginPath();
+    g.moveTo(fl?14:-14,4);g.quadraticCurveTo(fl?26:-26,-2+Math.sin(anim*3)*4,fl?32:-32,8);g.stroke();
+    g.fillStyle='#2e6236';g.beginPath();g.moveTo(fl?32:-32,8);
+    g.lineTo(fl?40:-40,4);g.lineTo(fl?36:-36,14);g.fill();
+    // skrzydła
+    g.fillStyle='rgba(90,40,60,.85)';
+    const wb=Math.sin(anim*6)*6;
+    g.beginPath();g.moveTo(0,-14);g.lineTo(-20,-26-wb);g.lineTo(-8,-8);g.fill();
+    g.beginPath();g.moveTo(0,-14);g.lineTo(20,-26-wb);g.lineTo(8,-8);g.fill();
+    // korpus + brzuch
+    g.fillStyle='#3a7a4a';g.beginPath();g.ellipse(0,0,15,17,0,0,7);g.fill();
+    g.fillStyle='#7bc950';g.beginPath();g.ellipse(0,4,9,11,0,0,7);g.fill();
+    for(let i=0;i<3;i++)R(g,-6,-2+i*6,12,2,'#5aa838');
+    // łeb + rogi + ślepia
+    g.fillStyle='#3a7a4a';g.beginPath();g.ellipse(fl?-10:10,-16,9,7,0,0,7);g.fill();
+    g.fillStyle='#ece9f4';
+    g.beginPath();g.moveTo(fl?-14:14,-22);g.lineTo(fl?-18:18,-30);g.lineTo(fl?-10:10,-24);g.fill();
+    g.fillStyle='#c02020';g.beginPath();g.arc(fl?-13:13,-17,2,0,7);g.fill();
+    // dym / ogień z nozdrzy
+    if(Math.floor(anim*4)%2){g.fillStyle='rgba(245,160,50,.7)';
+      g.beginPath();g.arc(fl?-19:19,-14,2.5,0,7);g.fill();}
+  },
+  yeti(g,f){// YETI Z GIEWONTU — wielki, biały, futrzasty
+    g.fillStyle='#d8d4e8';g.beginPath();g.ellipse(0,2,16,19,0,0,7);g.fill();
+    g.fillStyle='#ece9f4';g.beginPath();g.ellipse(0,0,13,16,0,0,7);g.fill();
+    // futro — kłaczki
+    g.strokeStyle='#d8d4e8';g.lineWidth=1.5;
+    for(let i=0;i<8;i++){const a=i/8*6.28;
+      g.beginPath();g.moveTo(Math.cos(a)*13,Math.sin(a)*16);
+      g.lineTo(Math.cos(a)*17,Math.sin(a)*20+Math.sin(anim*5+i)*1.5);g.stroke();}
+    // łapy
+    g.fillStyle='#ece9f4';g.beginPath();g.arc(-16,6+Math.sin(anim*7)*3,6,0,7);g.fill();
+    g.beginPath();g.arc(16,6-Math.sin(anim*7)*3,6,0,7);g.fill();
+    // twarz
+    g.fillStyle='#8faabf';g.beginPath();g.ellipse(0,-8,8,7,0,0,7);g.fill();
+    g.fillStyle='#c02020';g.beginPath();g.arc(-3.5,-10,1.8,0,7);g.arc(3.5,-10,1.8,0,7);g.fill();
+    R(g,-4,-4,8,1.6,'#16324a');
+    g.fillStyle='#ece9f4';R(g,-3,-3,2,2.4,'#ece9f4');R(g,1,-3,2,2.4,'#ece9f4'); // kły
+    // sopelki na futrze
+    if(Math.floor(anim*2)%2){g.fillStyle='#bfe8f4';R(g,-8,14,2,4,'#bfe8f4');R(g,7,13,2,5,'#bfe8f4');}
+  },
+  klaunica(g,f){// KLAUNICA Z FESTIWALU — rogi klauna, czerwone włosy, telefon z dowodem
+    const fl=P.x<f.x?-1:1,sw=Math.sin(anim*6)*1.2;
+    g.fillStyle='rgba(0,0,0,.32)';g.beginPath();g.ellipse(0,26,15,4.5,0,0,7);g.fill();
+    // czarne buty
+    R(g,-8,20,6,6,'#12121a');R(g,2,20,6,6,'#12121a');
+    R(g,-8.5,24.5,7,2,'#0a0a10');R(g,1.5,24.5,7,2,'#0a0a10');
+    // PODKOLANÓWKI do kolan — biało-czarne paski
+    for(let i=0;i<5;i++){const c2=i%2?'#12121a':'#f2f0f8';
+      R(g,-8,10+i*2,6,2,c2);R(g,2,10+i*2,6,2,c2);}
+    // czarna spódniczka (kloszowana)
+    g.fillStyle='#15151f';g.beginPath();
+    g.moveTo(-9,10);g.lineTo(9,10);g.lineTo(13,1);g.lineTo(-13,1);g.closePath();g.fill();
+    g.fillStyle='#22222e';g.beginPath();
+    g.moveTo(-9,10);g.lineTo(0,10);g.lineTo(-4,1);g.lineTo(-13,1);g.closePath();g.fill();
+    R(g,-10,-1,20,3,'#0d0d14');                             // pasek spódnicy
+    // brzuch + CZERWONY STANIK
+    rr(g,-7,-9,14,10,2,'#e8c9a0');
+    g.fillStyle='#e03050';g.beginPath();
+    g.moveTo(-8,-10);g.lineTo(8,-10);g.lineTo(6,-3);g.lineTo(0,-6);g.lineTo(-6,-3);g.closePath();g.fill();
+    R(g,-8.5,-11,17,2,'#c02040');
+    // ręce — jedna trzyma telefon i NAGRYWA
+    R(g,-12,-8,4,10,'#e8c9a0');R(g,8,-9+sw,4,9,'#e8c9a0');
+    rr(g,7.5,-16+sw,6,9,1.4,'#1a1a24');R(g,8.4,-15+sw,4.2,6.6,'#6fd8e8');
+    if(Math.floor(anim*3)%2)R(g,9.4,-14.4+sw,1.6,1.6,'#e03028');   // dioda REC
+    // głowa + CZERWONE WŁOSY (grzywka i pasma po bokach, twarz zostaje odkryta)
+    rr(g,-8,-26,16,16,4.5,'#e8c9a0');
+    g.fillStyle='#d81f34';
+    g.beginPath();g.arc(0,-24,10,Math.PI,0);g.fill();             // czupryna nad czołem
+    R(g,-10,-25,3.5,17,'#d81f34');R(g,6.5,-25,3.5,17,'#d81f34');   // pasma po bokach twarzy
+    R(g,-10,-25,20,4,'#d81f34');                                    // grzywka
+    R(g,-9.6,-25,1.6,13,'#f0344a');R(g,7,-24,1.4,10,'#b81628');    // światło i cień we włosach
+    rr(g,-6,-21,12,11,3,'#e8c9a0');                                 // TWARZ (odkryta spod włosów)
+    // oczy + wściekła mina
+    g.fillStyle='#fff7f2';g.beginPath();g.arc(-3.2,-17,2.8,0,7);g.arc(3.2,-17,2.8,0,7);g.fill();
+    g.fillStyle='#12121a';g.beginPath();g.arc(-3.2+fl*.8,-17,1.6,0,7);g.arc(3.2+fl*.8,-17,1.6,0,7);g.fill();
+    R(g,-6,-20.6,4.6,1.7,'#8a1420');R(g,1.4,-20.6,4.6,1.7,'#8a1420');  // zmarszczone brwi
+    R(g,-2.6,-13.4,5.2,2,'#a3243a');R(g,-1.6,-13,3.2,1,'#e8737f');     // krzywy uśmiech
+    // ROGI KLAUNA — długie, wygięte na boki, z kulkami na końcach
+    const horn=(dir,col,ball)=>{
+      const wob=Math.sin(anim*3+dir)*1.6,ex=dir*23,ey=-30+wob;
+      g.strokeStyle=col;g.lineWidth=3.8;g.lineCap='round';
+      g.beginPath();g.moveTo(dir*5,-25);
+      g.quadraticCurveTo(dir*15,-41,ex,ey);g.stroke();
+      g.fillStyle=ball;g.beginPath();g.arc(ex,ey,3.6,0,7);g.fill();
+      g.fillStyle='rgba(255,255,255,.4)';g.beginPath();g.arc(ex-1.1,ey-1.1,1.3,0,7);g.fill();
+    };
+    horn(-1,'#15151f','#f6f4fa');   // lewy: CZARNY róg z BIAŁĄ kulką
+    horn( 1,'#e03050','#12121a');   // prawy: CZERWONY róg z CZARNĄ kulką
+    g.lineCap='butt';
+    // telegraf szarży: pochyla się do przodu i sypie iskrami
+    if(f.telT!==undefined){g.fillStyle='rgba(224,48,80,.28)';
+      g.beginPath();g.arc(0,-6,22+Math.sin(anim*22)*3,0,7);g.fill();}
+  },
+  ul(g,f){// UL — wielka skrzynia pasieczna, im niższa faza tym bardziej rozbita
+    const fz=f.faza||1,drga=f.flash>0?(Math.random()-.5)*2:0;
+    g.translate(drga,0);
+    g.fillStyle='rgba(0,0,0,.32)';g.beginPath();g.ellipse(0,26,24,6,0,0,7);g.fill();
+    R(g,-20,20,40,6,'#5a3a1e');R(g,-22,24,44,3,'#42280f');        // podest
+    rr(g,-18,-18,36,38,3,'#c8935a');                                // korpus
+    for(let i=0;i<5;i++)R(g,-18,-14+i*8,36,2.6,'#a3743f');          // ramki
+    R(g,-18,-18,3,38,'#e0b06e');                                    // światło na lewej krawędzi
+    g.fillStyle='#8a5a2a';g.beginPath();                            // daszek
+    g.moveTo(-24,-16);g.lineTo(0,-30);g.lineTo(24,-16);g.fill();
+    R(g,-24,-17,48,3,'#6e4520');
+    R(g,-9,12,18,5,'#3a2410');                                       // WYLOTEK — stąd sypie się rój
+    /* pęknięcia narastają z każdą fazą — widać, że ul się rozlatuje */
+    g.strokeStyle='#5a3a1e';g.lineWidth=1.6;
+    for(let i=0;i<(fz-1)*3;i++){const a=i*1.9;
+      g.beginPath();g.moveTo(Math.cos(a)*6,Math.sin(a)*6-4);
+      g.lineTo(Math.cos(a)*17,Math.sin(a)*15-4);g.stroke();}
+    /* rój krążący wokół ula — gęstnieje z fazą */
+    if(!reduceMotion)for(let i=0;i<fz*3;i++){
+      const a=anim*(2+fz*.35)+i*(6.28/(fz*3)),rx=28+Math.sin(anim*3+i)*5;
+      R(g,Math.cos(a)*rx-1,Math.sin(a)*rx*.6-6,2.2,2.2,'#f5c542');}
+    if(fz>=3){g.fillStyle='rgba(245,160,50,.18)';                    // aura wściekłości
+      g.beginPath();g.arc(0,-2,34+Math.sin(anim*9)*3,0,7);g.fill();}
+  },
+  krolowa(g,f){// KRÓLOWA PSZCZÓŁ — wielka, w koronie, na przezroczystych skrzydłach
+    const fl=P.x<f.x?-1:1,fly=Math.sin(anim*3)*2.5,wf=Math.sin(anim*22)*(reduceMotion?0:5);
+    g.translate(0,fly);
+    g.fillStyle='rgba(0,0,0,.28)';g.beginPath();g.ellipse(0,30-fly*.5,17,4.5,0,0,7);g.fill();
+    // SKRZYDŁA (za korpusem)
+    g.fillStyle='rgba(200,232,248,.5)';
+    for(const dx2 of[-1,1]){
+      g.beginPath();g.ellipse(dx2*15,-12-wf*.4,13,6,dx2*(.5+wf*.03),0,7);g.fill();
+      g.beginPath();g.ellipse(dx2*12,-4-wf*.3,10,4.5,dx2*(.7+wf*.03),0,7);g.fill();}
+    // ODWŁOK w pasy + ŻĄDŁO
+    for(let i=0;i<4;i++)rr(g,-11,-2+i*6,22,6,2.4,i%2?'#1a1a24':'#f5c542');
+    g.fillStyle='#12121a';g.beginPath();
+    g.moveTo(-4,22);g.lineTo(4,22);g.lineTo(0,32);g.fill();       // żądło
+    // TUŁÓW futrzasty
+    rr(g,-12,-16,24,16,5,'#c8935a');
+    for(let i=0;i<6;i++)R(g,-12+i*4,-17,2,3,'#8a5a2a');
+    // GŁOWA + wielkie oczy + czułki
+    rr(g,-9,-30,18,16,5,'#1a1a24');
+    g.fillStyle='#2a2a3a';g.beginPath();
+    g.ellipse(-4.5,-24,3.6,5,-.2,0,7);g.ellipse(4.5,-24,3.6,5,.2,0,7);g.fill();
+    g.fillStyle='#e04848';g.beginPath();
+    g.arc(-4.5+fl*.8,-24,1.7,0,7);g.arc(4.5+fl*.8,-24,1.7,0,7);g.fill();
+    g.strokeStyle='#12121a';g.lineWidth=1.6;
+    for(const dx2 of[-1,1]){g.beginPath();g.moveTo(dx2*5,-30);
+      g.quadraticCurveTo(dx2*11,-40,dx2*8+Math.sin(anim*4)*2,-44);g.stroke();}
+    // KORONA
+    R(g,-8,-38,16,4,'#f5c542');
+    for(let i=0;i<3;i++){R(g,-7+i*6,-43,3,5,'#f5c542');R(g,-6.4+i*6,-42,1.8,1.8,'#e04848');}
+    if(f.telT!==undefined){g.fillStyle='rgba(245,197,66,.26)';      // telegraf ŻĄDŁA
+      g.beginPath();g.arc(0,-8,26+Math.sin(anim*22)*3,0,7);g.fill();}
+  },
+  laweciarz(g,f){// PAN LAWETA 3000 — pomarańczowa laweta z hakiem
+    const fl=P.x<f.x;
+    g.fillStyle='rgba(0,0,0,.3)';g.beginPath();g.ellipse(0,20,26,5,0,0,7);g.fill();
+    // platforma + koła
+    rr(g,-26,2,52,12,2,'#f5a032');R(g,-26,2,52,3,'#ffc46a');
+    R(g,-24,12,52,3,'#8a5a1a');
+    g.fillStyle='#1a1a24';
+    for(const wx of[-18,-6,14,22]){g.beginPath();g.arc(wx,17,5,0,7);g.fill();
+      g.fillStyle='#5a5a6a';g.beginPath();g.arc(wx,17,2,0,7);g.fill();g.fillStyle='#1a1a24';}
+    // kabina po stronie gracza
+    const kx=fl?-24:8;
+    rr(g,kx,-14,16,17,2,'#c8384a');
+    rr(g,kx+2,-11,12,7,1.5,'#6fd8e8');R(g,kx+2,-11,12,2.4,'#a8e8f4');
+    R(g,kx+1,-16,14,2.4,'#8a2438');
+    // kogut na dachu
+    if(Math.floor(anim*6)%2)R(g,kx+5,-19,6,3,'#f5c542');else R(g,kx+5,-19,6,3,'#e04848');
+    // ramię z hakiem — celuje w gracza
+    const ax=fl?-30:30,sw=Math.sin(anim*2)*4;
+    g.strokeStyle='#8a8a98';g.lineWidth=4;
+    g.beginPath();g.moveTo(fl?-10:10,-2);g.lineTo(ax,-10+sw);g.stroke();
+    g.strokeStyle='#c9c4dd';g.lineWidth=1.5;
+    g.beginPath();g.moveTo(ax,-10+sw);g.lineTo(ax,2+sw);g.stroke();
+    g.strokeStyle='#ece9f4';g.lineWidth=3;
+    g.beginPath();g.arc(ax,5+sw,4,.6,4.2);g.stroke();   // HAK
+    // ślepia w szybie
+    g.fillStyle='#c02020';R(g,kx+4,-9,3,2,'#c02020');R(g,kx+9,-9,3,2,'#c02020');
+  },
+};
 function drawBoss(f,sx,sy){
   const bob=(f.stun>0||f.hold>0)?0:Math.sin(anim*5)*1.2;   // w trakcie ataku stoi jak wryty
   if(f.flash>0)cx.globalAlpha=.6;
   cx.save();cx.translate(sx,sy+bob);
-  if(f.t==='krol'){ // KRÓL DZIKÓW — wielki dzik w koronie
-    cx.save();cx.scale(2.2,2.2);cx.translate(-9,-9);
-    drawBoarTop(cx,{dx:P.x<f.x?-1:1,t:anim},0,0);
-    cx.restore();
-    R(cx,-8,-26,16,7,'#f5c542');
-    for(let i=0;i<3;i++){R(cx,-7+i*6,-31,3,5,'#f5c542');R(cx,-6.4+i*6,-30,1.8,1.8,'#e04848');}
-    R(cx,P.x<f.x?-16:11,-6,5,3,'#c02020'); // czerwone ślepia
-  }else if(f.t==='mdres'){ // MEGA DRES — dres 2×, czerwony kaptur, kettlebell
-    cx.save();cx.scale(2,2);cx.translate(-8,-20);
-    const td=FOE_TYPES.mdres;
-    R(cx,4,18,3,6,'#1a1a24');R(cx,9,18,3,6,'#1a1a24');
-    rr(cx,2,8,12,11,2,td.c);
-    R(cx,2.8,9,1.4,9,'#c8384a');R(cx,11.8,9,1.4,9,'#c8384a'); // czerwone lampasy
-    rr(cx,4,0,8,8,2.4,td.skin);
-    rr(cx,3,-2,10,5,2,td.hood);R(cx,3,2,1.5,5,td.hood);R(cx,11.5,2,1.5,5,td.hood);
-    R(cx,5.5,3,2,1.5,'#c02020');R(cx,8.5,3,2,1.5,'#c02020');
-    cx.restore();
-    // kettlebell w łapie
-    rr(cx,12,2,11,10,4,'#2a2a34');
-    cx.strokeStyle='#2a2a34';cx.lineWidth=3;
-    cx.beginPath();cx.arc(17.5,0,4,Math.PI,0);cx.stroke();
-  }else if(f.t==='smok'){ // SMOK WAWELSKI — zielony, zieje ogniem
-    const fl=P.x<f.x;
-    // ogon
-    cx.strokeStyle='#3a7a4a';cx.lineWidth=6;cx.beginPath();
-    cx.moveTo(fl?14:-14,4);cx.quadraticCurveTo(fl?26:-26,-2+Math.sin(anim*3)*4,fl?32:-32,8);cx.stroke();
-    cx.fillStyle='#2e6236';cx.beginPath();cx.moveTo(fl?32:-32,8);
-    cx.lineTo(fl?40:-40,4);cx.lineTo(fl?36:-36,14);cx.fill();
-    // skrzydła
-    cx.fillStyle='rgba(90,40,60,.85)';
-    const wb=Math.sin(anim*6)*6;
-    cx.beginPath();cx.moveTo(0,-14);cx.lineTo(-20,-26-wb);cx.lineTo(-8,-8);cx.fill();
-    cx.beginPath();cx.moveTo(0,-14);cx.lineTo(20,-26-wb);cx.lineTo(8,-8);cx.fill();
-    // korpus + brzuch
-    cx.fillStyle='#3a7a4a';cx.beginPath();cx.ellipse(0,0,15,17,0,0,7);cx.fill();
-    cx.fillStyle='#7bc950';cx.beginPath();cx.ellipse(0,4,9,11,0,0,7);cx.fill();
-    for(let i=0;i<3;i++)R(cx,-6,-2+i*6,12,2,'#5aa838');
-    // łeb + rogi + ślepia
-    cx.fillStyle='#3a7a4a';cx.beginPath();cx.ellipse(fl?-10:10,-16,9,7,0,0,7);cx.fill();
-    cx.fillStyle='#ece9f4';
-    cx.beginPath();cx.moveTo(fl?-14:14,-22);cx.lineTo(fl?-18:18,-30);cx.lineTo(fl?-10:10,-24);cx.fill();
-    cx.fillStyle='#c02020';cx.beginPath();cx.arc(fl?-13:13,-17,2,0,7);cx.fill();
-    // dym / ogień z nozdrzy
-    if(Math.floor(anim*4)%2){cx.fillStyle='rgba(245,160,50,.7)';
-      cx.beginPath();cx.arc(fl?-19:19,-14,2.5,0,7);cx.fill();}
-  }else if(f.t==='yeti'){ // YETI Z GIEWONTU — wielki, biały, futrzasty
-    cx.fillStyle='#d8d4e8';cx.beginPath();cx.ellipse(0,2,16,19,0,0,7);cx.fill();
-    cx.fillStyle='#ece9f4';cx.beginPath();cx.ellipse(0,0,13,16,0,0,7);cx.fill();
-    // futro — kłaczki
-    cx.strokeStyle='#d8d4e8';cx.lineWidth=1.5;
-    for(let i=0;i<8;i++){const a=i/8*6.28;
-      cx.beginPath();cx.moveTo(Math.cos(a)*13,Math.sin(a)*16);
-      cx.lineTo(Math.cos(a)*17,Math.sin(a)*20+Math.sin(anim*5+i)*1.5);cx.stroke();}
-    // łapy
-    cx.fillStyle='#ece9f4';cx.beginPath();cx.arc(-16,6+Math.sin(anim*7)*3,6,0,7);cx.fill();
-    cx.beginPath();cx.arc(16,6-Math.sin(anim*7)*3,6,0,7);cx.fill();
-    // twarz
-    cx.fillStyle='#8faabf';cx.beginPath();cx.ellipse(0,-8,8,7,0,0,7);cx.fill();
-    cx.fillStyle='#c02020';cx.beginPath();cx.arc(-3.5,-10,1.8,0,7);cx.arc(3.5,-10,1.8,0,7);cx.fill();
-    R(cx,-4,-4,8,1.6,'#16324a');
-    cx.fillStyle='#ece9f4';R(cx,-3,-3,2,2.4,'#ece9f4');R(cx,1,-3,2,2.4,'#ece9f4'); // kły
-    // sopelki na futrze
-    if(Math.floor(anim*2)%2){cx.fillStyle='#bfe8f4';R(cx,-8,14,2,4,'#bfe8f4');R(cx,7,13,2,5,'#bfe8f4');}
-  }else if(f.t==='klaunica'){ // KLAUNICA Z FESTIWALU — rogi klauna, czerwone włosy, telefon z dowodem
-    const fl=P.x<f.x?-1:1,sw=Math.sin(anim*6)*1.2;
-    cx.fillStyle='rgba(0,0,0,.32)';cx.beginPath();cx.ellipse(0,26,15,4.5,0,0,7);cx.fill();
-    // czarne buty
-    R(cx,-8,20,6,6,'#12121a');R(cx,2,20,6,6,'#12121a');
-    R(cx,-8.5,24.5,7,2,'#0a0a10');R(cx,1.5,24.5,7,2,'#0a0a10');
-    // PODKOLANÓWKI do kolan — biało-czarne paski
-    for(let i=0;i<5;i++){const c2=i%2?'#12121a':'#f2f0f8';
-      R(cx,-8,10+i*2,6,2,c2);R(cx,2,10+i*2,6,2,c2);}
-    // czarna spódniczka (kloszowana)
-    cx.fillStyle='#15151f';cx.beginPath();
-    cx.moveTo(-9,10);cx.lineTo(9,10);cx.lineTo(13,1);cx.lineTo(-13,1);cx.closePath();cx.fill();
-    cx.fillStyle='#22222e';cx.beginPath();
-    cx.moveTo(-9,10);cx.lineTo(0,10);cx.lineTo(-4,1);cx.lineTo(-13,1);cx.closePath();cx.fill();
-    R(cx,-10,-1,20,3,'#0d0d14');                             // pasek spódnicy
-    // brzuch + CZERWONY STANIK
-    rr(cx,-7,-9,14,10,2,'#e8c9a0');
-    cx.fillStyle='#e03050';cx.beginPath();
-    cx.moveTo(-8,-10);cx.lineTo(8,-10);cx.lineTo(6,-3);cx.lineTo(0,-6);cx.lineTo(-6,-3);cx.closePath();cx.fill();
-    R(cx,-8.5,-11,17,2,'#c02040');
-    // ręce — jedna trzyma telefon i NAGRYWA
-    R(cx,-12,-8,4,10,'#e8c9a0');R(cx,8,-9+sw,4,9,'#e8c9a0');
-    rr(cx,7.5,-16+sw,6,9,1.4,'#1a1a24');R(cx,8.4,-15+sw,4.2,6.6,'#6fd8e8');
-    if(Math.floor(anim*3)%2)R(cx,9.4,-14.4+sw,1.6,1.6,'#e03028');   // dioda REC
-    // głowa + CZERWONE WŁOSY (grzywka i pasma po bokach, twarz zostaje odkryta)
-    rr(cx,-8,-26,16,16,4.5,'#e8c9a0');
-    cx.fillStyle='#d81f34';
-    cx.beginPath();cx.arc(0,-24,10,Math.PI,0);cx.fill();             // czupryna nad czołem
-    R(cx,-10,-25,3.5,17,'#d81f34');R(cx,6.5,-25,3.5,17,'#d81f34');   // pasma po bokach twarzy
-    R(cx,-10,-25,20,4,'#d81f34');                                    // grzywka
-    R(cx,-9.6,-25,1.6,13,'#f0344a');R(cx,7,-24,1.4,10,'#b81628');    // światło i cień we włosach
-    rr(cx,-6,-21,12,11,3,'#e8c9a0');                                 // TWARZ (odkryta spod włosów)
-    // oczy + wściekła mina
-    cx.fillStyle='#fff7f2';cx.beginPath();cx.arc(-3.2,-17,2.8,0,7);cx.arc(3.2,-17,2.8,0,7);cx.fill();
-    cx.fillStyle='#12121a';cx.beginPath();cx.arc(-3.2+fl*.8,-17,1.6,0,7);cx.arc(3.2+fl*.8,-17,1.6,0,7);cx.fill();
-    R(cx,-6,-20.6,4.6,1.7,'#8a1420');R(cx,1.4,-20.6,4.6,1.7,'#8a1420');  // zmarszczone brwi
-    R(cx,-2.6,-13.4,5.2,2,'#a3243a');R(cx,-1.6,-13,3.2,1,'#e8737f');     // krzywy uśmiech
-    // ROGI KLAUNA — długie, wygięte na boki, z kulkami na końcach
-    const horn=(dir,col,ball)=>{
-      const wob=Math.sin(anim*3+dir)*1.6,ex=dir*23,ey=-30+wob;
-      cx.strokeStyle=col;cx.lineWidth=3.8;cx.lineCap='round';
-      cx.beginPath();cx.moveTo(dir*5,-25);
-      cx.quadraticCurveTo(dir*15,-41,ex,ey);cx.stroke();
-      cx.fillStyle=ball;cx.beginPath();cx.arc(ex,ey,3.6,0,7);cx.fill();
-      cx.fillStyle='rgba(255,255,255,.4)';cx.beginPath();cx.arc(ex-1.1,ey-1.1,1.3,0,7);cx.fill();
-    };
-    horn(-1,'#15151f','#f6f4fa');   // lewy: CZARNY róg z BIAŁĄ kulką
-    horn( 1,'#e03050','#12121a');   // prawy: CZERWONY róg z CZARNĄ kulką
-    cx.lineCap='butt';
-    // telegraf szarży: pochyla się do przodu i sypie iskrami
-    if(f.telT!==undefined){cx.fillStyle='rgba(224,48,80,.28)';
-      cx.beginPath();cx.arc(0,-6,22+Math.sin(anim*22)*3,0,7);cx.fill();}
-  }else if(f.t==='ul'){ // UL — wielka skrzynia pasieczna, im niższa faza tym bardziej rozbita
-    const fz=f.faza||1,drga=f.flash>0?(Math.random()-.5)*2:0;
-    cx.translate(drga,0);
-    cx.fillStyle='rgba(0,0,0,.32)';cx.beginPath();cx.ellipse(0,26,24,6,0,0,7);cx.fill();
-    R(cx,-20,20,40,6,'#5a3a1e');R(cx,-22,24,44,3,'#42280f');        // podest
-    rr(cx,-18,-18,36,38,3,'#c8935a');                                // korpus
-    for(let i=0;i<5;i++)R(cx,-18,-14+i*8,36,2.6,'#a3743f');          // ramki
-    R(cx,-18,-18,3,38,'#e0b06e');                                    // światło na lewej krawędzi
-    cx.fillStyle='#8a5a2a';cx.beginPath();                            // daszek
-    cx.moveTo(-24,-16);cx.lineTo(0,-30);cx.lineTo(24,-16);cx.fill();
-    R(cx,-24,-17,48,3,'#6e4520');
-    R(cx,-9,12,18,5,'#3a2410');                                       // WYLOTEK — stąd sypie się rój
-    /* pęknięcia narastają z każdą fazą — widać, że ul się rozlatuje */
-    cx.strokeStyle='#5a3a1e';cx.lineWidth=1.6;
-    for(let i=0;i<(fz-1)*3;i++){const a=i*1.9;
-      cx.beginPath();cx.moveTo(Math.cos(a)*6,Math.sin(a)*6-4);
-      cx.lineTo(Math.cos(a)*17,Math.sin(a)*15-4);cx.stroke();}
-    /* rój krążący wokół ula — gęstnieje z fazą */
-    if(!reduceMotion)for(let i=0;i<fz*3;i++){
-      const a=anim*(2+fz*.35)+i*(6.28/(fz*3)),rx=28+Math.sin(anim*3+i)*5;
-      R(cx,Math.cos(a)*rx-1,Math.sin(a)*rx*.6-6,2.2,2.2,'#f5c542');}
-    if(fz>=3){cx.fillStyle='rgba(245,160,50,.18)';                    // aura wściekłości
-      cx.beginPath();cx.arc(0,-2,34+Math.sin(anim*9)*3,0,7);cx.fill();}
-  }else if(f.t==='krolowa'){ // KRÓLOWA PSZCZÓŁ — wielka, w koronie, na przezroczystych skrzydłach
-    const fl=P.x<f.x?-1:1,fly=Math.sin(anim*3)*2.5,wf=Math.sin(anim*22)*(reduceMotion?0:5);
-    cx.translate(0,fly);
-    cx.fillStyle='rgba(0,0,0,.28)';cx.beginPath();cx.ellipse(0,30-fly*.5,17,4.5,0,0,7);cx.fill();
-    // SKRZYDŁA (za korpusem)
-    cx.fillStyle='rgba(200,232,248,.5)';
-    for(const dx2 of[-1,1]){
-      cx.beginPath();cx.ellipse(dx2*15,-12-wf*.4,13,6,dx2*(.5+wf*.03),0,7);cx.fill();
-      cx.beginPath();cx.ellipse(dx2*12,-4-wf*.3,10,4.5,dx2*(.7+wf*.03),0,7);cx.fill();}
-    // ODWŁOK w pasy + ŻĄDŁO
-    for(let i=0;i<4;i++)rr(cx,-11,-2+i*6,22,6,2.4,i%2?'#1a1a24':'#f5c542');
-    cx.fillStyle='#12121a';cx.beginPath();
-    cx.moveTo(-4,22);cx.lineTo(4,22);cx.lineTo(0,32);cx.fill();       // żądło
-    // TUŁÓW futrzasty
-    rr(cx,-12,-16,24,16,5,'#c8935a');
-    for(let i=0;i<6;i++)R(cx,-12+i*4,-17,2,3,'#8a5a2a');
-    // GŁOWA + wielkie oczy + czułki
-    rr(cx,-9,-30,18,16,5,'#1a1a24');
-    cx.fillStyle='#2a2a3a';cx.beginPath();
-    cx.ellipse(-4.5,-24,3.6,5,-.2,0,7);cx.ellipse(4.5,-24,3.6,5,.2,0,7);cx.fill();
-    cx.fillStyle='#e04848';cx.beginPath();
-    cx.arc(-4.5+fl*.8,-24,1.7,0,7);cx.arc(4.5+fl*.8,-24,1.7,0,7);cx.fill();
-    cx.strokeStyle='#12121a';cx.lineWidth=1.6;
-    for(const dx2 of[-1,1]){cx.beginPath();cx.moveTo(dx2*5,-30);
-      cx.quadraticCurveTo(dx2*11,-40,dx2*8+Math.sin(anim*4)*2,-44);cx.stroke();}
-    // KORONA
-    R(cx,-8,-38,16,4,'#f5c542');
-    for(let i=0;i<3;i++){R(cx,-7+i*6,-43,3,5,'#f5c542');R(cx,-6.4+i*6,-42,1.8,1.8,'#e04848');}
-    if(f.telT!==undefined){cx.fillStyle='rgba(245,197,66,.26)';      // telegraf ŻĄDŁA
-      cx.beginPath();cx.arc(0,-8,26+Math.sin(anim*22)*3,0,7);cx.fill();}
-  }else if(f.t==='laweciarz'){ // PAN LAWETA 3000 — pomarańczowa laweta z hakiem
-    const fl=P.x<f.x;
-    cx.fillStyle='rgba(0,0,0,.3)';cx.beginPath();cx.ellipse(0,20,26,5,0,0,7);cx.fill();
-    // platforma + koła
-    rr(cx,-26,2,52,12,2,'#f5a032');R(cx,-26,2,52,3,'#ffc46a');
-    R(cx,-24,12,52,3,'#8a5a1a');
-    cx.fillStyle='#1a1a24';
-    for(const wx of[-18,-6,14,22]){cx.beginPath();cx.arc(wx,17,5,0,7);cx.fill();
-      cx.fillStyle='#5a5a6a';cx.beginPath();cx.arc(wx,17,2,0,7);cx.fill();cx.fillStyle='#1a1a24';}
-    // kabina po stronie gracza
-    const kx=fl?-24:8;
-    rr(cx,kx,-14,16,17,2,'#c8384a');
-    rr(cx,kx+2,-11,12,7,1.5,'#6fd8e8');R(cx,kx+2,-11,12,2.4,'#a8e8f4');
-    R(cx,kx+1,-16,14,2.4,'#8a2438');
-    // kogut na dachu
-    if(Math.floor(anim*6)%2)R(cx,kx+5,-19,6,3,'#f5c542');else R(cx,kx+5,-19,6,3,'#e04848');
-    // ramię z hakiem — celuje w gracza
-    const ax=fl?-30:30,sw=Math.sin(anim*2)*4;
-    cx.strokeStyle='#8a8a98';cx.lineWidth=4;
-    cx.beginPath();cx.moveTo(fl?-10:10,-2);cx.lineTo(ax,-10+sw);cx.stroke();
-    cx.strokeStyle='#c9c4dd';cx.lineWidth=1.5;
-    cx.beginPath();cx.moveTo(ax,-10+sw);cx.lineTo(ax,2+sw);cx.stroke();
-    cx.strokeStyle='#ece9f4';cx.lineWidth=3;
-    cx.beginPath();cx.arc(ax,5+sw,4,.6,4.2);cx.stroke();   // HAK
-    // ślepia w szybie
-    cx.fillStyle='#c02020';R(cx,kx+4,-9,3,2,'#c02020');R(cx,kx+9,-9,3,2,'#c02020');
-  }else{ // KRAKEN BAŁTYCKI — zielony łeb + macki
-    cx.fillStyle='#2a6a5a';
-    for(let i=0;i<6;i++){ // macki
-      const a=i/6*6.28+anim*.8;
-      cx.beginPath();cx.moveTo(0,2);
-      const mx=Math.cos(a)*18,my=6+Math.sin(a)*6;
-      cx.quadraticCurveTo(mx*.6,my+Math.sin(anim*6+i)*5,mx,my+Math.sin(anim*4+i)*4);
-      cx.lineWidth=5;cx.strokeStyle='#2a6a5a';cx.stroke();
-      cx.fillStyle='#3a8a72';cx.beginPath();
-      cx.arc(mx,my+Math.sin(anim*4+i)*4,3,0,7);cx.fill();
-    }
-    cx.fillStyle='#2a6a5a';cx.beginPath();cx.ellipse(0,-8,13,15,0,0,7);cx.fill();
-    cx.fillStyle='#3a8a72';cx.beginPath();cx.ellipse(-4,-12,5,7,0,0,7);cx.fill();
-    // ślepia
-    cx.fillStyle='#fff7d6';cx.beginPath();cx.arc(-5,-8,3.4,0,7);cx.arc(5,-8,3.4,0,7);cx.fill();
-    cx.fillStyle='#c02020';cx.beginPath();cx.arc(-4.4,-8,1.7,0,7);cx.arc(5.6,-8,1.7,0,7);cx.fill();
-    R(cx,-4,-1,8,1.4,'#16324a');
-  }
+  const D=BOSS_DRAW[f.t];
+  if(D)D(cx,f);
   cx.restore();
   cx.globalAlpha=1;
   if(f.stun>0)for(let i=0;i<3;i++){const a=anim*4+i*2.1;
@@ -8330,7 +8366,7 @@ function drawWorld(){
   }
   cx.globalAlpha=1;
   // UMIEJĘTNOŚCI: okrągłe naczynia (E = skill, Q = SUPER-HIT) w prawym dolnym rogu
-  {const c=CHARS[S.ch],B=BURSTS[S.ch];
+  {const c=CHARS[S.ch],B=CHARS[S.ch].burst;
    const ready=spcT<=0,cdFill=c.spcCd?1-Math.max(0,spcT)/c.spcCd:1;
    if(B){
      drawSkillOrb(W-58,H-40,10.5,cdFill,c.col,c.el,ready,'E',Math.ceil(spcT)+'s');
