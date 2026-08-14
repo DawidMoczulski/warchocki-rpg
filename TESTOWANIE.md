@@ -71,16 +71,24 @@ Chrome przy pierwszym wklejeniu do konsoli wymaga wpisania `allow pasting`.
 const s = JSON.parse(localStorage.getItem('wrpg'));   // podejrzyj zapis
 s.dia = 9999;                                          // diamenty
 s.rolex = 200;                                         // Złote Rolexy = życzenia
-s.pity = 89;                                           // następne życzenie = gwarancja 5⭐
+s.pity = 79;                                           // następne życzenie = gwarancja 5⭐
 s.pity4 = 14;                                          // następne życzenie = gwarancja 4⭐
+s.guar = 1;                                            // następna 5⭐ NA PEWNO z baneru (wygrane 50/50)
+s.guarW = 1;                                           // następna 5⭐ broń NA PEWNO sygnaturowa
 s.quests.policja = 0;                                  // 0 = nieodkryty, 1 = w toku, 2 = zrobiony
 localStorage.setItem('wrpg', JSON.stringify(s)); location.reload();
 ```
 
 Klucze zapisu: `quests`, `col` (znajdźki), `mile` (nagrane miejsca), `dych`, `party`,
 `chars` (poziomy), `dia`, `rolex`, `pity`/`pityW` (gwarancje 5⭐),
-`pity4`/`pity4W` (gwarancje 4⭐), `subs`,
+`pity4`/`pity4W` (gwarancje 4⭐), `guar`/`guarW` (50/50 i ścieżka marzeń), `subs`,
 `region`, `px`/`py`, `domLvl`, `bossLvl`.
+
+**Stawki życzeń** (jak w Genshinie, tylko gwarancja ściągnięta na 80.):
+baza 0,6% na postać (broń 0,7%), miękka gwarancja od 65. życzenia (broń: 63.),
+twarda na 80. Trafiona 5⭐ przechodzi przez 50/50 — przegrana daje innego
+ziomala z ekipy, ale zapala `guar`, więc następna jest pewna. W długim biegu
+**2 z 3 piątek to postać z baneru**, średnio **~85 życzeń** na promowaną.
 
 **Przeskok baneru bez czekania dwóch tygodni** (konsola, F12):
 
@@ -88,7 +96,8 @@ Klucze zapisu: `quests`, `col` (znajdźki), `mile` (nagrane miejsca), `dych`, `p
 banOffset = 14*86400;      // +1 baner (kolejny raz: 28*86400, 42*86400, ...)
 bannerChar();              // kto jest teraz promowany
 bannerLeft();              // ile sekund do zmiany
-BANNER_ORDER;              // pełna kolejka: edek, dych, grazynka, jarek, zenek, julka, bogdan
+BANNER_ORDER;              // pełna kolejka 5⭐: dych, edek, grazynka, zenek, julka
+                           // (Jarek i Bogdan to 4⭐ — lecą z gwarancji, nie z baneru)
 ```
 
 `banOffset` żyje tylko do odświeżenia strony i nie zapisuje się do `wrpg`.

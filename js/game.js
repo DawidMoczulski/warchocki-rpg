@@ -97,7 +97,7 @@ const DEFAULT_SAVE={dia:25,owned:['was_klasyk','rolex_d'],equip:{mustache:'was_k
   quests:{},col:{},k:{},trip:0,legend:false,px:456,py:368,
   region:'wawa',ch:'edek',dych:0,subs:120,views:0,films:[],mile:{},visited:{wawa:1},
   chars:{edek:{lvl:1,asc:0,con:0,tal:{n:1,e:1,q:1}}},party:['edek'],cons:{},
-  mats:{sr:0,ch:0,di:0},pity:0,pityW:0,pity4:0,pity4W:0,rolex:0,wish:0,wishW:0,domLvl:{},bossLvl:{},
+  mats:{sr:0,ch:0,di:0},pity:0,pityW:0,pity4:0,pity4W:0,guar:0,guarW:0,rolex:0,wish:0,wishW:0,domLvl:{},bossLvl:{},
   gear:{},gearOwn:{kij:1},food:{picie:2},ingr:{}};
 let S=null;
 function loadSave(){
@@ -127,6 +127,11 @@ function loadSave(){
     if(S.pity4W===undefined)S.pity4W=0;
     if(S.wish===undefined)S.wish=0;
     if(S.wishW===undefined)S.wishW=0;
+    /* migracja v18 -> v19 (ZASADY GENSHINA): doszło 50/50 na banerze postaci
+       i ŚCIEŻKA MARZEŃ na broni. Kto miał stary zapis, zaczyna bez gwarancji
+       — czyli na czystym 50/50, tak jak nowy gracz. */
+    if(S.guar===undefined)S.guar=0;
+    if(S.guarW===undefined)S.guarW=0;
     if(!S.domLvl)S.domLvl={};
     if(!S.bossLvl)S.bossLvl={};
     // migracja v6 -> v7 (ekwipunek + jedzenie)
@@ -3679,10 +3684,13 @@ function bossDefeated(f){
    ---------------------------------------------------------------------
    Koniec „paczek od fanów”. Są dwa banery, dokładnie jak w Genshinie:
      • BANER POSTACI — w danej chwili promowana jest DOKŁADNIE JEDNA postać
-       (Dycha też trzeba teraz wywishować). Gwarancja pada na 90. życzeniu,
-       a od 70. szansa rośnie bardzo mocno — to „miękka gwarancja”.
+       (Dycha też trzeba teraz wywishować). Baza to 0,6%, od 65. życzenia
+       działa „miękka gwarancja”, a na 80. pada twarda. Trafiona 5⭐ przechodzi
+       jeszcze przez 50/50: połowa wypada obok baneru, ale wtedy NASTĘPNA jest
+       gwarantowana — nie da się przegrać dwa razy z rzędu.
      • BANER BRONI  — sygnaturowa 5★ broń tej samej postaci. To JEDYNE
        miejsce, w którym w ogóle wypada broń 5★; z banera postaci NIGDY.
+       Tu 5⭐ trafia w sygnaturę w 75%, a nietraf zapala ŚCIEŻKĘ MARZEŃ.
    Walutą jest ZŁOTY ROLEX: 150💎 za sztukę, 1 rolex = 1 życzenie.
    Banery rotują co BANNER_LEN sekund realnego czasu, panel odlicza sekundy.
    ===================================================================== */
@@ -3702,8 +3710,19 @@ const BANNER_T0=Date.UTC(2026,7,10,22,0,0)/1000;
 /* Na banerze staje zawsze postać 5⭐ — 4⭐ (Jarek, Bogdan) chodzą z gwarancji */
 const BANNER_ORDER=['dych','edek','grazynka','zenek','julka'];
 const CHAR4=['jarek','bogdan'];
-const PITY_HARD=90,PITY_SOFT=70,CHAR_BASE=.03;     // baner postaci
-const WPITY_HARD=80,WPITY_SOFT=60,WEAP_BASE=.06;   // baner broni
+/* STAWKI JAK W GENSHINIE, tylko z gwarancją ściągniętą z 90. na 80. życzenie.
+   Baza jest niska (0,6%), całą robotę robi miękka gwarancja: od 65. życzenia
+   szansa skacze o CHAR_RAMP na każde kolejne losowanie i dobija do 100% równo
+   na PITY_HARD. Dzięki temu twarda gwarancja nie jest martwym zapisem —
+   krzywa dochodzi do niej, zamiast kończyć się wcześniej. */
+const PITY_HARD=80,PITY_SOFT=65,CHAR_BASE=.006,CHAR_RAMP=.066;   // baner postaci
+const WPITY_HARD=80,WPITY_SOFT=63,WEAP_BASE=.007,WEAP_RAMP=.058; // baner broni
+/* 50/50 — serce genshinowej gachy. Trafiona 5⭐ tylko w połowie przypadków jest
+   tą z baneru; przy przegranej wypada ktoś inny z ekipy, ALE zapala się
+   gwarancja (S.guar) i następna 5⭐ jest już pewniakiem z baneru.
+   Na broni to samo w wersji ŚCIEŻKI MARZEŃ: 75% na sygnaturę, a jak nie —
+   kolejna 5⭐ leci w ciemno na sygnaturę (S.guarW). */
+const FIFTY=.5,WEAP_HIT=.75;
 /* GWARANCJA 4⭐: co najwyżej co 15 życzeń wypada coś 4⭐ — postać ALBO broń.
    To jest ta „ludzka" ścieżka: nawet bez szczęścia do 5⭐ gracz zbierze ekipę. */
 const P4_AT=15,STAR4_BASE=.08;
@@ -3722,8 +3741,11 @@ const bannerNext=()=>bannerAt(bannerSlot()+1);
 const bannerWeap=()=>CHARS[bannerChar()].sig;
 const bannerLeft=()=>BANNER_LEN-modP(banNow()-BANNER_T0,BANNER_LEN);
 /* szansa na 5★: płasko do progu, potem stromo w górę, na twardej gwarancji 100% */
-const charChance=p=>p>=PITY_HARD?1:p>=PITY_SOFT?Math.min(1,CHAR_BASE+.09*(p-PITY_SOFT+1)):CHAR_BASE;
-const weapChance=p=>p>=WPITY_HARD?1:p>=WPITY_SOFT?Math.min(1,WEAP_BASE+.10*(p-WPITY_SOFT+1)):WEAP_BASE;
+const charChance=p=>p>=PITY_HARD?1:p>=PITY_SOFT?Math.min(1,CHAR_BASE+CHAR_RAMP*(p-PITY_SOFT+1)):CHAR_BASE;
+const weapChance=p=>p>=WPITY_HARD?1:p>=WPITY_SOFT?Math.min(1,WEAP_BASE+WEAP_RAMP*(p-WPITY_SOFT+1)):WEAP_BASE;
+/* pula „poza banerem" = pozostałe 5⭐ z ekipy. To one wypadają przy przegranym
+   50/50 — czyli przegrana i tak daje realną postać, nie sam pech. */
+const off5Pool=()=>BANNER_ORDER.filter(k=>k!==bannerChar());
 
 /* pula 4⭐: broń i artefakty (na banerze broni — same bronie) */
 const gear4Pool=weapBan=>Object.keys(WEAPONS).concat(Object.keys(ARTS))
@@ -3765,23 +3787,36 @@ function rollFiller(weapBan){
   if(r<.9){S.mats.di+=1;return{t:'di',n:1};}
   const n=4+((Math.random()*7)|0);S.dia+=n;return{t:'dia',n};
 }
+/* WYDANIE 5⭐ POSTACI — wspólne dla wygranego i przegranego 50/50, żeby
+   duplikat liczył się tak samo niezależnie od tego, skąd postać przyszła.
+   `off` znaczy „to jest ta z przegranej", i idzie tylko do opisu wyniku. */
+function grantChar5(id,off){
+  if(!S.chars[id]){
+    S.chars[id]=newChar();
+    if(S.party.length<3)S.party.push(id);
+    return{t:'char',id,nw:true,off};
+  }
+  /* DUPLIKAT = GWIAZDA FORTUNY: zasób na KONSTELACJĘ tej konkretnej postaci
+     (dokładnie jak w Genshinie). Przy komplecie C6 zamienia się w materiały. */
+  const d=S.chars[id];
+  if((d.con||0)>=6&&!(S.cons[id]>0)){S.mats.ch+=12;S.mats.di+=1;S.rolex=(S.rolex||0)+1;
+    return{t:'char',id,dup:true,maxed:true,off};}
+  S.cons[id]=(S.cons[id]||0)+1;S.mats.ch+=5;
+  return{t:'char',id,dup:true,off};
+}
 function rollChar(){
   S.pity++;S.pity4=(S.pity4||0)+1;S.wish=(S.wish||0)+1;
   if(Math.random()<charChance(S.pity)){
     S.pity=0;S.pity4=0;                  // 5⭐ zeruje też licznik 4⭐
-    const id=bannerChar();
-    if(!S.chars[id]){
-      S.chars[id]=newChar();
-      if(S.party.length<3)S.party.push(id);
-      return{t:'char',id,nw:true};
+    /* 50/50: z zapaloną gwarancją bierzemy baner bez losowania i ją gasimy.
+       Bez gwarancji rzucamy monetą — przegrana zapala ją na następny raz. */
+    const pula=off5Pool();
+    if(!S.guar&&pula.length&&Math.random()>=FIFTY){
+      S.guar=1;
+      return grantChar5(pickA(pula),true);
     }
-    /* DUPLIKAT = GWIAZDA FORTUNY: zasób na KONSTELACJĘ tej konkretnej postaci
-       (dokładnie jak w Genshinie). Przy komplecie C6 zamienia się w materiały. */
-    const d=S.chars[id];
-    if((d.con||0)>=6&&!(S.cons[id]>0)){S.mats.ch+=12;S.mats.di+=1;S.rolex=(S.rolex||0)+1;
-      return{t:'char',id,dup:true,maxed:true};}
-    S.cons[id]=(S.cons[id]||0)+1;S.mats.ch+=5;
-    return{t:'char',id,dup:true};
+    S.guar=0;
+    return grantChar5(bannerChar(),false);
   }
   if(S.pity4>=P4_AT||Math.random()<STAR4_BASE){S.pity4=0;return roll4(false);}
   return rollFiller(false);
@@ -3791,14 +3826,17 @@ function rollWeap(){
   if(Math.random()<weapChance(S.pityW)){
     S.pityW=0;S.pity4W=0;
     const sig=bannerWeap();
-    let id=sig;
-    /* 25%: kapsuła wypluwa INNĄ broń 5★ zamiast promowanej — jak w Genshinie */
-    if(Math.random()<.25){
+    let id=sig,off=false;
+    /* ŚCIEŻKA MARZEŃ: 25% szans, że kapsuła wypluje INNĄ broń 5★ zamiast
+       sygnatury — ale wtedy zapala się gwarancja i następna 5★ to już pewna
+       sygnatura. Z zapaloną gwarancją pomijamy losowanie i gasimy ją. */
+    if(!S.guarW&&Math.random()>=WEAP_HIT){
       const inne=Object.keys(WEAPONS).filter(k=>WEAPONS[k].star>=5&&k!==sig);
-      if(inne.length)id=pickA(inne);
+      if(inne.length){id=pickA(inne);off=true;S.guarW=1;}
     }
-    if(S.gearOwn[id]){S.mats.di+=2;S.mats.ch+=15;return{t:'gear5',id,dup:true};}
-    S.gearOwn[id]=1;return{t:'gear5',id};
+    if(!off)S.guarW=0;
+    if(S.gearOwn[id]){S.mats.di+=2;S.mats.ch+=15;return{t:'gear5',id,dup:true,off};}
+    S.gearOwn[id]=1;return{t:'gear5',id,off};
   }
   if(S.pity4W>=P4_AT||Math.random()<STAR4_BASE){S.pity4W=0;return roll4(true);}
   return rollFiller(true);
@@ -3826,9 +3864,12 @@ function gresHtml(r,i){
   const d='style="animation-delay:'+(i*.12)+'s"';
   if(r.t==='char'){
     const c=CHARS[r.id];
-    if(r.nw)return'<div class="gres char" '+d+'><span class="gbig">'+c.el+'</span>⭐ NOWA POSTAĆ!<br><b>'+c.n+'</b></div>';
-    if(r.maxed)return'<div class="gres dup" '+d+'><span class="gbig">'+c.el+'</span>'+c.n+'<br>C6 KOMPLET → +12⚙️ +1💠 +1'+RLX+'</div>';
-    return'<div class="gres dup" '+d+'><span class="gbig">⭐</span>'+c.n+'<br>+1 GWIAZDA FORTUNY<br><i style="font-size:8px">→ KONSTELACJE (+5⚙️)</i></div>';
+    /* przegrane 50/50 musi być widać na kafelku, inaczej gracz nie rozumie,
+       czemu poleciała gwarancja, a z kapsuły wyszedł ktoś inny */
+    const o=r.off?'<br><i style="font-size:8px;color:var(--info)">POZA BANEREM → NASTĘPNA 5⭐ GWARANTOWANA</i>':'';
+    if(r.nw)return'<div class="gres char" '+d+'><span class="gbig">'+c.el+'</span>⭐ NOWA POSTAĆ!<br><b>'+c.n+'</b>'+o+'</div>';
+    if(r.maxed)return'<div class="gres dup" '+d+'><span class="gbig">'+c.el+'</span>'+c.n+'<br>C6 KOMPLET → +12⚙️ +1💠 +1'+RLX+o+'</div>';
+    return'<div class="gres dup" '+d+'><span class="gbig">⭐</span>'+c.n+'<br>+1 GWIAZDA FORTUNY<br><i style="font-size:8px">→ KONSTELACJE (+5⚙️)</i>'+o+'</div>';
   }
   if(r.t==='char4'){
     const c=CHARS[r.id];
@@ -3838,8 +3879,9 @@ function gresHtml(r,i){
   }
   if(r.t==='gear5'){
     const it=WEAPONS[r.id];
-    if(r.dup)return'<div class="gres dup" '+d+'><span class="gbig">'+it.ic+'</span>'+it.n+'<br>MASZ JUŻ → +15⚙️ +2💠</div>';
-    return'<div class="gres char" '+d+'><span class="gbig">'+it.ic+'</span>🗡 BROŃ ⭐⭐⭐⭐⭐<br><b>'+it.n+'</b></div>';
+    const o=r.off?'<br><i style="font-size:8px;color:var(--info)">NIE SYGNATURA → ŚCIEŻKA MARZEŃ AKTYWNA</i>':'';
+    if(r.dup)return'<div class="gres dup" '+d+'><span class="gbig">'+it.ic+'</span>'+it.n+'<br>MASZ JUŻ → +15⚙️ +2💠'+o+'</div>';
+    return'<div class="gres char" '+d+'><span class="gbig">'+it.ic+'</span>🗡 BROŃ ⭐⭐⭐⭐⭐<br><b>'+it.n+'</b>'+o+'</div>';
   }
   if(r.t==='gear'){
     const it=WEAPONS[r.id]||ARTS[r.id];
@@ -3895,6 +3937,9 @@ function drawBannerArt(id,wep){
 /* ---- PANEL ŻYCZEŃ -------------------------------------------------------- */
 let gachaTab='char',gachaTick=0;
 const pad2=n=>('0'+n).slice(-2);
+/* procent szansy: przy 0,6% zaokrąglenie do pełnych zjadłoby całą liczbę
+   („0%” wygląda na zepsute), więc małe wartości idą z jednym miejscem */
+const pct=n=>{const v=n*100;return(v<10?v.toFixed(1).replace('.',','):Math.round(v))+'%';};
 /* baner stoi 2 tygodnie, więc same sekundy byłyby nieczytelne — pokazujemy dni
    i zegar, ale sekundy tykają co tyknięcie, tak jak w prawdziwej gachy */
 const fmtLeft=s=>(s>=86400?Math.floor(s/86400)+(Math.floor(s/86400)===1?' DZIEŃ ':' DNI '):'')
@@ -3907,6 +3952,9 @@ function renderGacha(res){
   const hard=wep?WPITY_HARD:PITY_HARD,soft=wep?WPITY_SOFT:PITY_SOFT;
   const doSoft=Math.max(0,soft-pity),doHard=hard-pity;
   const do4=P4_AT-(wep?(S.pity4W||0):(S.pity4||0));
+  /* szansa NA NASTĘPNE życzenie: licznik rośnie przed rzutem, więc pity+1 */
+  const nextP=wep?weapChance(pity+1):charChance(pity+1);
+  const gwar=wep?(S.guarW||0):(S.guar||0);
   const d=S.chars[id],mam=!!d,con=d?(d.con||0):0;
   const pliki=banFileList(id,wep);          // .svg → .png → (brak) rysowany fallback
   const stan=wep
@@ -3933,13 +3981,26 @@ function renderGacha(res){
       '<i id="banClock">'+bannerLeft()+' sekund · baner trwa 14 dni</i><br>'+
       '<i>potem wchodzi: '+CHARS[bannerNext()].el+' '+CHARS[bannerNext()].n+'</i></div>'+
     '<p class="pity">'+
-      (doSoft>0
+      'SZANSA NA NAJBLIŻSZE ŻYCZENIE: <b style="color:var(--acc)">'+pct(nextP)+'</b>'+
+        ' <i>(baza '+pct(wep?WEAP_BASE:CHAR_BASE)+')</i>'+
+      '<br>'+(doSoft>0
         ?'SZANSA MOCNO ROŚNIE od '+soft+'. życzenia — zostało '+doSoft
-        :'<b style="color:var(--acc)">MIĘKKA GWARANCJA AKTYWNA</b> — szansa '+Math.round(( wep?weapChance(pity+1):charChance(pity+1))*100)+'%')+
+        :'<b style="color:var(--acc)">MIĘKKA GWARANCJA AKTYWNA</b>')+
       '<br>GWARANCJA 5⭐ na '+hard+'. życzeniu — zostało <b>'+doHard+'</b>'+
+      /* 50/50 to najważniejsza liczba na tym panelu — gracz musi wiedzieć,
+         czy gra o pewniaka, czy rzuca monetą. Stąd własna ramka, nie drobny druk. */
+      '<br><b style="color:'+(gwar?'var(--ok)':'var(--info)')+'">'+
+        (gwar
+          ?(wep?'🎯 ŚCIEŻKA MARZEŃ AKTYWNA — następna 5⭐ to NA PEWNO '+w.n
+               :'🎯 GWARANCJA — następna 5⭐ to NA PEWNO '+c.n)
+          :(wep?'🎲 75% na sygnaturę, 25% na inną broń 5⭐'
+               :'🎲 50/50 — połowa szans na '+c.n+', połowa na innego ziomala'))+
+      '</b>'+
+      (gwar?'':'<br><i>'+(wep?'nietraf zapala ŚCIEŻKĘ MARZEŃ':'przegrana zapala GWARANCJĘ')+
+        ' — dwa razy z rzędu nie przegrasz</i>')+
       '<br><b class="s4txt">GWARANCJA 4⭐ za '+do4+'</b> — '+
         (wep?'broń 4⭐':'postać 4⭐ albo broń')+
-      (wep?'<br>75% szans na sygnaturę, 25% na inną broń 5⭐'
+      (wep?''
           :'<br>postacie 4⭐: '+CHAR4.map(k=>CHARS[k].el+' '+CHARS[k].n.split(' ')[0]).join(' · ')+
            '<br>duplikat = ⭐ GWIAZDA FORTUNY → KONSTELACJA tej postaci')+
     '</p>'+
