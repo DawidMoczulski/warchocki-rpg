@@ -98,7 +98,7 @@ const DEFAULT_SAVE={dia:25,owned:['was_klasyk','rolex_d'],equip:{mustache:'was_k
   region:'wawa',ch:'edek',dych:0,subs:120,views:0,films:[],mile:{},visited:{wawa:1},
   chars:{edek:{lvl:1,asc:0,con:0,tal:{n:1,e:1,q:1}}},party:['edek'],cons:{},
   mats:{sr:0,ch:0,di:0},pity:0,pityW:0,pity4:0,pity4W:0,guar:0,guarW:0,rolex:0,wish:0,wishW:0,domLvl:{},bossLvl:{},
-  gear:{},gearOwn:{kij:1},food:{picie:2},ingr:{}};
+  gear:{},gearOwn:{kij:1},food:{picie:2},ingr:{},dmats:{}};
 let S=null;
 function loadSave(){
   try{
@@ -150,9 +150,30 @@ function loadSave(){
       d.lvl=Math.max(1,Math.min(90,d.lvl|0));
     }
     if(!S.party.includes(S.ch))S.ch=S.party[0];
+    /* DOMENY 3.0: unikalne surowce wzniesień. Kto już chodził po domenach,
+       dostaje jednorazowo zapas na JEDEN przełom każdej posiadanej postaci —
+       inaczej nagle stanąłby w miejscu i wyglądałoby to jak zabranie postępu. */
+    /* UWAGA: `S.dmats` istnieje ZAWSZE, bo DEFAULT_SAVE je dokłada przy scalaniu.
+       O tym, czy zapis jest sprzed DOMEN 3.0, mówi dopiero WCZYTANY obiekt `p`. */
+    if(!S.dmats)S.dmats={};
+    if(!p.dmats&&Object.values(S.domLvl||{}).some(v=>v>0))S.dmatsBonus=1;
   }catch(e){S=null}
 }
 function save(){store.set('wrpg',JSON.stringify(S));}
+/* wypłata zapasu z migracji — wołana raz, gdy rejestry są już zbudowane */
+function dmatsBonus(){
+  if(!S||!S.dmatsBonus)return;
+  delete S.dmatsBonus;
+  let ile=0;
+  for(const id in S.chars){
+    const m=matOf(id);if(!m)continue;
+    const n=ASC_MAT[Math.min(ASC_MAT.length-1,S.chars[id].asc||0)];
+    S.dmats[m]=(S.dmats[m]||0)+n;ile+=n;
+  }
+  save();
+  if(ile)setTimeout(()=>toast('🌀 DOMENY 3.0 — każda domena ma teraz swój surowiec.<br>'+
+    'Masz zapas na jeden przełom, resztę wyfarmisz na miejscu.',5200),1200);
+}
 loadSave();
 /* ---------------- SKRÓTY TESTOWE (?test=…) ----------------
    Ustawiają zapis w wybranym momencie gry, żeby dało się sprawdzić konkretny
@@ -176,6 +197,11 @@ const TEST_SETUPS={
   plaza:{q:{dych:2,pletwy:2,gdzieplaza:2},reg:'chodziez',at:[30,50]},   // od razu na plaży
   torpeda:{q:{dych:2,pletwy:2,gdzieplaza:2,sprawdzwode:2,multiwitamina:2},
     reg:'chodziez',at:[33,49]},                    // przy ratowniku, minigra gotowa
+  /* DOMENY 3.0 — `zawsze` otwiera wszystkie domeny niezależnie od dnia tygodnia */
+  domena:{q:{dych:2},reg:'wawa',at:[39,42],zawsze:1,lvl:50},        // pod PIWNICĄ HEJTERÓW
+  wesele:{q:{dych:2},reg:'chodziez',at:[85,32],zawsze:1,lvl:50},    // pod WESELEM W REMIZIE
+  las:{q:{dych:2},reg:'chodziez',at:[42,12],zawsze:1,lvl:50},       // pod DZIKIM LASEM
+  domenaboss:{q:{dych:2},reg:'wawa',at:[39,42],zawsze:1,lvl:70,dom:10}, // pełna obsada mini-bossów
 };
 (function applyTestSetup(){
   let m=null;
@@ -193,11 +219,18 @@ const TEST_SETUPS={
   /* uczciwa walka: poziom 25 + wzniesienie, które ten poziom w ogóle dopuszcza */
   for(const id of S.party){const c=S.chars[id];
     if(!c)continue;
-    if(c.lvl<25)c.lvl=25;
+    if(c.lvl<(t.lvl||25))c.lvl=(t.lvl||25);
     c.asc=Math.max(c.asc||0,ascFromLvl(c.lvl));
     if(!c.tal)c.tal={n:1,e:1,q:1};if(c.con===undefined)c.con=0;}
   S.quests=Object.assign({},S.quests,t.q);
   S.visited[t.reg]=1;S.introDone=true;
+  /* Domeny: otwarte bez czekania na właściwy dzień + ustawiony poziom.
+     Przez setTimeout, bo `DOMAINS` i `domAlways` są deklarowane DUŻO niżej
+     w pliku — sięgnięcie do nich stąd wprost poleciałoby na TDZ. */
+  if(t.zawsze||t.dom)setTimeout(()=>{
+    if(t.zawsze)domAlways=1;
+    if(t.dom){for(const k in DOMAINS)S.domLvl[k]=t.dom;save();}
+  },0);
   S.region=t.reg;S.px=t.at[0]*16+8;S.py=t.at[1]*16+8;
   S.dia=Math.max(S.dia||0,500);
   save();
@@ -1035,9 +1068,33 @@ const REGIONS={
 };
 let REG='wawa';
 /* kafle blokujące ruch (tablica = szybkie sprawdzanie w AI/ruchu). Nowe assety 18–31. */
-const SOLIDF=new Uint8Array(64);
+/* TABLICE WŁAŚCIWOŚCI KAFLI — 96 pozycji, bo kafle domen zaczynają się od 39. */
+const SOLIDF=new Uint8Array(96);
 [3,4,5,6,10,11,12,13,14,15,16,   18,19,20,22,24,26,27,29,30,   32,33,34,35,36,38].forEach(v=>{SOLIDF[v]=1;});
 const SOLID=v=>SOLIDF[v]===1;
+/* PRZEPAŚĆ to nie ściana: da się w nią WEJŚĆ (i spaść), więc ma własną flagę.
+   Wypełnia ją blok domen — patrz „KAFLE DOMEN”. */
+const PITF=new Uint8Array(96);
+const PIT=v=>PITF[v]===1;
+/* KAFLE DOMEN (patrz TILES 39–47): skrzynia, beczka, pustak, filar i maszyna
+   blokują ruch; przepaść (44) NIE blokuje — po to, żeby dało się w nią wpaść. */
+[39,40,41,42,45].forEach(v=>{SOLIDF[v]=1;});
+[48,49,50].forEach(v=>{SOLIDF[v]=1;});    // KŁÓDKI (złota/czerwona/niebieska)
+PITF[44]=1;PITF[70]=1;              // 70 = dno rozpadliny z wodą (też się w nie spada)
+/* KAFLE KLIMATYCZNE (51–59) — czysta dekoracja ręcznie robionych map domen.
+   Nic nie robią mechanicznie poza kolizją: mają sprawić, że plansza jest ŁADNA
+   i że gracz ją zapamięta. Wodospad, lampa i woda mają swoje animacje —
+   rysuje je `drawDomainDeko` na wierzchu terenu, żeby kafle siedziały w cache. */
+[51,53,55,56,58].forEach(v=>{SOLIDF[v]=1;});  // wodospad, regał, głaz, lampa, rury
+SOLIDF[60]=1;                                 // MUR PIWNICY (60) i POSADZKA (61)
+[62,63,65,66,67,68].forEach(v=>{SOLIDF[v]=1;});  // las: klon, świerk, ruina, stos drewna, szałas, gęstwina
+/* MECH (64) i ŚCIÓŁKA (69) są deptalne — to podłoga DZIKIEGO LASU */
+const ZAMEK={48:'zloty',49:'czerwony',50:'niebieski'};
+const jestZamek=v=>!!ZAMEK[v];
+/* co da się rozwalić i czym: HP>0 = idzie zwykłym ciosem, `bomba` = tylko wybuch */
+const BLOK_HP={39:1,40:1};                 // skrzynia, beczka
+const BLOK_BOMBA={41:1};                   // pustak — cios się odbija
+const BLOK_NISZCZALNY=v=>BLOK_HP[v]||BLOK_BOMBA[v];
 
 const DOORS=[
   {r:'wawa',x:36,y:17,n:'PKiN',act:'pkin'},
@@ -1085,7 +1142,8 @@ const NPCS=[
   {r:'wawa',id:'kibic',n:'Kibic Zbyszek',x:57*16+4,y:30*16,c:'#c8384a',hair:'#8a5a2a'},
   {r:'wawa',id:'zabson',n:'Żabson',x:44*16+8,y:27*16,c:'#3a7a5a',hair:'#111'},
   {r:'wawa',id:'julka',n:'Julka z Tindera',x:33*16,y:18.5*16,c:'#e88ac8',hair:'#f0d060'},
-  {r:'morze',id:'dych_npc',n:'Dych Dziki',x:33*16,y:15*16,c:'#31518f',hair:'#4a4f66',robo:true},
+  /* robo:true = robota rysuje drawDychBody, więc c/hair (portret „ludzki”) są tu nieużywane */
+  {r:'morze',id:'dych_npc',n:'Dych Dziki',x:33*16,y:15*16,robo:true},
   {r:'chodziez',id:'mietek',n:'Sąsiad Mietek',x:14*16,y:11*16,c:'#6a5a4a',hair:'#aaa'},
   /* --- JEZIORO MIEJSKIE: dawcy serii „Pływamy z Dych Dzikim" --- */
   /* zwykli mieszkańcy — jest kogo pytać o drogę na plażę (quest „gdzieplaza”) */
@@ -1093,7 +1151,7 @@ const NPCS=[
   {r:'chodziez',id:'listonosz',n:'Listonosz Marek',x:26*16,y:16.5*16,c:'#e8a030',hair:'#3a2a1a'},
   {r:'chodziez',id:'babcia',n:'Babcia Krysia',x:30*16,y:11*16,c:'#8a6fa8',hair:'#d8d4e8'},
   {r:'chodziez',id:'plazowicz',n:'Plażowicz Rysiek',x:44*16,y:24*16,c:'#e8a030',hair:'#5a4020'},
-  {r:'chodziez',id:'dych_jezioro',n:'Dych Dziki',x:28.5*16,y:41*16,c:'#31518f',hair:'#4a4f66',robo:true},
+  {r:'chodziez',id:'dych_jezioro',n:'Dych Dziki',x:28.5*16,y:41*16,robo:true},
   {r:'chodziez',id:'pani_napoje',n:'Pani Iwona z napojami',x:48*16,y:49*16,c:'#c8384a',hair:'#8a5a2a'},
   {r:'chodziez',id:'ratownik_jez',n:'Ratownik Zbyszek',x:33*16,y:48*16,c:'#e04848',hair:'#f0d060'},
   {r:'chodziez',id:'ceramiczka',n:'Pani z Ceramiki',x:20*16,y:10.5*16,c:'#b06a3a',hair:'#4a2a1a'},
@@ -1106,7 +1164,7 @@ const NPCS=[
   {r:'tatry',id:'toprowiec',n:'Ratownik TOPR Franek',x:44*16,y:21*16,c:'#e04848',hair:'#3a2a1a'},
   /* --- TRASA NA POLAND ROCK --- */
   {r:'trasa',id:'festiwalowicz',n:'Festiwalowicz Kuba',x:6*16,y:25*16,c:'#7a3a8a',hair:'#3a2a1a'},
-  {r:'trasa',id:'dych_trasa',n:'Dych Dziki',x:11*16,y:26*16,c:'#31518f',hair:'#4a4f66',robo:true},
+  {r:'trasa',id:'dych_trasa',n:'Dych Dziki',x:11*16,y:26*16,robo:true},
   {r:'trasa',id:'pani_stacja',n:'Pani Jola ze stacji',x:17*16,y:31*16,c:'#c8384a',hair:'#f0d060'},
   {r:'trasa',id:'stopowiczka',n:'Autostopowiczka Ola',x:33*16,y:25*16,c:'#3a7a5a',hair:'#8a5a2a'},
   {r:'trasa',id:'kamperowiec',n:'Pan Mirek z kamperem',x:47*16,y:26*16,c:'#4a6a9a',hair:'#aaa'},
@@ -1127,6 +1185,7 @@ let selfieT=45,dropT=14,leafT=0,smokeT=0,worldFlash=0,boatY=8*16,boatV=12;
 /* walka */
 let foes=[],hitFX=[],foeT=6,bossShots=[];
 let hurtT=0,atkT=0,atkAnim=0,atkDir=0,spcT=0,dashT=0,dashDir=0;
+let fallT=0;   // krótka blokada zaraz po wpadnięciu w przepaść (domFall)
 let odganiamAt=0;   // cooldown klipu „Odganiam się" (czas w `anim`)
 const BOSS_LEASH=320; /* promień areny bossa (px) — dalej = boss wraca na środek i walka od nowa (arena jest duża i murowana) */
 const DV=[[0,1],[-1,0],[1,0],[0,-1]]; // wektory kierunków (dół/lewo/prawo/góra)
@@ -1364,7 +1423,9 @@ const FOE_TYPES={
   prewencja:{hp:250,atk:16,spd:34,c:'#141c3a',dia:8,pts:2200,kbres:true,armor:.4},              // tarcza — wolny, pancerny
   drogowka:{hp:120,atk:15,spd:52,c:'#24305c',dia:7,pts:2000,shoots:true,shotType:'lizak',cover:true}, // strzela lizakiem zza szlabanu
   policjantka:{hp:180,atk:17,spd:80,c:'#2a3a68',dia:10,pts:2600,charge:true},                   // szybka, szarżuje
-  komendant:{hp:760,atk:20,spd:52,c:'#0e1636',dia:30,pts:9000,mini:true,elite:true,unlock:0,
+  /* pol:true — mini-boss OBŁAWY, nie domen. Domeny biorą swoich z jawnej puli
+     `mini` we wpisie DOMAINS, więc komendant nigdy tam nie wyskoczy. */
+  komendant:{hp:760,atk:20,spd:52,c:'#0e1636',dia:30,pts:9000,mini:true,pol:true,elite:true,unlock:0,
     en:'KOMENDANT OD BRAMKI',kbres:true,armor:.25,shoots:true,shotType:'lizak',
     moves:['lizak3','slamfala','summon','mur'],minion:'policjant'},
   gigadres:{hp:220,atk:18,spd:58,c:'#0e0e16',hood:'#c8384a',skin:'#e8c9a0',dia:10,pts:3000},
@@ -1481,7 +1542,7 @@ const MB_MOVES={
     fxRing(f.x,f.y-8,20,'#6fd8e8',{life:.3,w:2});fxSparks(f.x,f.y-8,'#6fd8e8',8,100,{life:.4});
     for(let i=0;i<8;i++){
       const a=Math.random()*6.28,nx=P.x+Math.cos(a)*44,ny=P.y+Math.sin(a)*44;
-      if(!SOLID(at(Math.floor(nx/16),Math.floor(ny/16)))){f.x=nx;f.y=ny;break;}
+      if(!foeBlok(at(Math.floor(nx/16),Math.floor(ny/16)),f)){f.x=nx;f.y=ny;break;}
     }
     fxRing(f.x,f.y-8,20,'#6fd8e8',{life:.3,w:2});fxStarFlash(f.x,f.y-10,'#6fd8e8',8,{life:.2});
     beep(900,.12,'triangle',.07,1400);},
@@ -1903,6 +1964,10 @@ function dealDmg(f,chId,mult,opts){
   if(f.hp<=0)killFoe(f);
   return dmg;
 }
+/* Cios „czyjś” — pełna ścieżka obrażeń (żywioły, krytyki, pancerz).
+   UWAGA: kiedyś istniała druga funkcja o TEJ SAMEJ nazwie (surowe obrażenia)
+   i to ona wygrywała, bo deklaracje się hoistują — przez co zauroczony wróg
+   Julki bił za 1 punkt. Surowa wersja nazywa się teraz `hurtFoeRaw`. */
 function hurtFoe(f,dmgIgnored,ox,oy,chId){dealDmg(f,chId&&CHARS[chId]?chId:S.ch,1,{ox,oy});}
 let PROJ=[];      // pociski postaci (dorsz, serduszko)
 let slowAll=0;    // STOP-KLATKA Jarka: globalne spowolnienie wrogów
@@ -1932,9 +1997,12 @@ function tryAttack(){
       if(c.slow)f.slow=Math.max(f.slow||0,c.slow);
     }
   }
-  if(!hit&&Math.random()<.12)addHit(fx,fy-6,'SZUCH!','#8f88b0');
+  const wrupiec=domHitTiles(fx,fy,rng);          // skrzynie i beczki lecą od ciosu
+  if(!hit&&!wrupiec&&Math.random()<.12)addHit(fx,fy-6,'SZUCH!','#8f88b0');
 }
-function hurtFoe(f,dmg,ox,oy,chId){
+/* Obrażenia SUROWE — dokładnie tyle punktów, ile podasz, bez żywiołów i krytyków.
+   Używa tego to, co nie należy do żadnej postaci (np. wybuch bomby w domenie). */
+function hurtFoeRaw(f,dmg,ox,oy,chId){
   f.hp-=dmg;f.flash=.15;
   const d=Math.max(1,Math.hypot(f.x-ox,f.y-oy));
   if(!(FOE_TYPES[f.t]&&FOE_TYPES[f.t].rooted)){
@@ -2138,24 +2206,28 @@ function hurtPlayer(srcF){
   const kx=P.x+(P.x-sx2)/d*14,ky=P.y+(P.y-sy2)/d*14;
   if(canWalk(kx,P.y))P.x=kx;
   if(canWalk(P.x,ky))P.y=ky;
-  if(PHP[S.ch]<=0){
-    const alive=S.party.find(id=>(PHP[id]||0)>0);
-    if(alive){
-      addHit(P.x,P.y-30,'PADŁ!','#e04848');
-      toast('😵 '+CHARS[S.ch].n+' pada! Do walki wchodzi '+CHARS[alive].n+'!');
-      switchTo(alive);hurtT=1.6;
-    }else partyWipe();
-  }
+  playerDown();
+}
+/* postać zeszła do zera — wchodzi następna, a jak nie ma kogo, to wipe.
+   Wydzielone, bo do zera można zejść nie tylko od ciosu (patrz `domFall`). */
+function playerDown(){
+  if(PHP[S.ch]>0)return;
+  const alive=S.party.find(id=>(PHP[id]||0)>0);
+  if(alive){
+    addHit(P.x,P.y-30,'PADŁ!','#e04848');
+    toast('😵 '+CHARS[S.ch].n+' pada! Do walki wchodzi '+CHARS[alive].n+'!');
+    switchTo(alive);hurtT=1.6;
+  }else partyWipe();
 }
 /* cała drużyna padła */
 function partyWipe(){
   if(POL.on){polDefeat();return;}
   if(REG==='arena'&&DOM.cur){
-    const dn=DOMAINS[DOM.cur].n;
+    const dn=DOMAINS[DOM.cur].n,pietro=(DOM.floor+1)+'/'+domPietra(DOM.cur).length;
     exitDomain();
     for(const id of S.party)PHP[id]=Math.round(chHpMax(id)*.5);
     hurtT=2.5;
-    toast('💀 CAŁA DRUŻYNA PADŁA!<br>'+dn+': cały progres OD NOWA, byku!',4600);
+    toast('💀 CAŁA DRUŻYNA PADŁA!<br>'+dn+' — piętro '+pietro+': cały przebieg OD NOWA, byku!',4600);
     vsay('c_niepoddajemy');SFX.no();
   }else{
     S.dia=Math.max(0,S.dia-5);save();refreshHUD();
@@ -2222,6 +2294,9 @@ function updateFoes(dt){
       if(okX)f.x=nx;
       const okY=!SOLID(at(Math.floor(f.x/16),Math.floor(ny/16)));
       if(okY)f.y=ny;
+      /* ODRZUT W PRZEPAŚĆ = koniec. Sam z siebie wróg tam nie wejdzie
+         (patrz foeBlok), ale wepchnąć go można — i o to chodzi. */
+      if(domWpadl(f))continue;
       /* wyrżnęła rogami w barierkę — liczy się oś, wzdłuż której leciała */
       const wall=Math.abs(f.kbx)>=Math.abs(f.kby)?!okX:!okY;
       if(f.charging>0&&wall){
@@ -2244,8 +2319,8 @@ function updateFoes(dt){
         if(bd<14){hurtFoe(tgt,1,f.x,f.y,'julka');f.charm-=.8;}
       }else{f.dx=0;f.dy=0;}
       const nx=f.x+f.dx*slowK*dt,ny=f.y+f.dy*slowK*dt;
-      if(!SOLID(at(Math.floor(nx/16),Math.floor(f.y/16))))f.x=nx;
-      if(!SOLID(at(Math.floor(f.x/16),Math.floor(ny/16))))f.y=ny;
+      if(!foeBlok(at(Math.floor(nx/16),Math.floor(f.y/16)),f))f.x=nx;
+      if(!foeBlok(at(Math.floor(f.x/16),Math.floor(ny/16)),f))f.y=ny;
       continue;
     }
     const d=Math.hypot(P.x-f.x,P.y-f.y);
@@ -2481,8 +2556,8 @@ function updateFoes(dt){
       if(f.boss||f.swarm||!inBossArena(fx,fy)){f.x=fx;f.y=fy;}
       else{f.dx*=-1;f.dy*=-1;}
     }else{
-      if(!SOLID(at(Math.floor(nx/16),Math.floor(f.y/16)))&&(f.boss||f.swarm||!inBossArena(nx,f.y)))f.x=nx;else f.dx*=-1;
-      if(!SOLID(at(Math.floor(f.x/16),Math.floor(ny/16)))&&(f.boss||f.swarm||!inBossArena(f.x,ny)))f.y=ny;else f.dy*=-1;
+      if(!foeBlok(at(Math.floor(nx/16),Math.floor(f.y/16)),f)&&(f.boss||f.swarm||!inBossArena(nx,f.y)))f.x=nx;else f.dx*=-1;
+      if(!foeBlok(at(Math.floor(f.x/16),Math.floor(ny/16)),f)&&(f.boss||f.swarm||!inBossArena(f.x,ny)))f.y=ny;else f.dy*=-1;
     }
     if(!f.sub&&d<(f.boss?22:td.elite?16:13))hurtPlayer(f);
     /* SZARŻA: jeden czysty cios na wroga + odrzut, żeby Dych nie utknął w przeciwniku */
@@ -2535,6 +2610,7 @@ function updateFoes(dt){
   for(const n of dmgNums)n.life-=dt;
   dmgNums=dmgNums.filter(n=>n.life>0);
   if(atkT>0)atkT-=dt;
+  if(fallT>0)fallT-=dt;
   if(atkAnim>0)atkAnim-=dt;
   if(spcT>0)spcT-=dt;
   if(hurtT>0)hurtT-=dt;
@@ -2639,6 +2715,10 @@ const CHARS={
       addShake(2,.28);
       beep(90,.3,'sawtooth',.09,45);
     },n:'Dych Dziki',elId:'piwo',star:5,
+    /* KADROWANIE SYLWETKI — Dych jest wyższy od reszty ekipy, więc miejsca,
+       które kadrują po GŁOWIE (ikonka w HUD, chip w panelu), muszą wiedzieć,
+       gdzie ta głowa jest. `head`=[x, y środka, połowa szerokości], `top`=czubek. */
+    head:[8,-2.8,5.6],top:-8.4,
     idleV:['d_siemanko','d_wariacie','d_mordeczko','d_lecimy'],
     spd:95,batk:30,rng:26,atk:'melee',
     spcN:'DZIKA SZARŻA',spcCd:5,spcD:'taranuje wszystko na swojej drodze',
@@ -3102,186 +3182,1722 @@ function addToParty(id){
 }
 
 /* =====================================================================
-   DOMENY 2.0 — podziemia z komnatami, bramami, elitą, surowcami
-   i kryształami (nie kwadrat!). Układ losowany przy każdym wejściu.
+   DOMENY 3.0 — kilka PIĘTER pod rząd (jak wspinaczka w Genshinie), a na
+   każdym komnaty z bramami, elitą i mini-bossami. Piętro ładuje się osobno,
+   więc mapa nigdy nie jest większa niż 64×32 kafle (tyle mieści cache).
+   Wipe drużyny albo wyjście = CAŁA domena od nowa.
+
+   Jeden wpis w DOMAINS opisuje domenę w całości. Żeby dorzucić kolejną,
+   wypełniasz szablon — nie dopisujesz nigdzie `case` ani `if`.
    ===================================================================== */
 const DOMAINS={
-  piwnica:{r:'wawa',x:39,y:40,n:'PIWNICA HEJTERÓW',floor:2,acc:9,wall:20,gate:26,
-    foes:['hejter','zazdrosnik','pies'],elite:'rycerz',ing:['grzyb','ziemniak'],col:'#8a6fc8'},
-  las:{r:'chodziez',x:42,y:10,n:'DZIKI LAS',floor:0,acc:25,wall:4,gate:30,
-    foes:['zazdrosnik','dres','wilk'],elite:'odyniec',ing:['jagoda','grzyb','ziolo'],col:'#7bc950'},
-  molo_d:{r:'morze',x:54,y:18,n:'ZATOPIONE MOLO',floor:8,acc:1,wall:3,gate:24,
-    foes:['dres','hejter','krab'],elite:'utopiec',ing:['ryba_sur','czosnek'],col:'#6fd8e8'},
-  jama:{r:'krakow',x:18,y:31,n:'SMOCZA JAMA',floor:2,acc:9,wall:16,gate:27,
-    foes:['hejter','dres','zmija'],elite:'smoczatko',ing:['ziolo','jablko'],col:'#c8384a'},
-  grota:{r:'tatry',x:4,y:10,n:'LODOWA GROTA',floor:17,acc:8,wall:16,gate:24,
-    foes:['zazdrosnik','dres','balwan'],elite:'golem',ing:['miod','czosnek','ziolo'],col:'#bfe8f4'},
-  pole:{r:'trasa',x:56,y:40,n:'POLE NAMIOTOWE O 3 W NOCY',floor:0,acc:28,wall:4,gate:30,
-    foes:['hejter','pies','golab'],elite:'odyniec',ing:['jagoda','ziemniak','ziolo'],col:'#f5a032'},
+  /* PIWNICA ma RĘCZNIE ROBIONE plansze (js/mapy.js) — stamtąd biorą się też jej
+     piętra, więc nie ma tu pola `pietra`. Stąd własna posadzka i mur zamiast
+     głazów na trawie, które zostały po losowym generatorze. */
+  piwnica:{r:'wawa',dni:0,x:39,y:40,n:'PIWNICA HEJTERÓW',floor:61,acc:57,wall:60,
+    foes:['hejter','zazdrosnik','pies'],elite:'rycerz',mini:['paparazzo','betoniarz','komornik'],ing:['grzyb','ziemniak'],col:'#8a6fc8'},
+  /* DZIKI LAS — druga domena z RĘCZNYMI planszami (js/mapy.js), stąd brak
+     pola `pietra`. Ściółka pod nogami, gęstwina zamiast muru, a `amb` włącza
+     szum drzew i ptaki (syntezowane, bez plików). */
+  las:{r:'chodziez',dni:1,x:42,y:10,n:'DZIKI LAS',floor:69,acc:64,wall:68,
+    amb:{wiatr:.5,ptaki:1},mrok:.42,mrokCol:'10,26,14',   // cień koron, nie ciemność piwnicy
+    foes:['zazdrosnik','dres','wilk'],elite:'odyniec',mini:['soltys','betoniarz','smog'],ing:['jagoda','grzyb','ziolo'],col:'#7bc950'},
+  molo_d:{r:'morze',dni:2,x:54,y:18,n:'ZATOPIONE MOLO',floor:8,acc:1,wall:3,
+    pietra:['przedsionek','krata','komnaty','zapadnia','skarbiec'],
+    foes:['dres','hejter','krab'],elite:'utopiec',mini:['paparazzo','dj','smog'],ing:['ryba_sur','czosnek'],col:'#6fd8e8'},
+  jama:{r:'krakow',dni:0,x:18,y:31,n:'SMOCZA JAMA',floor:2,acc:9,wall:16,
+    pietra:['przedsionek','krata','komnaty','zapadnia','skarbiec'],
+    foes:['hejter','dres','zmija'],elite:'smoczatko',mini:['soltys','betoniarz','smog'],ing:['ziolo','jablko'],col:'#c8384a'},
+  grota:{r:'tatry',dni:1,x:4,y:10,n:'LODOWA GROTA',floor:17,acc:8,wall:16,
+    pietra:['przedsionek','krata','komnaty','zapadnia','skarbiec'],
+    foes:['zazdrosnik','dres','balwan'],elite:'golem',mini:['soltys','betoniarz','rolexiarz'],ing:['miod','czosnek','ziolo'],col:'#bfe8f4'},
+  wesele:{r:'chodziez',dni:0,x:85,y:30,n:'WESELE W REMIZIE',floor:37,acc:9,wall:13,
+    pietra:['przedsionek','krata','komnaty','zapadnia','skarbiec'],
+    foes:['hejter','dres','zazdrosnik'],elite:'rycerz',mini:['soltys','dj','komornik'],
+    ing:['ziemniak','czosnek','miod'],col:'#e88ac8'},
+  pole:{r:'trasa',dni:2,x:56,y:40,n:'POLE NAMIOTOWE O 3 W NOCY',floor:0,acc:28,wall:4,
+    pietra:['przedsionek','krata','komnaty','zapadnia','skarbiec'],
+    foes:['hejter','pies','golab'],elite:'odyniec',mini:['paparazzo','dj','rolexiarz'],ing:['jagoda','ziemniak','ziolo'],col:'#f5a032'},
 };
-let DOM={cur:null,rooms:[],gates:[],crystals:[],usedMini:[],chest:null,prevReg:null,prevX:0,prevY:0,done:false};
-/* generator: 4 nieregularne komnaty (blob z elips) połączone korytarzami z bramami */
-function buildDomainMap(cfg){
-  rect(0,0,MW-1,MH-1,cfg.wall);
-  const cy0=13;
-  const rooms=[
-    {cx:9, cy:cy0+((Math.random()*5)|0)-2, r:5.6},
-    {cx:29,cy:cy0+((Math.random()*7)|0)-3, r:7},
-    {cx:49,cy:cy0+((Math.random()*7)|0)-3, r:7},
-    {cx:66,cy:cy0+((Math.random()*5)|0)-2, r:6.2},
-  ];
-  const carve=(cx2,cy2,rx,ry)=>{
-    for(let y=Math.max(1,Math.floor(cy2-ry));y<=Math.min(MH-2,Math.ceil(cy2+ry));y++)
-      for(let x=Math.max(1,Math.floor(cx2-rx));x<=Math.min(MW-2,Math.ceil(cx2+rx));x++){
-        const dx=(x-cx2)/rx,dy=(y-cy2)/ry;
-        if(dx*dx+dy*dy<=1)set(x,y,Math.random()<.12?cfg.acc:cfg.floor);
-      }
-  };
-  for(const rm of rooms){
-    carve(rm.cx,rm.cy,rm.r,rm.r*.75);                              // główna elipsa
-    for(let i=0;i<3;i++)carve(rm.cx+(Math.random()-.5)*rm.r*1.4,   // nieregularne wybrzuszenia
-      rm.cy+(Math.random()-.5)*rm.r,2.4+Math.random()*2.4,2+Math.random()*2);
-  }
-  const gates=[];
-  for(let i=0;i<3;i++){ // korytarze między komnatami + BRAMA w połowie
-    const a=rooms[i],b=rooms[i+1];
-    for(let x=a.cx;x<=b.cx;x++){
-      const t=(x-a.cx)/Math.max(1,b.cx-a.cx);
-      const y=Math.round(a.cy+(b.cy-a.cy)*t);
-      for(let yy=y-1;yy<=y+1;yy++)set(x,yy,cfg.floor);
-    }
-    const gx=Math.round((a.cx+b.cx)/2);
-    const cells=[];
-    // brama = 2 kolumny kafla-gate zamykające cały przekrój przejścia
-    for(let yy=1;yy<MH-1;yy++)for(const xx of[gx,gx+1]){
-      if(!SOLID(at(xx,yy))){cells.push([xx,yy]);set(xx,yy,cfg.gate);}
-    }
-    gates.push({room:i,cells,open:false,x:gx*16+16,y:rooms[i].cy*16});
-  }
-  DOM.rooms=rooms.map((rm,i)=>({cx:rm.cx*16+8,cy:rm.cy*16+8,r:rm.r*16+14,
-    spawned:i===0,cleared:i===0}));   // komnata 1 = wejściowa, bez walki
-  DOM.gates=gates;
-  /* brama z komnaty wejściowej otwarta od startu (walka zaczyna się od komnaty 2) */
-  for(const[x,y]of gates[0].cells)set(x,y,cfg.floor);
-  gates[0].open=true;
+/* --------------------------------------------------------------------
+   KALENDARZ DOMEN — każda stoi otworem w DWA dni tygodnia, a w NIEDZIELĘ
+   otwarte jest wszystko. Doba domen skacze o 4:00 nad ranem (jak w Genshinie),
+   żeby nocna sesja nie zabierała nikomu dnia w połowie grania.
+
+   Liczymy na czasie LOKALNYM gracza, nie na sztywnym UTC — dzięki temu
+   przeglądarka sama ogarnia przejście CEST↔CET. Z tego samego powodu przy
+   przeskoku doby używamy setDate(+1), a NIE dodawania 86400 sekund.
+   -------------------------------------------------------------------- */
+const DOM_DAYS=[[1,4],[2,5],[3,6]];                 // 0: PON+CZW, 1: WT+PT, 2: ŚR+SOB
+const DOM_DAY_TXT=['PON · CZW','WT · PT','ŚR · SOB'];
+const DOM_RESET_H=4;
+let domOffset=0;    // TESTY (konsola): domOffset=86400 → „jutro"
+let domAlways=0;    // TESTY (konsola): domAlways=1 → wszystko otwarte
+const domNow=()=>new Date(Date.now()+domOffset*1000);
+function domWeekday(d){
+  const t=new Date((d||domNow()).getTime()-DOM_RESET_H*3600e3);
+  return t.getDay();                                 // 0 = niedziela
 }
-REGIONS.arena={n:'DOMENA',w:76,h:26,build:()=>{},spawn:[9*16,13*16],pks:[2,2],
+const domDni=id=>DOM_DAYS[DOMAINS[id].dni||0];
+const domDayOpen=id=>!!(domAlways||domWeekday()===0||domDni(id).includes(domWeekday()));
+function domNextReset(d){
+  const t=d||domNow();
+  const r=new Date(t.getFullYear(),t.getMonth(),t.getDate(),DOM_RESET_H,0,0,0);
+  if(t>=r)r.setDate(r.getDate()+1);
+  return r;
+}
+/* ile sekund do najbliższego OTWARCIA (0 = otwarta teraz) */
+function domNextOpen(id){
+  if(domDayOpen(id))return 0;
+  let r=domNextReset();
+  for(let i=0;i<8;i++){
+    const w=domWeekday(new Date(r.getTime()+1000));
+    if(w===0||domDni(id).includes(w))return Math.max(0,Math.floor((r-domNow())/1000));
+    const n=new Date(r.getTime());n.setDate(n.getDate()+1);r=n;
+  }
+  return 0;
+}
+/* ile sekund JESZCZE jest otwarta (0, jeśli zamknięta) */
+const domOpenLeft=id=>domDayOpen(id)?Math.max(0,Math.floor((domNextReset()-domNow())/1000)):0;
+const domDayTxt=id=>DOM_DAY_TXT[DOMAINS[id].dni||0]+' · NDZ';
+const domStanTxt=id=>domDayOpen(id)
+  ?('dziś OTWARTA — jeszcze '+fmtLeft(domOpenLeft(id)))
+  :('ZAMKNIĘTA — otwarcie za '+fmtLeft(domNextOpen(id)));
+const domOtwarteDzis=()=>Object.keys(DOMAINS).filter(domDayOpen);
+/* RODZAJE PIĘTER — jeden wpis = jeden charakter planszy. Generator jest wspólny
+   i czyta z wpisu, ile ma komnat, jak gęsto sypać rupieciami i czy jest zegar.
+   `min` to szacowany czas przejścia — suma po `pietra` ma dać 10–15 minut. */
+const FLOOR_KINDS={
+  przedsionek:{n:'PRZEDSIONEK',w:40,h:24,siatka:[1,1],walka:0,limit:0,min:1,
+    opis:'Cisza przed burzą. Rozejrzyj się i szukaj schodów.'},
+  komnaty:{n:'KOMNATY',w:64,h:32,siatka:[3,2],petle:1,klucze:1,korytarz:3,
+    walka:1,elita:1,limit:0,min:3,gest:.1,
+    opis:'Labirynt sześciu komnat. Za kłódką jest dalsza droga — klucz gdzieś leży.'},
+  krata:{n:'KRATA',w:64,h:32,siatka:[3,2],petle:2,klucze:2,korytarz:3,
+    walka:1,limit:0,min:3.5,gest:.34,filary:1,maszyn:2,
+    opis:'Beton kruszy TYLKO bomba. Dwie kłódki, dwa klucze — szukaj po bokach.'},
+  zapadnia:{n:'ZAPADNIA',w:56,h:30,siatka:[2,2],petle:1,klucze:1,korytarz:3,
+    mostki:3,walka:1,limit:180,min:2.5,gest:.1,dziury:4,
+    opis:'Przez przepaść prowadzą TYLKO kruche płyty. I tyka zegar.'},
+  skarbiec:{n:'SKARBIEC',w:44,h:26,siatka:[1,1],walka:1,straz:1,limit:0,min:3,gest:.08,
+    opis:'STRAŻNIK i skrzynia. Tu się rozstrzyga.'},
+};
+/* Przy ręcznej planszy `fk` jest scalone z wpisem mapy (nazwa, opis, limit,
+   rozmiar) — stąd czytamy je z DOM, a nie prosto z rejestru. */
+const flKind=()=>DOM.fk||FLOOR_KINDS[DOM.kind]||FLOOR_KINDS.komnaty;
+const domPietra=id=>(typeof MAPY!=='undefined'&&MAPY[id]&&MAPY[id].map(m=>m.kind))
+  ||DOMAINS[id].pietra||['komnaty','skarbiec'];
+
+let DOM={cur:null,floor:0,kind:null,fk:null,rooms:[],crystals:[],usedMini:[],
+  chest:null,stairs:null,exit2:null,prevReg:null,prevX:0,prevY:0,done:false,
+  seed:1,tLimit:0,tLeft:0,wyjT:0,grace:0,masz:[],bomby:[],carry:null,zap:[],regen:[],
+  zamki:[],klucze:[],mam:{},wejscie:0,wyjscie:0,sciezka:[],
+  deko:DEKO_PUSTE(),reczna:false,wejscieXY:null,schodyXY:null};
+/* LOSOWANIE PLANSZY Z ZIARNA (mulberry32). Ten sam `seed` = ta sama domena,
+   dzięki czemu testy mogą przemielić setki układów i sprawdzić, czy każdy da
+   się przejść. W grze ziarno bierzemy z zegara przy wejściu do domeny. */
+let domSeed=1;
+const domSeedSet=n=>{domSeed=(n>>>0)||1;};
+function domRng(){
+  domSeed=(domSeed+0x6D2B79F5)|0;
+  let t=domSeed;
+  t=Math.imul(t^(t>>>15),1|t);
+  t=(t+Math.imul(t^(t>>>7),61|t))^t;
+  return ((t^(t>>>14))>>>0)/4294967296;
+}
+const domPick=a=>a[(domRng()*a.length)|0];
+
+/* --------------------------------------------------------------------
+   GENERATOR PIĘTRA
+   Komnaty to nieregularne bąble z elips (nie kwadraty!), połączone
+   korytarzem z bramą w połowie. Wszystko z `domRng`, więc powtarzalne.
+   -------------------------------------------------------------------- */
+/* --------------------------------------------------------------------
+   LABIRYNT KOMNAT — piętro to SIATKA komnat (`siatka:[kolumny,rzędy]`)
+   połączona losowym drzewem korytarzy plus kilka pętli. Dzięki temu
+   prostokąt planszy jest wykorzystany w całości, a nie jak wcześniej:
+   jeden korytarz przez środek.
+
+   Postęp blokują KLUCZE i ZAMKI. Klucz do zamka nr `i` zawsze leży w części
+   labiryntu osiągalnej PRZED tym zamkiem — solidność wynika z konstrukcji,
+   nie z modlitwy. Najchętniej w bocznej odnodze, żeby było po co zwiedzać.
+   -------------------------------------------------------------------- */
+const KLUCZE=[
+  {k:'zloty',   n:'ZŁOTY KLUCZ',    ic:'🔑',col:'#f5c542',tile:48},
+  {k:'czerwony',n:'CZERWONY KLUCZ', ic:'🗝️',col:'#e04848',tile:49},
+  {k:'niebieski',n:'NIEBIESKI KLUCZ',ic:'🔐',col:'#6fd8e8',tile:50},
+];
+const kluczCfg=k=>KLUCZE.find(x=>x.k===k)||KLUCZE[0];
+
+function domCarve(cfg,cx2,cy2,rx,ry){
+  for(let y=Math.max(1,Math.floor(cy2-ry));y<=Math.min(MH-2,Math.ceil(cy2+ry));y++)
+    for(let x=Math.max(1,Math.floor(cx2-rx));x<=Math.min(MW-2,Math.ceil(cx2+rx));x++){
+      const dx=(x-cx2)/rx,dy=(y-cy2)/ry;
+      if(dx*dx+dy*dy<=1)set(x,y,domRng()<.12?cfg.acc:cfg.floor);
+    }
+}
+/* korytarz w L o zadanej szerokości — łączy środki dwóch komnat */
+function domKorytarz(cfg,ax,ay,bx,by,szer){
+  const hw=(szer-1)>>1,os=[[ax,ay]];
+  const poloz=(x,y)=>{os.push([x,y]);
+    for(let dy=-hw;dy<=hw;dy++)for(let dx=-hw;dx<=hw;dx++){
+      const tx=x+dx,ty=y+dy;
+      if(tx<1||ty<1||tx>=MW-1||ty>=MH-1)continue;
+      set(tx,ty,cfg.floor);
+    }};
+  let x=ax,y=ay;
+  if(domRng()<.5){while(x!==bx){x+=Math.sign(bx-x);poloz(x,y);}while(y!==by){y+=Math.sign(by-y);poloz(x,y);}}
+  else{while(y!==by){y+=Math.sign(by-y);poloz(x,y);}while(x!==bx){x+=Math.sign(bx-x);poloz(x,y);}}
+  return os;                       // oś korytarza — potrzebna, żeby POSTAWIĆ NA NIM kłódkę
+}
+function domBuildFloor(cfg,fk,idx){
+  rect(0,0,MW-1,MH-1,cfg.wall);
+  const kx=(fk.siatka&&fk.siatka[0])||1, ky=(fk.siatka&&fk.siatka[1])||1;
+  const ile=kx*ky, komId=(gx,gy)=>gy*kx+gx;
+  const komW=MW/kx, komH=MH/ky;
+
+  /* --- 1. KOMNATY: po jednej na komórkę siatki, z lekkim rozrzutem --- */
+  const rooms=[];
+  for(let gy=0;gy<ky;gy++)for(let gx=0;gx<kx;gx++){
+    const prom=ile===1?Math.min(11,(MH/2)-3)
+                      :Math.max(3.4,Math.min(komW,komH)*.40+domRng()*1.2);
+    const cx=Math.round(Math.max(prom+2,Math.min(MW-prom-2,
+      (gx+.5)*komW+(domRng()-.5)*komW*.24)));
+    const cy=Math.round(Math.max(prom+2,Math.min(MH-prom-2,
+      (gy+.5)*komH+(domRng()-.5)*komH*.24)));
+    rooms.push({gx,gy,cx,cy,r:prom});
+  }
+  for(const rm of rooms){
+    domCarve(cfg,rm.cx,rm.cy,rm.r,rm.r*.78);                       // główna elipsa
+    for(let i=0;i<3;i++)domCarve(cfg,rm.cx+(domRng()-.5)*rm.r*1.3, // nieregularne wybrzuszenia
+      rm.cy+(domRng()-.5)*rm.r,1.8+domRng()*rm.r*.5,1.5+domRng()*rm.r*.4);
+  }
+
+  /* --- 2. LABIRYNT: losowe drzewo rozpinające po siatce + pętle --- */
+  const kraw=[],sasiedztwo=Array.from({length:ile},()=>[]);
+  const dodaj=(a,b)=>{kraw.push([a,b]);sasiedztwo[a].push(b);sasiedztwo[b].push(a);};
+  if(ile>1){
+    const odw=new Uint8Array(ile),stos=[0];odw[0]=1;
+    while(stos.length){
+      const c=stos[stos.length-1],gx=c%kx,gy=(c/kx)|0,wolne=[];
+      for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){
+        const nx=gx+dx,ny=gy+dy;
+        if(nx<0||ny<0||nx>=kx||ny>=ky||odw[komId(nx,ny)])continue;
+        wolne.push(komId(nx,ny));
+      }
+      if(!wolne.length){stos.pop();continue;}
+      const n=domPick(wolne);odw[n]=1;dodaj(c,n);stos.push(n);
+    }
+    /* PĘTLE — bez nich labirynt jest drzewem i każdą ślepą uliczkę trzeba
+       przechodzić dwa razy. Kilka skrótów robi z tego prawdziwy labirynt. */
+    for(let i=0;i<(fk.petle||0);i++){
+      const a=(domRng()*ile)|0,gx=a%kx,gy=(a/kx)|0,wolne=[];
+      for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){
+        const nx=gx+dx,ny=gy+dy;
+        if(nx<0||ny<0||nx>=kx||ny>=ky)continue;
+        const b=komId(nx,ny);
+        if(!sasiedztwo[a].includes(b))wolne.push(b);
+      }
+      if(wolne.length)dodaj(a,domPick(wolne));
+    }
+  }
+
+  /* --- 3. WEJŚCIE i WYJŚCIE: najdalsza para w labiryncie --- */
+  const odleglosci=(od)=>{
+    const d=new Array(ile).fill(-1),q=[od];d[od]=0;
+    for(let i=0;i<q.length;i++)for(const n of sasiedztwo[q[i]])
+      if(d[n]<0){d[n]=d[q[i]]+1;q.push(n);}
+    return d;
+  };
+  const wejscie=ile>1?((domRng()*ile)|0):0;
+  const dW=odleglosci(wejscie);
+  let wyjscie=wejscie,naj=-1;
+  for(let i=0;i<ile;i++)if(dW[i]>naj){naj=dW[i];wyjscie=i;}
+
+  /* ścieżka wejście → wyjście (po drzewie/labiryncie, wstecz po odległościach) */
+  const sciezka=[wyjscie];
+  while(sciezka[0]!==wejscie){
+    const c=sciezka[0];
+    const poprz=sasiedztwo[c].find(n=>dW[n]===dW[c]-1);
+    if(poprz===undefined)break;
+    sciezka.unshift(poprz);
+  }
+
+  /* --- 4. KORYTARZE (zapamiętujemy ich osie) --- */
+  const korytarze={};
+  for(const[a,b]of kraw){
+    const os=domKorytarz(cfg,rooms[a].cx,rooms[a].cy,rooms[b].cx,rooms[b].cy,fk.korytarz||3);
+    korytarze[a+'-'+b]=os;korytarze[b+'-'+a]=os;
+  }
+
+  /* --- 5. ZAMKI na ścieżce głównej + KLUCZE przed nimi --- */
+  const zamki=[],klucze=[];
+  const ileZamkow=Math.min(fk.klucze||0,KLUCZE.length,Math.max(0,sciezka.length-1));
+  if(ileZamkow>0){
+    /* zamki rozstawiamy równomiernie po ścieżce, zawsze na jej krawędziach */
+    const kandydaci=[];
+    for(let i=1;i<sciezka.length;i++)kandydaci.push(i);
+    const wybrane=[];
+    for(let i=0;i<ileZamkow;i++){
+      const poz=Math.round((i+1)*kandydaci.length/(ileZamkow+1));
+      const k=kandydaci[Math.max(0,Math.min(kandydaci.length-1,poz))];
+      if(k!==undefined&&!wybrane.includes(k))wybrane.push(k);
+    }
+    wybrane.sort((a,b)=>a-b);
+    wybrane.forEach((krok,i)=>{
+      const kol=KLUCZE[i].k;
+      const a=sciezka[krok-1],b=sciezka[krok];
+      /* zamek stawiamy w połowie korytarza — cały jego przekrój */
+      const cells=domZamekCells(cfg,korytarze[a+'-'+b],rooms,KLUCZE[i].tile);
+      if(!cells.length)return;
+      const sx2=cells.reduce((t,c)=>t+c[0],0)/cells.length;
+      const sy2=cells.reduce((t,c)=>t+c[1],0)/cells.length;
+      zamki.push({kolor:kol,cells,open:false,
+        x:sx2*16+8,y:sy2*16+8,room:a});
+      /* KLUCZ: gdziekolwiek w części osiągalnej PRZED tym zamkiem.
+         Najchętniej poza ścieżką główną — wtedy trzeba zboczyć i pozwiedzać. */
+      const zamkniete=wybrane.slice(0,i+1).map(kk=>[sciezka[kk-1],sciezka[kk]]);
+      const przed=domOsiagalneKomnaty(sasiedztwo,ile,wejscie,zamkniete);
+      const boczne=przed.filter(r=>!sciezka.includes(r)&&r!==wejscie);
+      const pula=boczne.length?boczne:przed.filter(r=>r!==wejscie);
+      const gdzie=pula.length?domPick(pula):wejscie;
+      const rm=rooms[gdzie];
+      klucze.push({kolor:kol,room:gdzie,taken:false,
+        x:rm.cx*16+8+(domRng()-.5)*rm.r*10,
+        y:rm.cy*16+8+(domRng()-.5)*rm.r*8});
+    });
+  }
+
+  /* --- 6. PRZEPRAWY PO KRUCHYCH PŁYTACH (tylko tam, gdzie to zamierzone) --- */
+  if(fk.mostki)domMostki(cfg,fk,rooms,kraw);
+
+  DOM.rooms=rooms.map((rm,i)=>({cx:rm.cx*16+8,cy:rm.cy*16+8,r:rm.r*16+14,
+    gx:rm.gx,gy:rm.gy,spawned:false,cleared:false,plan:null}));
+  DOM.zamki=zamki;
+  DOM.klucze=klucze;
+  DOM.mam={};
+  DOM.wejscie=wejscie;
+  DOM.wyjscie=wyjscie;
+  DOM.sciezka=sciezka;
+  return rooms;
+}
+/* zamek = pełny przekrój korytarza w połowie drogi między komnatami */
+function domZamekCells(cfg,os,rooms,tile){
+  if(!os||!os.length)return[];
+  /* Kłódkę stawiamy NA KORYTARZU tej konkretnej pary komnat i POZA komnatami.
+     Wcześniej brany był środek odcinka między środkami komnat — przy korytarzu
+     w L trafiał w zupełnie inne miejsce mapy i potrafił odciąć komnatę z kluczem
+     do samego siebie. */
+  const poza=os.filter(([x,y])=>!rooms.some(r=>Math.hypot(x-r.cx,y-r.cy)<r.r+1.5));
+  const lista=poza.length?poza:os;
+  const[bx,by]=lista[(lista.length/2)|0];
+  if(bx<1||by<1||bx>=MW-1||by>=MH-1||SOLID(at(bx,by)))return[];
+  /* oś zamknięcia z przebiegu korytarza, a nie z położenia komnat */
+  const i=os.findIndex(([x,y])=>x===bx&&y===by);
+  const pr=os[Math.max(0,i-1)],na=os[Math.min(os.length-1,i+1)];
+  const poziomo=Math.abs(na[0]-pr[0])>=Math.abs(na[1]-pr[1]);
+  const cells=[];
+  const dodaj=(x,y)=>{if(x<1||y<1||x>=MW-1||y>=MH-1)return false;
+    if(SOLID(at(x,y)))return false;cells.push([x,y]);set(x,y,tile);return true;};
+  if(poziomo){                            // korytarz biegnie poziomo → zamykamy kolumnę
+    for(const x of[bx,bx+1]){
+      for(let y=by;y>=1;y--)if(!dodaj(x,y))break;
+      for(let y=by+1;y<MH-1;y++)if(!dodaj(x,y))break;
+    }
+  }else{                                  // pionowo → zamykamy wiersz
+    for(const y of[by,by+1]){
+      for(let x=bx;x>=1;x--)if(!dodaj(x,y))break;
+      for(let x=bx+1;x<MW-1;x++)if(!dodaj(x,y))break;
+    }
+  }
+  return cells;
+}
+/* które komnaty są osiągalne, gdy podane krawędzie są ZAMKNIĘTE */
+function domOsiagalneKomnaty(sasiedztwo,ile,od,zamkniete){
+  const zam=(a,b)=>zamkniete.some(([p,q])=>(p===a&&q===b)||(p===b&&q===a));
+  const wid=new Uint8Array(ile),q=[od];wid[od]=1;
+  for(let i=0;i<q.length;i++)for(const n of sasiedztwo[q[i]]){
+    if(wid[n]||zam(q[i],n))continue;
+    wid[n]=1;q.push(n);
+  }
+  const out=[];for(let i=0;i<ile;i++)if(wid[i])out.push(i);
+  return out;
+}
+/* PRZEPRAWA: korytarz przecięty przepaścią, przez którą prowadzi WYŁĄCZNIE
+   kładka z kruchych płyt. Płyty odrastają po 7 s, więc nieudana próba kosztuje
+   HP i nerwy, ale nigdy nie zamyka drogi na stałe. */
+function domMostki(cfg,fk,rooms,kraw){
+  let zrobione=0;
+  const zajete=[];                    // środki już postawionych przepraw
+  const wolne=(x,y)=>!SOLID(at(x,y))&&!PIT(at(x,y));
+  for(const[a,b]of kraw){
+    if(zrobione>=(fk.mostki||0))break;
+    const A=rooms[a],B=rooms[b];
+    const sx=Math.round((A.cx+B.cx)/2),sy=Math.round((A.cy+B.cy)/2);
+    /* Przeprawę stawiamy NA KORYTARZU, nie w komnacie — szukamy najbliższego
+       wolnego kafla poza wszystkimi komnatami. Sam środek odcinka między
+       komnatami zwykle wypada w ścianie, bo korytarz idzie w L. */
+    let bx=-1,by=-1,naj=1e9;
+    for(let y=2;y<MH-2;y++)for(let x=2;x<MW-2;x++){
+      if(!wolne(x,y))continue;
+      if(rooms.some(r=>Math.hypot(x-r.cx,y-r.cy)<r.r+1.5))continue;
+      /* dwie przeprawy obok siebie zjadały sobie nawzajem kładki i zostawiały
+         dwa rzędy płyt rozjechane o jeden kafel — czyli dziurę nie do przejścia */
+      if(zajete.some(([zx,zy])=>Math.abs(zx-x)+Math.abs(zy-y)<10))continue;
+      const d=Math.abs(x-sx)+Math.abs(y-sy);
+      if(d<naj){naj=d;bx=x;by=y;}
+    }
+    if(bx<0)continue;
+    zajete.push([bx,by]);
+    /* KIERUNEK KORYTARZA czytamy z mapy. Wcześniej zgadywaliśmy go z położenia
+       komnat i przy korytarzu w L przepaść potrafiła paść WZDŁUŻ przejścia,
+       a kładka równolegle do niej — czyli plansza pękała na pół. */
+    let poziom=0,pion=0;
+    for(let d=1;d<=3;d++){
+      if(wolne(bx-d,by))poziom++; if(wolne(bx+d,by))poziom++;
+      if(wolne(bx,by-d))pion++;   if(wolne(bx,by+d))pion++;
+    }
+    const poziomo=poziom>=pion;
+    const dl=2+((domRng()*2)|0);
+    for(let d=-dl;d<=dl;d++){
+      const x=poziomo?bx+d:bx, y=poziomo?by:by+d;
+      for(let e=-2;e<=2;e++){                     // przepaść W POPRZEK korytarza
+        const tx=poziomo?x:x+e, ty=poziomo?y+e:y;
+        if(tx<1||ty<1||tx>=MW-1||ty>=MH-1)continue;
+        if(SOLID(at(tx,ty)))continue;             // kłódki i mury zostają
+        set(tx,ty,44);
+      }
+      if(!jestZamek(at(x,y)))set(x,y,43);         // …a WZDŁUŻ niej kładka z płyt
+    }
+    zrobione++;
+  }
+}
+/* =====================================================================
+   RĘCZNIE ROBIONE PLANSZE DOMEN  (dane: js/mapy.js)
+   ---------------------------------------------------------------------
+   Losowy generator dawał plansze POPRAWNE, ale nijakie — jeden korytarz,
+   zero kompozycji, kłódki lądowały tam, gdzie akurat wypadło. Domena, do
+   której wracasz co tydzień, ma być MIEJSCEM: wodospad w tym samym rogu,
+   regały pod tą samą ścianą, skrót, który znasz i przechodzisz coraz
+   szybciej. Dlatego plansza jest rysowana ręcznie w ASCII, a tutaj tylko
+   ją odczytujemy.
+
+   Jeden znak = jeden kafel. Legenda niżej jest jedynym źródłem prawdy —
+   dorzucenie nowego elementu do map to jeden wpis tutaj.
+   ===================================================================== */
+const MAPA_ZNAKI={
+  '#':'wall', '.':'floor', ',':'acc',
+  'S':'floor', '>':'floor', 'k':'floor','r':'floor','b':'floor',
+  '*':'floor', '%':'floor',
+  'A':'floor','B':'floor','C':'floor','D':'floor','E':'floor','F':'floor','H':'floor',
+  ' ':44, '_':70,
+  '1':48,'2':49,'3':50,
+  'X':39,'O':40,'=':41,'I':42,'-':43,'M':45,'^':47,
+  'W':51,'~':52,'L':53,'p':54,'G':55,'T':56,':':57,'|':58,'o':59,
+  /* --- las: część kafli była w grze od dawna, część doszła z domeną --- */
+  'd':30,'q':62,'s':63,'y':18,'x':19,'f':31,'u':26,'i':27,'w':23,'c':21,'+':61,
+  'v':25,'z':28,'l':29,'Q':24,'m':64,'e':65,'n':66,'j':67,'g':68,
+};
+/* do której listy dekoracji trafia znak (animacje i dźwięk czytają gotowe listy,
+   zamiast skanować planszę co klatkę) */
+const MAPA_DEKO={'W':'wod','T':'lampy','~':'woda','|':'rury',
+  'i':'ogniska','s':'szyszki','q':'liscie','d':'liscie'};
+function DEKO_PUSTE(){return{wod:[],lampy:[],woda:[],rury:[],ogniska:[],szyszki:[],liscie:[]};}
+/* Litery komnat WYPISANE JAWNIE — zakres 'A'..'H' łapał też 'G' (głaz)
+   i po każdej skale robiła się komnata-widmo w litej ścianie. */
+const MAPA_KOMNATY='ABCDEFH';
+const MAPA_KLUCZ={'k':'zloty','r':'czerwony','b':'niebieski'};
+const MAPA_ZAMEK={'1':'zloty','2':'czerwony','3':'niebieski'};
+/* czy domena ma ręczne plansze (MAPY siedzi w osobnym pliku js/mapy.js) */
+const domMapaDef=(id,idx)=>(typeof MAPY!=='undefined'&&MAPY[id]&&MAPY[id][idx])||null;
+const domReczna=id=>!!(typeof MAPY!=='undefined'&&MAPY[id]);
+
+/* PROMIEŃ KOMNATY liczymy z samej mapy: strzelamy promieniami z jej środka
+   i bierzemy medianę odległości do przeszkody. Dzięki temu autor rysuje
+   komnatę, a nie wpisuje liczby — a „wejście do komnaty budzi obsadę"
+   działa tak samo jak przy generatorze. */
+function domPromienKomnaty(tx,ty){
+  const dl=[];
+  for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]){
+    let d=0;
+    while(d<14){
+      const x=tx+dx*(d+1),y=ty+dy*(d+1);
+      if(x<0||y<0||x>=MW||y>=MH)break;
+      const v=at(x,y);
+      if(SOLID(v)||PIT(v))break;
+      d++;
+    }
+    dl.push(d*(dx&&dy?1.35:1));                  // po skosie kafel „liczy się" więcej
+  }
+  dl.sort((a,b)=>a-b);
+  const med=(dl[3]+dl[4])/2;
+  return Math.max(3.2,Math.min(9,med))*16+10;
+}
+function domBuildFromMap(cfg,fk,def){
+  const mapa=def.mapa;
+  const pokoje=[],klucze=[],zamkiKafle=[],maszyny=[],deko=DEKO_PUSTE();
+  let spawn=null,schody=null;
+  const surowce=[],krysztaly=[];
+  for(let y=0;y<MH;y++){
+    const wiersz=mapa[y]||'';
+    for(let x=0;x<MW;x++){
+      const z=wiersz[x]!==undefined?wiersz[x]:'#';
+      const co=MAPA_ZNAKI[z];
+      if(co===undefined){set(x,y,cfg.wall);continue;}   // nieznany znak = ściana, nie wywrotka
+      set(x,y,typeof co==='number'?co:cfg[co]);
+      if(z==='S')spawn=[x,y];
+      else if(z==='>')schody=[x,y];
+      else if(MAPA_KLUCZ[z])klucze.push({kolor:MAPA_KLUCZ[z],tx:x,ty:y});
+      else if(MAPA_ZAMEK[z])zamkiKafle.push([x,y]);
+      else if(MAPA_KOMNATY.indexOf(z)>=0)pokoje.push({z,tx:x,ty:y});
+      else if(z==='M')maszyny.push([x,y]);
+      else if(z==='*')krysztaly.push([x,y]);
+      else if(z==='%')surowce.push([x,y]);
+      const kub=MAPA_DEKO[z];
+      if(kub)deko[kub].push([x,y]);
+    }
+  }
+  /* --- KOMNATY: kolejność alfabetyczna znaczników, promień z mapy --- */
+  pokoje.sort((a,b)=>a.z<b.z?-1:1);
+  const nadp=def.promienie||{};
+  DOM.rooms=pokoje.map(p=>({cx:p.tx*16+8,cy:p.ty*16+8,
+    r:nadp[p.z]?nadp[p.z]*16+10:domPromienKomnaty(p.tx,p.ty),
+    znak:p.z,spawned:false,cleared:false,plan:null}));
+  if(!DOM.rooms.length)DOM.rooms=[{cx:MW*8,cy:MH*8,r:80,znak:'A',spawned:false,cleared:false,plan:null}];
+  const najblizsza=(tx,ty)=>{
+    let naj=0,d0=1e9;
+    DOM.rooms.forEach((rm,i)=>{const d=Math.hypot(rm.cx-(tx*16+8),rm.cy-(ty*16+8));
+      if(d<d0){d0=d;naj=i;}});
+    return naj;
+  };
+  DOM.wejscie=spawn?najblizsza(spawn[0],spawn[1]):0;
+  DOM.wyjscie=schody?najblizsza(schody[0],schody[1]):DOM.rooms.length-1;
+  DOM.wejscieXY=spawn?[spawn[0]*16+8,spawn[1]*16+8]:[DOM.rooms[0].cx,DOM.rooms[0].cy];
+  DOM.schodyXY=schody?[schody[0]*16+8,schody[1]*16+8]:null;
+  DOM.sciezka=[DOM.wejscie,DOM.wyjscie];
+  /* --- KŁÓDKI: sąsiadujące kafle tego samego koloru to JEDNA brama --- */
+  DOM.zamki=domZamkiZKafli(zamkiKafle);
+  DOM.klucze=klucze.map(k=>({kolor:k.kolor,room:najblizsza(k.tx,k.ty),taken:false,
+    x:k.tx*16+8,y:k.ty*16+8}));
+  DOM.mam={};
+  DOM.masz=maszyny.map(([x,y])=>({tx:x,ty:y,x:x*16+8,y:y*16+8,t:0,ready:true}));
+  DOM.deko=deko;
+  DOM.reczna=true;
+  /* HP rupieci — tak samo jak przy generatorze */
+  for(let y=0;y<MH;y++)for(let x=0;x<MW;x++){
+    const h=BLOK_HP[at(x,y)];if(h)dhpSet(x,y,h);
+  }
+  return{surowce,krysztaly};
+}
+/* kafle kłódek zlepiamy w bramy: sąsiedztwo 4-kierunkowe + ten sam kolor */
+function domZamkiZKafli(kafle){
+  const zamki=[],uzyte=new Set();
+  for(const[x,y]of kafle){
+    const kl=x+','+y;
+    if(uzyte.has(kl))continue;
+    const tile=at(x,y),kolor=ZAMEK[tile];
+    const cells=[],kol=[[x,y]];uzyte.add(kl);
+    while(kol.length){
+      const[a,b]=kol.pop();cells.push([a,b]);
+      for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){
+        const nx=a+dx,ny=b+dy,k2=nx+','+ny;
+        if(uzyte.has(k2)||nx<0||ny<0||nx>=MW||ny>=MH)continue;
+        if(at(nx,ny)!==tile)continue;
+        uzyte.add(k2);kol.push([nx,ny]);
+      }
+    }
+    const sx2=cells.reduce((t,c)=>t+c[0],0)/cells.length;
+    const sy2=cells.reduce((t,c)=>t+c[1],0)/cells.length;
+    zamki.push({kolor,cells,open:false,x:sx2*16+8,y:sy2*16+8,room:0});
+  }
+  return zamki;
+}
+/* =====================================================================
+   KONTROLA JAKOŚCI RĘCZNEJ PLANSZY
+   ---------------------------------------------------------------------
+   Ręczna mapa nie ma siatki bezpieczeństwa — nikt jej po autorze nie
+   poprawi. Za to da się ją sprawdzić TWARDO, bo jest zawsze taka sama:
+   ta funkcja przechodzi planszę tak, jak przeszedłby ją gracz, i zgłasza
+   każdy problem. Woła ją test, ale też sama gra (wynik ląduje w konsoli),
+   więc zepsuta mapa nie doleci po cichu do gracza.
+   ===================================================================== */
+function domFlood(zablokowane,przezPlyty){
+  const wid=new Uint8Array(MW*MH);
+  const st=DOM.wejscieXY||[DOM.rooms[DOM.wejscie].cx,DOM.rooms[DOM.wejscie].cy];
+  const sx=Math.floor(st[0]/16),sy=Math.floor(st[1]/16);
+  const mozna=v=>{
+    if(zablokowane.includes(v))return false;
+    if(jestZamek(v))return true;              // kłódka NIE na liście = mamy do niej klucz
+    if(v===43)return przezPlyty!==false;      // krucha płyta: przejdziesz, jak zdążysz
+    if(PIT(v))return false;
+    if(SOLID(v))return !!BLOK_NISZCZALNY(v);  // rupiecie da się rozwalić
+    return true;
+  };
+  if(!mozna(at(sx,sy)))return wid;
+  const kol=[sy*MW+sx];wid[sy*MW+sx]=1;
+  for(let qi=0;qi<kol.length;qi++){
+    const i=kol[qi],x=i%MW,y=(i/MW)|0;
+    for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){
+      const nx=x+dx,ny=y+dy;
+      if(nx<0||ny<0||nx>=MW||ny>=MH)continue;
+      const j=ny*MW+nx;
+      if(wid[j]||!mozna(M[j]))continue;
+      wid[j]=1;kol.push(j);
+    }
+  }
+  return wid;
+}
+function domSprawdzMape(){
+  const bledy=[],pole=(px,py)=>[Math.floor(px/16),Math.floor(py/16)];
+  const wszystkieZamki=DOM.zamki.map(z=>kluczCfg(z.kolor).tile);
+  const widzi=(wid,px,py)=>{const[x,y]=pole(px,py);return !!wid[y*MW+x];};
+  /* 1. każdy klucz do wzięcia PRZED kłódką w swoim kolorze */
+  const mam=[];
+  for(let i=0;i<DOM.klucze.length+1;i++){
+    const blok=DOM.zamki.filter(z=>!mam.includes(z.kolor)).map(z=>kluczCfg(z.kolor).tile);
+    const wid=domFlood(blok);
+    let ruch=false;
+    for(const k of DOM.klucze)if(!mam.includes(k.kolor)&&widzi(wid,k.x,k.y)){mam.push(k.kolor);ruch=true;}
+    if(!ruch)break;
+  }
+  for(const k of DOM.klucze)
+    if(!mam.includes(k.kolor))bledy.push('klucz '+k.kolor+' jest ZA swoją kłódką — nie do wzięcia');
+  /* 2. z otwartymi kłódkami wszystko istotne musi być osiągalne */
+  const otw=domFlood([]);
+  const cel=[];
+  if(DOM.schodyXY)cel.push(['schody',DOM.schodyXY[0],DOM.schodyXY[1]]);
+  DOM.rooms.forEach((rm,i)=>cel.push(['komnata '+(rm.znak||i),rm.cx,rm.cy]));
+  /* maszyna sama w sobie jest SOLID — liczy się, czy da się do niej PODEJŚĆ */
+  DOM.masz.forEach((m,i)=>{
+    const sasiad=[[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>{
+      const x=m.tx+dx,y=m.ty+dy;
+      return x>=0&&y>=0&&x<MW&&y<MH&&otw[y*MW+x];
+    });
+    if(!sasiad)bledy.push('maszyna '+i+' — nie da się do niej podejść');
+  });
+  DOM.klucze.forEach(k=>cel.push(['klucz '+k.kolor,k.x,k.y]));
+  for(const[n,px,py]of cel)if(!widzi(otw,px,py))bledy.push(n+' nieosiągalna');
+  /* 3. KŁÓDKA MA NAPRAWDĘ ZAMYKAĆ — sedno reklamacji „da się je obejść".
+     Zamykamy jedną, resztę otwieramy: cel za nią musi zniknąć z zasięgu. */
+  for(const z of DOM.zamki){
+    const wid=domFlood([kluczCfg(z.kolor).tile]);
+    const meta=DOM.schodyXY||[DOM.rooms[DOM.wyjscie].cx,DOM.rooms[DOM.wyjscie].cy];
+    if(widzi(wid,meta[0],meta[1]))bledy.push('kłódkę '+z.kolor+' DA SIĘ OBEJŚĆ (wyjście osiągalne mimo zamknięcia)');
+  }
+  /* 4. drobiazgi, które psują przebieg po cichu */
+  if(!DOM.rooms.length)bledy.push('plansza bez komnat');
+  if(MW>64||MH>32)bledy.push('plansza większa niż 64×32 — cache kawałków będzie się przepiekał');
+  for(const z of DOM.zamki)if(z.cells.length<2)bledy.push('kłódka '+z.kolor+' ma tylko '+z.cells.length+' kafel — to szpara, nie brama');
+  for(const kol of Object.keys(MAPA_ZAMEK).map(k=>MAPA_ZAMEK[k])){
+    const zam=DOM.zamki.filter(z=>z.kolor===kol).length,kl=DOM.klucze.filter(k=>k.kolor===kol).length;
+    if(zam>kl)bledy.push('kolor '+kol+': '+zam+' kłódek na '+kl+' kluczy');
+  }
+  /* 5. wszystkie wiersze mapy równej długości (literówka w ASCII) */
+  return bledy;
+}
+/* --------------------------------------------------------------------
+   OBSADA KOMNAT — generator układa PLAN, `domSpawnRoom` go wykonuje.
+   Dzięki temu ta sama funkcja obsługuje każdy rodzaj piętra.
+   -------------------------------------------------------------------- */
+function domPlanFloor(cfg,fk,idx){
+  const lvl=S.domLvl[DOM.cur]||0,ost=DOM.wyjscie;
+  const ostPietro=idx===domPietra(DOM.cur).length-1;
+  const zKluczem=new Set(DOM.klucze.map(k=>k.room));
+  for(let i=0;i<DOM.rooms.length;i++){
+    const plan=[];
+    const wejsciowa=i===DOM.wejscie;
+    /* komnata wejściowa pierwszego piętra jest spokojna; dalej wszędzie jest walka,
+       a komnaty z kluczem i wyjściowa dostają obstawę na osobno */
+    if(fk.walka&&!(wejsciowa&&idx===0)){
+      plan.push({t:domPick(cfg.foes),n:2+Math.min(3,lvl)+(wejsciowa?0:1),r:52});
+      if(!wejsciowa&&(i===ost||zKluczem.has(i)))plan.push({t:domPick(cfg.foes),n:2,r:80});
+    }
+    if(fk.elita&&i===ost)plan.push({t:cfg.elite,elite:1});
+    if(fk.straz&&i===ost){
+      plan.push({straz:1});
+      if(lvl>=1)plan.push({t:cfg.elite,elite:1,ox:0,oy:40});
+    }
+    /* mini-boss: jeden na piętro, progi 2 / 5 / 10 poziomu domeny */
+    if(i===ost&&idx>0){
+      const prog=[2,5,10][DOM.usedMini.length];
+      if(prog!==undefined&&lvl+1>=prog)plan.push({mini:1,ox:0,oy:-30});
+    }
+    DOM.rooms[i].plan=plan;
+  }
+  return ostPietro;
+}
+/* --------------------------------------------------------------------
+   RUPIECIE DO ROZWALENIA — Bomberman w środku Genshina
+   Skrzynie i beczki lecą od zwykłego ciosu, pustaki WYŁĄCZNIE od bomby,
+   a filary nie ustąpią nigdy (to szkielet kraty).
+   -------------------------------------------------------------------- */
+let DHP=null;                                  // HP kafli — żyje tylko w domenie
+const dhp=(x,y)=>DHP?DHP[y*MW+x]:0;
+const dhpSet=(x,y,v)=>{if(DHP)DHP[y*MW+x]=v;};
+
+const BOMB_CD=14;        // co ile sekund maszyna wypluwa kolejną bombę
+const BOMB_FUSE=5.5;     // lont — TYKA OD PODNIESIENIA, nie od upuszczenia
+const BOMB_R=44;         // promień wybuchu (2,75 kafla)
+const bombDmgFoe=()=>Math.round(chATK(S.ch)*2.4);
+const bombDmgP=()=>Math.round(26+(S.domLvl[DOM.cur]||0)*6);
+
+/* Nakładka BOMBERMANOWA. Ta sama funkcja robi gęstą kratę i lekki gruz
+   w jaskini — różni je tylko `gest` i `filary` we wpisie FLOOR_KINDS. */
+function domKrataOverlay(cfg,fk){
+  const gest=fk.gest||0;
+  if(!gest&&!fk.filary&&!fk.maszyn)return;
+  const podloga=v=>v===cfg.floor||v===cfg.acc;
+  const zBomba=(fk.maszyn||0)>0;
+  if(gest||fk.filary){
+    for(let y=1;y<MH-1;y++)for(let x=1;x<MW-1;x++){
+      if(!podloga(at(x,y)))continue;
+      /* filary co drugi kafel — klasyczna krata; nigdy nie zamykają przejścia,
+         bo między nimi zawsze zostaje wolny rząd */
+      if(fk.filary&&x%2===0&&y%2===0){set(x,y,42);continue;}
+      if(domRng()<gest){
+        const r=domRng();
+        set(x,y,r<.5?39:(zBomba&&r<.88)?41:40);
+      }
+    }
+  }
+  /* przedmuchujemy okolice miejsc, w których gracz MUSI móc stanąć */
+  const czysc=(px,py,r)=>{
+    const cx2=Math.floor(px/16),cy2=Math.floor(py/16);
+    for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){
+      const x=cx2+dx,y=cy2+dy;
+      if(x<1||y<1||x>=MW-1||y>=MH-1)continue;
+      if(jestZamek(at(x,y)))continue;               // kłódki są nietykalne
+      if(BLOK_NISZCZALNY(at(x,y))||at(x,y)===42)set(x,y,cfg.floor);
+    }};
+  /* miejsca ŚWIĘTE: spawn, środki komnat i schody. Nic tam nie stoi — ani
+     rupieć, ani filar, ani (przede wszystkim) maszyna, bo maszyna jest SOLID
+     i potrafiła wylądować dokładnie na schodach albo na punkcie startu. */
+  const swiete=[[DOM.rooms[DOM.wejscie].cx,DOM.rooms[DOM.wejscie].cy,3]];
+  for(const rm of DOM.rooms)swiete.push([rm.cx,rm.cy,2]);
+  if(DOM.stairs)swiete.push([DOM.stairs.x,DOM.stairs.y,3]);
+  /* klucz zasypany gruzem albo kłódka obudowana betonem = plansza nie do przejścia */
+  for(const k of DOM.klucze)swiete.push([k.x,k.y,2]);
+  for(const z of DOM.zamki)for(const[cx3,cy3]of z.cells)swiete.push([cx3*16+8,cy3*16+8,1]);
+  for(const[px,py,r]of swiete)czysc(px,py,r);
+  const zajete=(tx,ty)=>swiete.some(([px,py,r])=>
+    Math.abs(tx-Math.floor(px/16))<=r&&Math.abs(ty-Math.floor(py/16))<=r);
+  /* MASZYNY BOMBOWE — w otwartych miejscach, żeby dało się do nich dojść
+     bez bomby (inaczej pustaki zamurowałyby graczowi całe piętro) */
+  for(let i=0;i<(fk.maszyn||0);i++){
+    const rm=DOM.rooms[(i+1)%DOM.rooms.length];
+    for(let a=0;a<80;a++){
+      const tx=Math.floor((rm.cx+(domRng()-.5)*rm.r*1.5)/16);
+      const ty=Math.floor((rm.cy+(domRng()-.5)*rm.r*1.2)/16);
+      if(tx<2||ty<2||tx>=MW-2||ty>=MH-2)continue;
+      if(zajete(tx,ty))continue;
+      if(!podloga(at(tx,ty))&&!BLOK_NISZCZALNY(at(tx,ty)))continue;
+      if(DOM.masz.some(m=>Math.abs(m.tx-tx)+Math.abs(m.ty-ty)<8))continue;
+      set(tx,ty,45);
+      DOM.masz.push({tx,ty,x:tx*16+8,y:ty*16+8,t:0,ready:true});
+      /* dookoła maszyny robimy miejsce, żeby dało się do niej podejść */
+      for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]]){
+        const x=tx+dx,y=ty+dy;
+        if(x<1||y<1||x>=MW-1||y>=MH-1)continue;
+        if(BLOK_NISZCZALNY(at(x,y))||at(x,y)===42)set(x,y,cfg.floor);
+      }
+      break;
+    }
+  }
+  /* DZIURY W PODŁODZE — nieregularne bąble przepaści, a przez środek każdej
+     kusząca KRUCHA PŁYTA: skrót, który zawali się pod stopami. Że nikogo nie
+     odetną, pilnuje `domPrzekop` — on w razie czego przerzuci most. */
+  for(let i=0;i<(fk.dziury||0);i++){
+    const rm=DOM.rooms[i%DOM.rooms.length];
+    const dcx=Math.floor((rm.cx+(domRng()-.5)*rm.r*1.7)/16);
+    const dcy=Math.floor((rm.cy+(domRng()-.5)*rm.r*1.3)/16);
+    const rx=2+domRng()*3,ry=1.4+domRng()*1.8;
+    for(let y=Math.floor(dcy-ry);y<=Math.ceil(dcy+ry);y++)
+      for(let x=Math.floor(dcx-rx);x<=Math.ceil(dcx+rx);x++){
+        if(x<1||y<1||x>=MW-1||y>=MH-1)continue;
+        if(zajete(x,y))continue;
+        const nx=(x-dcx)/rx,ny=(y-dcy)/ry;
+        if(nx*nx+ny*ny>1)continue;
+        if(!podloga(at(x,y))&&!BLOK_NISZCZALNY(at(x,y)))continue;
+        set(x,y,44);
+      }
+    if(domRng()<.75){                                  // kładka z kruchych płyt
+      const y=dcy;
+      for(let x=Math.floor(dcx-rx);x<=Math.ceil(dcx+rx);x++)
+        if(x>0&&x<MW-1&&at(x,y)===44)set(x,y,43);
+    }
+  }
+  /* HP rupieci — jeden cios wystarczy, ale warstwa jest po to, żeby dało się
+     kiedyś dorzucić „skrzynię pancerną" bez zmiany architektury */
+  for(let y=0;y<MH;y++)for(let x=0;x<MW;x++){
+    const h=BLOK_HP[at(x,y)];if(h)dhpSet(x,y,h);
+  }
+}
+/* SIATKA BEZPIECZEŃSTWA: rupiecie da się rozwalić, filary już nie — więc po
+   nałożeniu kraty sprawdzamy, czy z wejścia da się dojść wszędzie, gdzie trzeba.
+   Jak nie — przekopujemy prostą drogę. Lepiej brzydka plansza niż zablokowana. */
+function domPrzejezdne(przezRupiecie,przezPrzepasc,bezPlyt,blokKafle){
+  const wid=new Uint8Array(MW*MH);
+  const sx=Math.floor(DOM.rooms[DOM.wejscie].cx/16),sy=Math.floor(DOM.rooms[DOM.wejscie].cy/16);
+  const cfg=DOMAINS[DOM.cur];
+  const zablokowane=blokKafle||[];
+  const mozna=v=>{
+    if(zablokowane.includes(v))return false;   // kłódka, do której nie mamy jeszcze klucza
+    if(v===43)return !bezPlyt;              // krucha płyta: chwilowo tak, docelowo nie
+    if(PIT(v))return !!przezPrzepasc;
+    /* KŁÓDKA liczy się jak przejście: klucz do niej leży — z konstrukcji
+       generatora — w części labiryntu osiągalnej PRZED nią */
+    if(jestZamek(v))return true;
+    if(!SOLID(v))return true;
+    return !!(przezRupiecie&&BLOK_NISZCZALNY(v));
+  };
+  const kol=[sy*MW+sx];wid[sy*MW+sx]=1;
+  for(let qi=0;qi<kol.length;qi++){
+    const i=kol[qi],x=i%MW,y=(i/MW)|0;
+    for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){
+      const nx=x+dx,ny=y+dy;
+      if(nx<0||ny<0||nx>=MW||ny>=MH)continue;
+      const j=ny*MW+nx;
+      if(wid[j]||!mozna(M[j]))continue;
+      wid[j]=1;kol.push(j);
+    }
+  }
+  return wid;
+}
+function domPrzekop(cfg,fk){
+  /* Przepaść liczymy jak ścianę. Kruche płyty pomijamy TYLKO tam, gdzie nie są
+     zamierzoną przeprawą (`mostki`) — na ZAPADNI kładka jest jedyną drogą
+     z rozmysłu i siatka bezpieczeństwa nie ma jej zasypywać. */
+  const wid=domPrzejezdne(true,false,!(fk&&fk.mostki));
+  const cele=DOM.rooms.map(rm=>[rm.cx,rm.cy]);
+  if(DOM.stairs)cele.push([DOM.stairs.x,DOM.stairs.y]);
+  for(const m of DOM.masz)cele.push([m.x,m.y]);
+  for(const k of DOM.klucze)cele.push([k.x,k.y]);
+  const sx=Math.floor(DOM.rooms[DOM.wejscie].cx/16),sy=Math.floor(DOM.rooms[DOM.wejscie].cy/16);
+  for(const[px,py]of cele){
+    const tx=Math.floor(px/16),ty=Math.floor(py/16);
+    if(wid[ty*MW+tx])continue;
+    /* prosty korytarz w L — najpierw w poziomie, potem w pionie */
+    let x=sx,y=sy;
+    const poloz=(a,b)=>{if(a<1||b<1||a>=MW-1||b>=MH-1)return;
+      const v=at(a,b);
+      if(v===45||jestZamek(v))return;         // maszyn i kłódek nie przebijamy
+      set(a,b,cfg.floor);};                   // most zasypuje też przepaść
+    while(x!==tx){x+=Math.sign(tx-x);poloz(x,y);poloz(x,y-1);}
+    while(y!==ty){y+=Math.sign(ty-y);poloz(x,y);poloz(x-1,y);}
+  }
+}
+/* GWARANCJA DOSTĘPNOŚCI KLUCZY — liczona na GOTOWEJ mapie, już po kracie,
+   przeprawach i siatce bezpieczeństwa. Generator dobiera klucze po grafie
+   labiryntu, ale kafle potrafią ten graf rozminąć (przeprawa przetnie korytarz,
+   krata zasypie przejście). Tu sprawdzamy fizycznie: czy da się wziąć klucz,
+   mając wszystkie jeszcze niezdobyte kłódki ZAMKNIĘTE. Jeśli nie — przenosimy
+   go na najbliższe osiągalne pole, najchętniej w środku jakiejś komnaty. */
+function domNaprawKlucze(cfg,fk){
+  if(!DOM.zamki.length||!DOM.klucze.length)return;
+  const mam=new Set();
+  for(let obieg=0;obieg<DOM.klucze.length+2&&mam.size<DOM.klucze.length;obieg++){
+    const blok=DOM.zamki.filter(z=>!mam.has(z.kolor)).map(z=>kluczCfg(z.kolor).tile);
+    const wid=domPrzejezdne(true,false,!(fk&&fk.mostki),blok);
+    let wziete=false;
+    for(const k of DOM.klucze){
+      if(mam.has(k.kolor))continue;
+      const tx=Math.floor(k.x/16),ty=Math.floor(k.y/16);
+      if(tx>=0&&ty>=0&&tx<MW&&ty<MH&&wid[ty*MW+tx]){mam.add(k.kolor);wziete=true;}
+    }
+    if(wziete)continue;
+    const k=DOM.klucze.find(k2=>!mam.has(k2.kolor));
+    if(!k)break;
+    const cel=domNajblizszeOsiagalne(wid,k.x,k.y);
+    if(!cel)break;
+    k.x=cel[0]*16+8;k.y=cel[1]*16+8;k.room=cel[2];
+    mam.add(k.kolor);
+  }
+}
+/* KŁÓDKA MA COŚ ZAMYKAĆ. Generator stawia je na krawędziach labiryntu, ale
+   pętle (`petle`) potrafią zrobić z kłódki ozdobę: zamknięta, a wyjście i tak
+   osiągalne dookoła. Gracz czyta to jako zepsutą grę, nie jako skrót. Dlatego
+   po zbudowaniu planszy sprawdzamy każdą kłódkę na KAFLACH — jeśli niczego nie
+   trzyma, znika razem ze swoim kluczem. Lepiej mniej kłódek niż udawane. */
+function domZweryfikujZamki(cfg,fk){
+  if(!DOM.zamki.length)return;
+  const meta=DOM.stairs?[DOM.stairs.x,DOM.stairs.y]
+                       :[DOM.rooms[DOM.wyjscie].cx,DOM.rooms[DOM.wyjscie].cy];
+  const mx=Math.floor(meta[0]/16),my=Math.floor(meta[1]/16);
+  for(let i=DOM.zamki.length-1;i>=0;i--){
+    const z=DOM.zamki[i];
+    const wid=domPrzejezdne(true,false,!(fk&&fk.mostki),[kluczCfg(z.kolor).tile]);
+    if(!wid[my*MW+mx])continue;                       // trzyma wyjście — zostaje
+    for(const[x,y]of z.cells)set(x,y,cfg.floor);      // do obejścia → nie ma jej wcale
+    DOM.zamki.splice(i,1);
+    const ki=DOM.klucze.findIndex(k=>k.kolor===z.kolor);
+    if(ki>=0)DOM.klucze.splice(ki,1);
+  }
+}
+function domNajblizszeOsiagalne(wid,px,py){
+  const cx2=px/16,cy2=py/16;
+  let naj=null,najD=1e9,najPokoj=null,najPokojD=1e9;
+  for(let y=1;y<MH-1;y++)for(let x=1;x<MW-1;x++){
+    if(!wid[y*MW+x])continue;
+    const v=at(x,y);
+    if(SOLID(v)||PIT(v)||v===43)continue;          // klucz ma leżeć na PEWNYM gruncie
+    const d=Math.abs(x-cx2)+Math.abs(y-cy2);
+    if(d<najD){najD=d;naj=[x,y,0];}
+    const pokoj=DOM.rooms.findIndex(r=>Math.hypot(x*16+8-r.cx,y*16+8-r.cy)<r.r*.7);
+    if(pokoj>=0&&d<najPokojD){najPokojD=d;najPokoj=[x,y,pokoj];}
+  }
+  return najPokoj||naj;                             // najchętniej w komnacie
+}
+/* --------------------------------------------------------------------
+   BOMBA — bierzesz ją z MASZYNY, NIESIESZ i UPUSZCZASZ.
+   Lont tyka od podniesienia, więc nosisz w rękach coś, co zaraz huknie.
+   -------------------------------------------------------------------- */
+function domMaszynyUpdate(dt){
+  for(const m of DOM.masz){
+    if(m.ready)continue;
+    m.t-=dt;
+    if(m.t<=0){m.ready=true;fxSparks(m.x,m.y-8,'#7bc950',5,70,{life:.4});beep(660,.06,'square',.04,880);}
+  }
+  if(DOM.carry){
+    DOM.carry.t-=dt;
+    const t=DOM.carry.t;
+    /* im bliżej końca, tym częstsze pikanie — masz zdążyć ją odłożyć */
+    const okres=t<1.5?.18:t<3?.35:.6;
+    DOM.carry.pik=(DOM.carry.pik||0)-dt;
+    if(DOM.carry.pik<=0){DOM.carry.pik=okres;beep(t<1.5?1200:800,.04,'square',.05,600);}
+    if(t<=0){DOM.carry=null;domBoom(P.x,P.y-6);}   // huknęła w rękach. Trudno.
+  }
+  for(let i=DOM.bomby.length-1;i>=0;i--){
+    const b=DOM.bomby[i];
+    b.t-=dt;
+    if(b.t<=0){DOM.bomby.splice(i,1);domBoom(b.x,b.y);}
+  }
+}
+function domTakeBomb(m){
+  if(!m.ready||DOM.carry)return;
+  m.ready=false;m.t=BOMB_CD;
+  DOM.carry={t:BOMB_FUSE,pik:0};
+  fxRing(m.x,m.y-6,18,'#f5a032',{life:.3,w:2});
+  toast('💣 BOMBA W ŁAPACH! Lont tyka — donieś ją i [E], żeby upuścić.',2600);
+  SFX.ok();
+}
+function domDropBomb(){
+  if(!DOM.carry)return;
+  /* przyciągamy do środka kafla — krata bombermanowa ma być czytelna */
+  const tx=Math.floor(P.x/16),ty=Math.floor(P.y/16);
+  DOM.bomby.push({x:tx*16+8,y:ty*16+8,t:DOM.carry.t});
+  DOM.carry=null;
+  SFX.ok();
+}
+/* wybuch: OKRĄG — rani wrogów, rozwala rupiecie i (bez litości) obrywa też gracz */
+function domBoom(bx,by){
+  const cfg=DOMAINS[DOM.cur]||{};
+  fxRing(bx,by,BOMB_R,'#f5a032',{life:.35,w:4,ground:true});
+  fxStarFlash(bx,by-4,'#fff7d6',16,{life:.25});
+  fxSparks(bx,by-4,'#f5a032',22,190,{life:.6});
+  fxDust(bx,by+4,10);
+  addShake(6,.4);addHitStop(.06);worldFlash=Math.max(worldFlash,.25);
+  beep(60,.35,'sawtooth',.12,30);
+  domBlastTiles(bx,by);
+  const dmg=bombDmgFoe();
+  for(const f of foes)if(!f.dead&&Math.hypot(f.x-bx,f.y-by)<BOMB_R)hurtFoeRaw(f,dmg,bx,by,S.ch);
+  if(Math.hypot(P.x-bx,P.y-by)<BOMB_R*.92)hurtPlayer({x:bx,y:by,atk:bombDmgP()});
+  /* łańcuch: sąsiednie bomby przyspieszają, ale nie wybuchają w tej samej
+     klatce — inaczej dwadzieścia beczek zrobiłoby jedną wielką zamulę */
+  for(const b of DOM.bomby)if(Math.hypot(b.x-bx,b.y-by)<BOMB_R*1.15)b.t=Math.min(b.t,.14);
+}
+function domBlastTiles(bx,by){
+  const cfg=DOMAINS[DOM.cur];
+  const brud=new Set();
+  const t0x=Math.floor((bx-BOMB_R)/16),t1x=Math.floor((bx+BOMB_R)/16);
+  const t0y=Math.floor((by-BOMB_R)/16),t1y=Math.floor((by+BOMB_R)/16);
+  for(let ty=t0y;ty<=t1y;ty++)for(let tx=t0x;tx<=t1x;tx++){
+    if(tx<1||ty<1||tx>=MW-1||ty>=MH-1)continue;
+    if(Math.hypot(tx*16+8-bx,ty*16+8-by)>BOMB_R)continue;
+    const v=at(tx,ty);
+    if(!BLOK_NISZCZALNY(v)&&v!==43)continue;
+    domBreakTile(tx,ty,v,true,brud);
+  }
+  for(const k of brud)chunkCache.delete(k);
+}
+function domBreakTile(tx,ty,v,odBomby,brud){
+  const cfg=DOMAINS[DOM.cur];
+  if(v===43){set(tx,ty,44);dhpSet(tx,ty,0);chunkDirtyAround(tx,ty,brud);return;}
+  set(tx,ty,cfg.floor);dhpSet(tx,ty,0);
+  chunkDirtyAround(tx,ty,brud);
+  const x=tx*16+8,y=ty*16+8;
+  if(v===40){                                   // BECZKA — detonuje z opóźnieniem
+    DOM.bomby.push({x,y,t:.14});
+    fxSparks(x,y-6,'#f5a032',8,120,{life:.35});
+    return;
+  }
+  fxSparks(x,y-6,'#c8935a',9,130,{life:.4});
+  fxDust(x,y+4,4);
+  if(!odBomby)addShake(1.2,.12);
+  domCrateDrop(x,y);
+}
+/* co sypie się ze skrzyni — drobnica, ale przy 20 skrzyniach na piętro robi
+   się z tego realny powód, żeby rozwalać wszystko po drodze */
+function domCrateDrop(x,y){
+  const lvl=S.domLvl[DOM.cur]||0,r=Math.random();
+  if(r<.45){const n=1+((Math.random()*(2+lvl))|0);S.mats.sr+=n;addHit(x,y-12,'+'+n+'🔩','#c8c4dc');}
+  else if(r<.68){const n=1+((Math.random()*(1+lvl*.5))|0);S.mats.ch+=n;addHit(x,y-12,'+'+n+'⚙️','#b98cf0');}
+  else if(r<.80){const n=3+((Math.random()*8)|0);S.dia+=n;addHit(x,y-12,'+'+n+'💎','#f5c542');SFX.dia();}
+  else if(r<.86){const k=pickA(Object.keys(FOOD));S.food[k]=(S.food[k]||0)+1;
+    addHit(x,y-12,FOOD[k].ic+' '+FOOD[k].n,'#7bc950');}
+  else return;                                   // większość skrzyń jest pusta — inaczej to loteria bez napięcia
+  save();refreshHUD();
+}
+/* CIOS W RUPIEĆ — wołane z tryAttack po pętli po wrogach */
+function domHitTiles(fx,fy,rng){
+  if(REG!=='arena'||!DOM.cur||!DHP)return false;
+  let cos=false;
+  const t0x=Math.floor((fx-rng)/16),t1x=Math.floor((fx+rng)/16);
+  const t0y=Math.floor((fy-rng)/16),t1y=Math.floor((fy+rng)/16);
+  for(let ty=t0y;ty<=t1y;ty++)for(let tx=t0x;tx<=t1x;tx++){
+    if(tx<0||ty<0||tx>=MW||ty>=MH)continue;
+    const v=at(tx,ty);
+    if(!BLOK_NISZCZALNY(v))continue;
+    const cx2=tx*16+8,cy2=ty*16+8;
+    if(Math.hypot(cx2-fx,cy2-fy)>rng+9)continue;
+    cos=true;
+    if(BLOK_BOMBA[v]){                           // PUSTAK — cios się odbija
+      fxSparks(cx2,cy2-6,'#c8c4dc',5,90,{life:.28});
+      if(Math.random()<.35)addHit(cx2,cy2-12,'ZA TWARDE! 💣','#8f88b0');
+      continue;
+    }
+    const h=dhp(tx,ty)-1;
+    if(h>0){dhpSet(tx,ty,h);fxSparks(cx2,cy2-6,'#c8935a',5,100,{life:.3});}
+    else domBreakTile(tx,ty,v,false);
+  }
+  return cos;
+}
+/* --------------------------------------------------------------------
+   PRZEPAŚĆ I KRUCHE PŁYTY
+   Przepaść NIE jest ścianą — trzeba móc w nią wejść, żeby dało się spaść.
+   Wróg sam z siebie tam nie wlezie, ale wepchnąć go można i to go kończy.
+   -------------------------------------------------------------------- */
+function foeBlok(v,f){
+  if(SOLID(v))return true;
+  if(!PIT(v))return false;
+  const td=f&&FOE_TYPES[f.t];
+  return !(td&&td.flying);                    // latające przelatują nad dziurą
+}
+function domWpadl(f){
+  if(!DOM.cur||f.dead||f.boss||f.guard)return false;
+  const td=FOE_TYPES[f.t];
+  if(!td||td.flying||td.mini)return false;    // mini-bossów tanim kopniakiem nie załatwisz
+  if(!PIT(at(Math.floor(f.x/16),Math.floor(f.y/16))))return false;
+  addHit(f.x,f.y-20,'W DÓŁ!','#6fd8e8');
+  fxDust(f.x,f.y+4,6);beep(160,.3,'sine',.07,50);
+  killFoe(f);
+  return true;
+}
+/* --------------------------------------------------------------------
+   KLUCZE I ZAMKI — klucz podnosi się samym dotknięciem, a kłódka otwiera się,
+   gdy podejdziesz do niej z właściwym kolorem. Żadnego [E] — to jest zajęte
+   przez bombę i skrzynie, a szukanie właściwego przycisku pod kłódką byłoby
+   tylko upierdliwe.
+   -------------------------------------------------------------------- */
+function domKluczeUpdate(){
+  for(const k of DOM.klucze){
+    if(k.taken)continue;
+    if(Math.hypot(P.x-k.x,P.y-k.y)>22)continue;
+    k.taken=true;DOM.mam[k.kolor]=(DOM.mam[k.kolor]||0)+1;
+    const kc=kluczCfg(k.kolor);
+    fxStarFlash(k.x,k.y-6,kc.col,12,{life:.35});
+    fxRing(k.x,k.y-4,26,kc.col,{life:.4,w:3});
+    fxSparks(k.x,k.y-6,kc.col,12,120,{life:.5});
+    addHit(k.x,k.y-18,kc.ic+' '+kc.n,kc.col);
+    toast(kc.ic+' <b style="color:'+kc.col+'">'+kc.n+'</b> — otworzy pasującą kłódkę.',2600);
+    SFX.dia();
+  }
+  for(const z of DOM.zamki){
+    if(z.open)continue;
+    let bliska=1e9;
+    for(const[cx3,cy3]of z.cells)
+      bliska=Math.min(bliska,Math.hypot(P.x-(cx3*16+8),P.y-(cy3*16+8)));
+    if(bliska>26)continue;
+    const kc=kluczCfg(z.kolor);
+    if(!DOM.mam[z.kolor]){
+      /* podpowiedź, ale rzadko — nie chcemy spamu przy każdym otarciu o kłódkę */
+      if(!z.gadal||anim>z.gadal){z.gadal=anim+4;
+        addHit(P.x,P.y-30,'🔒 '+kc.n+'!',kc.col);SFX.no();}
+      continue;
+    }
+    DOM.mam[z.kolor]--;z.open=true;
+    const fl=DOMAINS[DOM.cur].floor;
+    for(const[x,y]of z.cells)set(x,y,fl);
+    fxRing(z.x,z.y,42,kc.col,{life:.6,w:4});
+    fxSparks(z.x,z.y,kc.col,20,150,{life:.6});
+    addShake(3,.3);worldFlash=Math.max(worldFlash,.12);
+    toast(kc.ic+' KŁÓDKA PUŚCIŁA! Droga wolna, byku.',2600);SFX.ok();
+    if(Math.random()<.4&&!curVoice&&S.ch==='edek')vsay('c_elegancko2');
+  }
+}
+/* LATAJĄCY W DOMENIE nie mogą sobie odlecieć w róg planszy — zdarzało się, że
+   gołąb szedł w kąt za murem i piętro nie dawało się skończyć, bo komnata
+   „nie była czysta". Trzymamy ich w promieniu ich komnaty. */
+function domSmyczLatajacych(){
+  if(!DOM.cur||REG!=='arena')return;
+  for(const f of foes){
+    if(f.dead||f.boss)continue;
+    const td=FOE_TYPES[f.t];
+    if(!td||!td.flying)continue;
+    const rm=DOM.rooms[f.room];if(!rm)continue;
+    const d=Math.hypot(f.x-rm.cx,f.y-rm.cy),max=rm.r*1.15;
+    if(d<=max)continue;
+    f.x=rm.cx+(f.x-rm.cx)/d*max;
+    f.y=rm.cy+(f.y-rm.cy)/d*max;
+    f.dx*=-.5;f.dy*=-.5;
+  }
+}
+/* AWARYJNY WYŁAMYWACZ ZATORU: jeżeli obudzona komnata stoi niewyczyszczona,
+   a żaden jej wróg nie zbliżył się do gracza od 20 s, to znaczy, że gdzieś
+   utknął (za gruzem, w kieszeni po wybuchu). Ściągamy go do walki, zamiast
+   kazać graczowi zgadywać, gdzie się schował. */
+function domZatorUpdate(dt){
+  for(let i=0;i<DOM.rooms.length;i++){
+    const rm=DOM.rooms[i];
+    if(!rm.spawned||rm.cleared){rm.zator=0;continue;}
+    const zywi=foes.filter(f=>f.room===i&&!f.dead);
+    if(!zywi.length){rm.zator=0;continue;}
+    const blisko=zywi.some(f=>Math.hypot(f.x-P.x,f.y-P.y)<170);
+    rm.zator=blisko?0:(rm.zator||0)+dt;
+    if(rm.zator<20)continue;
+    rm.zator=0;
+    /* przyciągamy najdalszego na wolny kafel obok gracza */
+    let cel=zywi[0],naj=-1;
+    for(const f of zywi){const d=Math.hypot(f.x-P.x,f.y-P.y);if(d>naj){naj=d;cel=f;}}
+    for(let a=0;a<24;a++){
+      const kat=domRng()*6.28,nx=P.x+Math.cos(kat)*70,ny=P.y+Math.sin(kat)*70;
+      if(foeBlok(at(Math.floor(nx/16),Math.floor(ny/16)),cel))continue;
+      cel.x=nx;cel.y=ny;cel.stun=.5;
+      fxRing(nx,ny,26,'#e04848',{life:.4,w:2});
+      addHit(nx,ny-20,'WRACA DO WALKI!','#e04848');
+      break;
+    }
+  }
+}
+function domPitCheck(dt){
+  const tx=Math.floor(P.x/16),ty=Math.floor((P.y+2)/16);   // liczymy po STOPACH
+  const v=at(tx,ty);
+  if(PIT(v)){domFall();return;}
+  /* KRUCHA PŁYTA — wchodzisz, a ona zaczyna się sypać */
+  if(v===43&&!DOM.zap.some(z=>z.tx===tx&&z.ty===ty))DOM.zap.push({tx,ty,t:.65});
+  /* ostatni PEWNY grunt — tam wracamy po upadku */
+  DOM.safeT=(DOM.safeT||0)-dt;
+  if(DOM.safeT<=0&&v!==43){DOM.safeT=.3;DOM.safe={x:P.x,y:P.y};}
+}
+function domZapUpdate(dt){
+  for(let i=DOM.zap.length-1;i>=0;i--){
+    const z=DOM.zap[i];z.t-=dt;
+    if(z.t>0)continue;
+    DOM.zap.splice(i,1);
+    if(at(z.tx,z.ty)!==43)continue;
+    set(z.tx,z.ty,44);chunkDirtyAround(z.tx,z.ty);
+    fxDust(z.tx*16+8,z.ty*16+10,6);addShake(1.5,.15);beep(90,.2,'sawtooth',.06,50);
+    DOM.regen.push({tx:z.tx,ty:z.ty,t:7});
+  }
+  /* płyty MUSZĄ wracać — bez tego gracz potrafiłby odciąć sobie jedyne przejście */
+  for(let i=DOM.regen.length-1;i>=0;i--){
+    const r=DOM.regen[i];r.t-=dt;
+    if(r.t>0)continue;
+    DOM.regen.splice(i,1);
+    if(at(r.tx,r.ty)!==44)continue;
+    set(r.tx,r.ty,43);chunkDirtyAround(r.tx,r.ty);
+  }
+}
+function domFall(){
+  if(fallT>0)return;
+  const max=chHpMax(S.ch),dmg=Math.round(max*.12);
+  PHP[S.ch]=Math.max(0,(PHP[S.ch]||0)-dmg);
+  /* celowo z pominięciem nietykalności po ciosie — inaczej spadanie zaraz po
+     oberwaniu byłoby za darmo, a przepaść ma boleć */
+  fallT=.9;hurtT=1.4;hurtFlash=.6;addShake(5,.35);
+  worldFlash=Math.max(worldFlash,.15);
+  fxDust(P.x,P.y+6,10);SFX.no();
+  addDmgNum(P.x,P.y-26,'-'+dmg,'#e04848',false);
+  toast('💀 SPADŁEŚ! −12% HP — wracasz na twardy grunt.',2200);
+  const bez=DOM.safe||{x:DOM.rooms[DOM.wejscie].cx,y:DOM.rooms[DOM.wejscie].cy};
+  P.x=bez.x;P.y=bez.y;
+  playerDown();
+}
+/* =====================================================================
+   KLIMAT RĘCZNEJ PLANSZY — animacje i światło
+   ---------------------------------------------------------------------
+   Kafle są upieczone w cache, więc wszystko, co żyje (spadająca woda,
+   płomień w kaganku, kropla z rury, refleksy na kałuży), rysujemy tutaj,
+   na wierzchu terenu i POD postaciami. Listy pozycji zbiera czytnik mapy,
+   dzięki czemu nie skanujemy planszy co klatkę.
+   ===================================================================== */
+let domVign=null,domVignK='';
+function drawDomainDeko(){
+  if(!DOM.cur||!DOM.deko)return;
+  const D=DOM.deko,t=anim,widok=(sx,sy)=>sx>-24&&sx<W+24&&sy>-24&&sy<H+24;
+  /* --- WODOSPAD: strugi lecą w dół, u podstawy bije piana i mgiełka --- */
+  for(const[tx,ty]of D.wod){
+    const sx=tx*16-camX,sy=ty*16-camY;
+    if(!widok(sx,sy))continue;
+    for(let i=0;i<3;i++){
+      const seed=(tx*7+ty*3+i*5)%16;
+      const y=sy+((t*150+seed*11)%22)-4;
+      cx.fillStyle=i===1?'rgba(214,240,252,.42)':'rgba(168,214,240,.30)';
+      cx.fillRect(sx+2.4+i*5,y,1.8,8);
+    }
+    if((tx*5+ty)%3===0){
+      const y=sy+((t*95+tx*13)%18);
+      cx.fillStyle='rgba(255,255,255,.22)';cx.fillRect(sx+7,y,2.6,3);
+    }
+    /* dół kaskady — tam, gdzie woda uderza w posadzkę */
+    if(at(tx,ty+1)!==51){
+      const b=Math.abs(Math.sin(t*5+tx));
+      cx.fillStyle='rgba(200,232,246,'+(.16+b*.14)+')';
+      cx.beginPath();cx.ellipse(sx+8,sy+16,9+b*2.5,4+b,0,0,7);cx.fill();
+      for(let i=0;i<3;i++){
+        const a=t*3+i*2.1+tx,h=Math.abs(Math.sin(a))*7;
+        cx.fillStyle='rgba(232,248,255,.5)';
+        cx.fillRect(sx+3+i*4.6+Math.cos(a)*2,sy+15-h,1.6,1.6);
+      }
+      cx.fillStyle='rgba(190,220,240,.09)';                  // mgiełka
+      cx.beginPath();cx.ellipse(sx+8,sy+10,16,11,0,0,7);cx.fill();
+    }
+  }
+  /* --- KAŁUŻE I STRUMIEŃ: refleksy przesuwają się leniwie --- */
+  for(const[tx,ty]of D.woda){
+    const sx=tx*16-camX,sy=ty*16-camY;
+    if(!widok(sx,sy))continue;
+    const f=Math.sin(t*1.6+tx*.7+ty*.5);
+    cx.fillStyle='rgba(190,228,246,'+(.10+Math.max(0,f)*.16)+')';
+    cx.fillRect(sx+2+f*2,sy+4,7,1);
+    cx.fillStyle='rgba(150,200,230,'+(.08+Math.max(0,-f)*.14)+')';
+    cx.fillRect(sx+6-f*2,sy+10,6,1);
+  }
+  /* --- KAGANKI: jedyne ciepłe światło w piwnicy --- */
+  for(const[tx,ty]of D.lampy){
+    const sx=tx*16-camX+8,sy=ty*16-camY+9;
+    if(!widok(sx,sy))continue;
+    const m=.82+Math.abs(Math.sin(t*7+tx))*.18+Math.sin(t*23+ty)*.05;   // migotanie
+    cx.fillStyle='rgba(245,160,50,.13)';cx.beginPath();cx.arc(sx,sy,34*m,0,7);cx.fill();
+    cx.fillStyle='rgba(245,190,90,.16)';cx.beginPath();cx.arc(sx,sy,17*m,0,7);cx.fill();
+    cx.fillStyle='#f5c542';cx.beginPath();cx.ellipse(sx,sy-1.5,2.2*m,3.4*m,0,0,7);cx.fill();
+    cx.fillStyle='#fff7d6';cx.beginPath();cx.ellipse(sx,sy-1,1.1*m,1.9*m,0,0,7);cx.fill();
+  }
+  /* --- OGNISKA: ciepły krąg światła i unoszące się iskry --- */
+  for(const[tx,ty]of D.ogniska){
+    const sx=tx*16-camX+8,sy=ty*16-camY+10;
+    if(!widok(sx,sy))continue;
+    const m=.8+Math.abs(Math.sin(t*9+tx))*.2+Math.sin(t*27+ty)*.06;
+    cx.fillStyle='rgba(245,140,40,.13)';cx.beginPath();cx.arc(sx,sy,40*m,0,7);cx.fill();
+    cx.fillStyle='rgba(245,180,80,.14)';cx.beginPath();cx.arc(sx,sy,20*m,0,7);cx.fill();
+    for(let i=0;i<3;i++){
+      const f=(t*.55+i*.37+tx*.11)%1;
+      cx.fillStyle='rgba(245,160,50,'+(.75*(1-f))+')';
+      cx.fillRect(sx-3+Math.sin(f*7+i)*4,sy-4-f*22,1.4,1.4);
+    }
+  }
+  /* --- STARE ŚWIERKI: co jakiś czas spada szyszka i odbija się od ściółki --- */
+  for(const[tx,ty]of D.szyszki){
+    const sx=tx*16-camX,sy=ty*16-camY;
+    if(!widok(sx,sy))continue;
+    const okres=7+((tx*7+ty*13)%9);                 // każde drzewo we własnym rytmie
+    const f=((t+tx*3.3+ty*1.7)%okres)/okres;
+    if(f>.34)continue;
+    const u=f/.34;
+    const spad=u*u*26;                              // przyspiesza, jak to szyszka
+    const bx=sx+4+((tx*5+ty*3)%8),by=sy+2+spad;
+    if(u<.9){
+      cx.fillStyle='#6e4a28';cx.fillRect(bx,by,1.8,3);
+      cx.fillStyle='#8a6a44';cx.fillRect(bx,by,1.8,.9);
+    }else{                                          // klapnięcie w igliwie
+      cx.fillStyle='rgba(160,150,110,.5)';
+      cx.fillRect(bx-2,sy+27,6,1.2);
+    }
+  }
+  /* --- LIŚCIE: opadają z dębów i klonów, kołysząc się na boki --- */
+  for(const[tx,ty]of D.liscie){
+    const sx=tx*16-camX,sy=ty*16-camY;
+    if(!widok(sx,sy))continue;
+    for(let i=0;i<2;i++){
+      const okres=9+((tx*5+ty*7+i*3)%7);
+      const f=((t+tx*2.1+ty*1.3+i*4.5)%okres)/okres;
+      if(f>.6)continue;
+      const u=f/.6;
+      const lx=sx+3+((tx*3+i*7)%9)+Math.sin(u*9+i)*5;
+      const ly=sy+1+u*30;
+      cx.save();cx.translate(lx,ly);cx.rotate(Math.sin(u*7+i)*.9);
+      cx.fillStyle=['#c8562a','#e08a34','#d2a03c','#a8703a'][(tx+ty+i)%4];
+      cx.fillRect(-1.6,-1,3.2,2);
+      cx.restore();
+    }
+  }
+  /* --- RURY: kapie z nich od lat, stąd ta cała woda na podłodze --- */
+  for(const[tx,ty]of D.rury){
+    const sx=tx*16-camX,sy=ty*16-camY;
+    if(!widok(sx,sy))continue;
+    const faza=(t*.7+((tx*7+ty*13)%10)*.1)%1;
+    if(faza>.55)continue;
+    cx.fillStyle='rgba(190,224,244,.75)';
+    cx.fillRect(sx+11,sy+12+faza*26,1.4,2.6);
+  }
+  /* --- MROK: delikatna winieta wokół gracza. Rysowana POD postaciami, więc nie
+     przygasza ekipy ani liczb obrażeń, tylko domyka nastrój. Siłę i barwę bierze
+     domena (`mrok`, `mrokCol`) — w piwnicy jest czarno, w lesie tylko cień koron. --- */
+  const cfgD=DOMAINS[DOM.cur]||{};
+  const sila=cfgD.mrok!==undefined?cfgD.mrok:1;
+  const barwa=cfgD.mrokCol||'8,6,18';
+  const k=W+'x'+H+'/'+sila+'/'+barwa;
+  if(domVignK!==k||!domVign){
+    domVign=cx.createRadialGradient(0,0,40,0,0,Math.max(W,H)*.75);
+    domVign.addColorStop(0,'rgba('+barwa+',0)');
+    domVign.addColorStop(.55,'rgba('+barwa+','+(.20*sila).toFixed(3)+')');
+    domVign.addColorStop(1,'rgba('+barwa+','+(.52*sila).toFixed(3)+')');
+    domVignK=k;
+  }
+  if(sila<=0)return;
+  cx.save();cx.translate(P.x-camX,P.y-camY);
+  cx.fillStyle=domVign;cx.fillRect(-P.x+camX,-P.y+camY,W,H);
+  cx.restore();
+}
+/* =====================================================================
+   TŁO DŹWIĘKOWE DOMENY — w całości SYNTEZOWANE, zero nowych plików audio
+   ---------------------------------------------------------------------
+   Ten sam brązowy szum obsługuje wodospad i wiatr w koronach drzew —
+   różni je filtr i to, skąd bierze się głośność: woda robi się głośniejsza,
+   im bliżej kaskady, wiatr szumi równo i faluje własnym rytmem. Ptaki to
+   krótkie ćwierki z oscylatora, rzucane co kilka–kilkanaście sekund.
+   Domena włącza to jednym polem: `amb:{wiatr:.5, ptaki:1}`.
+   ===================================================================== */
+const AMB={woda:null,wiatr:null};
+let ambFail=false;
+/* jeden bufor szumu na całą sesję — 3 s, ze zszytą pętlą, żeby nie strzelało */
+let ambBuf=null;
+function ambBufor(){
+  if(ambBuf)return ambBuf;
+  const len=Math.floor(AC.sampleRate*3),buf=AC.createBuffer(1,len,AC.sampleRate);
+  const d=buf.getChannelData(0);
+  let last=0;
+  for(let i=0;i<len;i++){const w=Math.random()*2-1;last=last*.86+w*.14;d[i]=Math.max(-1,Math.min(1,last*3.2));}
+  const zsz=Math.floor(AC.sampleRate*.02);
+  for(let i=0;i<zsz;i++){const a=i/zsz;d[len-zsz+i]=d[len-zsz+i]*(1-a)+d[i]*a;}
+  ambBuf=buf;return buf;
+}
+function ambGlos(kt,typ,f,q){
+  if(!AC||AMB[kt]||ambFail)return AMB[kt];
+  try{
+    const src=AC.createBufferSource();src.buffer=ambBufor();src.loop=true;
+    const filt=AC.createBiquadFilter();filt.type=typ;
+    filt.frequency.value=f;filt.Q.value=q;
+    const gain=AC.createGain();gain.gain.value=0;
+    src.connect(filt);filt.connect(gain);gain.connect(chipGain);
+    src.start();
+    AMB[kt]={src,filt,gain};
+  }catch(e){ambFail=true;}                 // raz się nie udało — nie próbujemy co klatkę
+  return AMB[kt];
+}
+function domAmbientStop(){
+  for(const kt in AMB){
+    const v=AMB[kt];
+    if(!v)continue;
+    try{v.src.stop();}catch(e){}
+    AMB[kt]=null;
+  }
+}
+/* pojedynczy ćwierk: 2–4 nutki z szybkim przestrojeniem — brzmi jak ptak,
+   a kosztuje trzy oscylatory raz na kilkanaście sekund */
+function ptakCwierk(){
+  if(!AC||!chipGain)return;
+  try{
+    const n=2+((Math.random()*3)|0),baza=1700+Math.random()*1500;
+    for(let i=0;i<n;i++){
+      const t0=AC.currentTime+i*(.07+Math.random()*.07);
+      const o=AC.createOscillator(),g=AC.createGain();
+      o.type='sine';
+      const f0=baza*(.85+Math.random()*.35);
+      o.frequency.setValueAtTime(f0,t0);
+      o.frequency.exponentialRampToValueAtTime(f0*(1.25+Math.random()*.55),t0+.05);
+      o.frequency.exponentialRampToValueAtTime(f0*.88,t0+.1);
+      g.gain.setValueAtTime(.0001,t0);
+      g.gain.linearRampToValueAtTime(.03*musicVol,t0+.012);
+      g.gain.exponentialRampToValueAtTime(.0004,t0+.12);
+      o.connect(g);g.connect(chipGain);
+      o.start(t0);o.stop(t0+.15);
+    }
+  }catch(e){}
+}
+let ptakT=4;
+function domAmbientUpdate(dt){
+  if(!AC)return;
+  const cfg=(DOM.cur&&DOMAINS[DOM.cur])||{},amb=cfg.amb||{};
+  const t=AC.currentTime;
+  const w=(DOM.deko&&DOM.deko.wod)||[];
+  const wDom=REG==='arena'&&DOM.cur;
+  /* --- WODA: im bliżej kaskady, tym głośniej i jaśniej --- */
+  if(wDom&&w.length){
+    const v=ambGlos('woda','bandpass',800,.6);
+    if(v){
+      let d=1e9;
+      for(const[tx,ty]of w)d=Math.min(d,Math.hypot(tx*16+8-P.x,ty*16+8-P.y));
+      const bl=Math.max(0,Math.min(1,1-(d-40)/280));
+      v.gain.gain.setTargetAtTime(.42*bl*bl*musicVol,t,.18);
+      v.filt.frequency.setTargetAtTime(520+bl*1100,t,.25);
+    }
+  }else if(AMB.woda)AMB.woda.gain.gain.setTargetAtTime(0,t,.25);
+  /* --- WIATR W KORONACH: równy, cichy, faluje własnym rytmem --- */
+  if(wDom&&amb.wiatr){
+    const v=ambGlos('wiatr','lowpass',420,.7);
+    if(v){
+      const fala=.55+.45*Math.sin(anim*.21)*Math.sin(anim*.07+1.3);   // dwa okresy = nieregularnie
+      v.gain.gain.setTargetAtTime(.13*amb.wiatr*fala*musicVol,t,.9);
+      v.filt.frequency.setTargetAtTime(300+fala*380,t,1.1);
+    }
+  }else if(AMB.wiatr)AMB.wiatr.gain.gain.setTargetAtTime(0,t,.6);
+  /* --- PTAKI: rzadko, żeby nie zrobiło się z tego budzika --- */
+  if(wDom&&amb.ptaki){
+    ptakT-=dt||0;
+    if(ptakT<=0){ptakT=5+Math.random()*12;ptakCwierk();}
+  }
+}
+/* CHLUPANIE: brodzenie po rozlewisku rozbryzguje wodę i cicho pluska.
+   Drobiazg, ale to on sprawia, że kałuża jest kałużą, a nie niebieskim kafelkiem. */
+let chlapT=0;
+function domChlapUpdate(dt){
+  chlapT-=dt;
+  if(!P.moving||chlapT>0)return;
+  if(at(Math.floor(P.x/16),Math.floor((P.y+2)/16))!==52)return;
+  chlapT=.22;
+  fxSparks(P.x,P.y+4,'#bfe4f4',4,60,{life:.32,g:200,up:12});
+  if(Math.random()<.5)beep(280+Math.random()*160,.05,'sine',.02,180);
+}
+/* --------------------------------------------------------------------
+   RYSOWANIE RUCHOMYCH CZĘŚCI DOMENY (kafle siedzą w cache, więc wszystko,
+   co pulsuje, idzie tutaj — na wierzchu terenu)
+   -------------------------------------------------------------------- */
+function drawDomain(){
+  if(REG!=='arena'||!DOM.cur)return;
+  const col=DOMAINS[DOM.cur].col;
+  /* maszyny bombowe: zielona lampka = jest bomba, czerwona = odlicza */
+  for(const m of DOM.masz){
+    const sx=m.x-camX,sy=m.y-camY;
+    if(sx<-24||sx>W+24||sy<-24||sy>H+24)continue;
+    if(m.ready){
+      const g=1+Math.sin(anim*4)*.25;
+      cx.fillStyle=alpha('#7bc950',.16);cx.beginPath();cx.arc(sx,sy-2,13*g,0,7);cx.fill();
+      R(cx,sx-3,sy-8,6,6,'#20242a');R(cx,sx-2,sy-7,4,4,'#3a3a48');   // gotowa bomba w podajniku
+      R(cx,sx-.7,sy-11,1.4,3,'#f5a032');
+      cx.fillStyle='#7bc950';cx.fillRect(sx+4,sy+1,2,2);
+    }else{
+      cx.fillStyle='#e04848';cx.fillRect(sx+4,sy+1,2,2);
+      cx.font='6px "Press Start 2P"';cx.textAlign='center';
+      cx.fillStyle=alpha(UI.text,.7);cx.fillText(Math.ceil(m.t)+'',sx,sy-10);
+      cx.textAlign='left';
+    }
+  }
+  /* bomby leżące — pulsują coraz szybciej, im bliżej huku */
+  for(const b of DOM.bomby){
+    const sx=b.x-camX,sy=b.y-camY;
+    if(sx<-40||sx>W+40||sy<-40||sy>H+40)continue;
+    const p=Math.max(0,b.t),szyb=p<1.5?14:p<3?8:4;
+    const g=.5+Math.abs(Math.sin(anim*szyb))*.5;
+    cx.fillStyle=alpha('#f5a032',.10+g*.14);
+    cx.beginPath();cx.arc(sx,sy,BOMB_R*(.55+g*.12),0,7);cx.fill();    // podgląd zasięgu
+    cx.fillStyle='rgba(0,0,0,.35)';cx.beginPath();cx.ellipse(sx,sy+5,6,2,0,0,7);cx.fill();
+    cx.fillStyle=p<1.5&&g>.5?'#5a5060':'#20242a';
+    cx.beginPath();cx.arc(sx,sy,5.5,0,7);cx.fill();
+    R(cx,sx-.7,sy-9,1.4,4,'#3a2a12');
+    cx.fillStyle=g>.5?'#fff7d6':'#f5a032';cx.fillRect(sx-1,sy-11,2,2);  // iskra na loncie
+  }
+  /* KLUCZE leżące na ziemi — pulsują swoim kolorem, żeby było je widać z daleka */
+  for(const k of DOM.klucze){
+    if(k.taken)continue;
+    const sx=k.x-camX,sy=k.y-camY;
+    if(sx<-30||sx>W+30||sy<-30||sy>H+30)continue;
+    const kc=kluczCfg(k.kolor),g=.5+Math.abs(Math.sin(anim*2.6))*.5;
+    const un=Math.sin(anim*2.2)*1.6;
+    cx.fillStyle=alpha(kc.col,.10+g*.16);
+    cx.beginPath();cx.arc(sx,sy+un,13+g*4,0,7);cx.fill();
+    cx.fillStyle='rgba(0,0,0,.35)';cx.beginPath();cx.ellipse(sx,sy+7,5,1.8,0,0,7);cx.fill();
+    /* prosty kluczyk: uchwyt, trzonek i dwa ząbki */
+    cx.save();cx.translate(sx,sy+un);
+    cx.strokeStyle=kc.col;cx.lineWidth=1.6;
+    cx.beginPath();cx.arc(0,-3,2.6,0,7);cx.stroke();
+    R(cx,-.8,-1,1.6,7,kc.col);
+    R(cx,.8,4,2.4,1.4,kc.col);R(cx,.8,1.6,1.8,1.2,kc.col);
+    cx.restore();
+  }
+  /* KŁÓDKI — nad zamkniętą bramką wisi ikonka koloru, którego szukasz */
+  for(const z of DOM.zamki){
+    if(z.open)continue;
+    const sx=z.x-camX,sy=z.y-camY;
+    if(sx<-40||sx>W+40||sy<-40||sy>H+40)continue;
+    const kc=kluczCfg(z.kolor),mam=!!DOM.mam[z.kolor];
+    const g=.6+Math.abs(Math.sin(anim*(mam?5:2)))*.4;
+    cx.fillStyle=alpha(kc.col,.10*g);
+    cx.beginPath();cx.arc(sx,sy,20,0,7);cx.fill();
+    cx.font='7px "Press Start 2P"';cx.textAlign='center';
+    cx.fillStyle='#000';cx.fillText(mam?kc.ic:'🔒',sx+1,sy-13);
+    cx.fillStyle=kc.col;cx.fillText(mam?kc.ic:'🔒',sx,sy-14);
+    cx.textAlign='left';
+  }
+  /* kruche płyty, które właśnie się sypią */
+  for(const z of DOM.zap){
+    const sx=z.tx*16-camX,sy=z.ty*16-camY;
+    if(sx<-20||sx>W+20)continue;
+    const drg=(1-z.t/.65)*1.6;
+    cx.save();cx.translate(sx+8+(Math.random()-.5)*drg,sy+8+(Math.random()-.5)*drg);
+    cx.fillStyle=alpha('#08060f',.5*(1-z.t/.65));cx.fillRect(-8,-8,16,16);
+    cx.strokeStyle='#3a3550';cx.lineWidth=1;
+    cx.beginPath();cx.moveTo(-6,-4);cx.lineTo(0,1);cx.lineTo(5,-3);cx.stroke();
+    cx.restore();
+  }
+}
+REGIONS.arena={n:'DOMENA',w:64,h:28,build:()=>{},spawn:[9*16,13*16],pks:[2,2],
   cars:false,boars:false,leaves:false,smoke:false,boat:false,noLife:true,
-  foesMax:0,foeTypes:['hejter'],zones:[[2,2,73,23]]};
+  foesMax:0,foeTypes:['hejter'],zones:[[2,2,61,25]]};
 function mkDomFoe(t,x,y,room){
-  const cfg=DOMAINS[DOM.cur],lvl=S.domLvl[DOM.cur]||0,td=FOE_TYPES[t];
+  const lvl=S.domLvl[DOM.cur]||0,td=FOE_TYPES[t];
   /* ELITY, MINI-BOSSOWIE i STRAŻNIK dostrajają się do siły ekipy tak samo jak
      bossowie regionalni. Zwykła hałastra zostaje hałastrą — świat ma być do
-     przejścia, mocna ma być walka z tym, co pilnuje komnaty. */
+     przejścia, mocna ma być walka z tym, co pilnuje komnaty.
+     Każde piętro wyżej dokłada swoje — wspinaczka ma boleć. */
   const big=td.elite||td.mini||t==='straznik';
   const sc=big?bossScale():{hp:1,atk:1};
-  const h=Math.round(td.hp*(1+.35*lvl)*sc.hp);
-  return{t,x,y,room,hp:h,hp0:h,atk:Math.round((td.atk+lvl*1.6)*sc.atk),
+  const pie=1+.06*DOM.floor;
+  const h=Math.round(td.hp*(1+.35*lvl)*sc.hp*pie);
+  return{t,x,y,room,hp:h,hp0:h,atk:Math.round((td.atk+lvl*1.6)*sc.atk*pie),
     dx:0,dy:0,wt:.4,stun:.6,kb:0,kbx:0,kby:0,flash:0};
 }
-function enterDomain(id){
-  const cfg=DOMAINS[id],lvl=S.domLvl[id]||0;
-  DOM={cur:id,rooms:[],gates:[],crystals:[],usedMini:[],chest:null,prevReg:REG,prevX:P.x,prevY:P.y,done:false};
-  REG='arena';MW=REGIONS.arena.w;MH=REGIONS.arena.h;
-  M=new Uint8Array(MW*MH);chunkClear();buildDomainMap(cfg);   // nowa mapa = stare kawalki do kosza
-  resetAmbient();foes=[];hitFX=[];PROJ=[];bossShots=[];dmgNums=[];miniBlasts=[];foeT=1e9;
-  REGIONS.arena.spawn=[DOM.rooms[0].cx,DOM.rooms[0].cy];
-  P.x=DOM.rooms[0].cx;P.y=DOM.rooms[0].cy;resetFollowers();
-  /* surowce do ZBIERANIA w komnatach 1-3 + kryształy domeny w 2-3 */
-  forage=[];
-  const put=(arr,room,mk)=>{const rm=DOM.rooms[room];
-    for(let a=0;a<30;a++){
-      const x=rm.cx+(Math.random()-.5)*rm.r*1.4,y=rm.cy+(Math.random()-.5)*rm.r*1.1;
-      if(SOLID(at(Math.floor(x/16),Math.floor(y/16))))continue;
-      if(Math.hypot(x-rm.cx,y-rm.cy)<20)continue;
-      arr.push(mk(x,y));return;}};
-  for(let i=0;i<5;i++)put(forage,i%3,(x,y)=>({x,y,type:pickA(cfg.ing),ready:true,t:0}));
-  for(let i=0;i<2+Math.min(2,lvl);i++)put(DOM.crystals,1+i%2,(x,y)=>({x,y,taken:false}));
+/* --------------------------------------------------------------------
+   WEJŚCIE, PIĘTRA, WYJŚCIE
+   -------------------------------------------------------------------- */
+function domLoadFloor(idx){
+  const cfg=DOMAINS[DOM.cur],def=domMapaDef(DOM.cur,idx);
+  const kind=(def&&def.kind)||domPietra(DOM.cur)[idx];
+  /* RĘCZNA PLANSZA nadpisuje z rejestru to, co jest jej własne: rozmiar
+     (czytany wprost z ASCII), nazwę, opis i limit czasu. Reszta — czy jest
+     walka, elita, strażnik — zostaje wspólna dla całego rodzaju piętra. */
+  const fk=def?Object.assign({},FLOOR_KINDS[kind]||FLOOR_KINDS.komnaty,{
+    w:(def.mapa[0]||'').length,h:def.mapa.length,
+    n:def.n||(FLOOR_KINDS[kind]||{}).n,opis:def.opis||(FLOOR_KINDS[kind]||{}).opis,
+    limit:def.limit!==undefined?def.limit:(FLOOR_KINDS[kind]||{}).limit,
+  }):FLOOR_KINDS[kind];
+  DOM.floor=idx;DOM.kind=kind;DOM.fk=fk;
+  /* MW/MH ustawiamy PRZED nową mapą — inaczej `set()` pisałoby poza zakres
+     (Uint8Array po cichu to zjada) i piętro wyszłoby dziurawe */
+  REGIONS.arena.w=fk.w;REGIONS.arena.h=fk.h;REGIONS.arena.zones=[[2,2,fk.w-3,fk.h-3]];
+  MW=fk.w;MH=fk.h;
+  M=new Uint8Array(MW*MH);DHP=new Uint8Array(MW*MH);chunkClear();
+  DOM.rooms=[];DOM.crystals=[];DOM.chest=null;DOM.stairs=null;DOM.exit2=null;
+  DOM.done=false;DOM.wyjT=0;
+  DOM.masz=[];DOM.bomby=[];DOM.carry=null;DOM.zap=[];DOM.regen=[];
+  DOM.zamki=[];DOM.klucze=[];DOM.mam={};DOM.wejscie=0;DOM.wyjscie=0;DOM.sciezka=[];
+  DOM.deko=DEKO_PUSTE();DOM.reczna=false;
+  DOM.wejscieXY=null;DOM.schodyXY=null;
+  foes=[];hitFX=[];PROJ=[];bossShots=[];dmgNums=[];miniBlasts=[];foeT=1e9;forage=[];
+  resetAmbient();
+  const reczna=def?domBuildFromMap(cfg,fk,def):(domBuildFloor(cfg,fk,idx),null);
+  const ostPietro=domPlanFloor(cfg,fk,idx);
+  const lvl=S.domLvl[DOM.cur]||0;
+  /* gracz startuje tam, gdzie autor postawił `S` (albo w komnacie wejściowej
+     labiryntu, jeśli piętro jest jeszcze losowane) */
+  const wej=DOM.rooms[DOM.wejscie];
+  const st=DOM.wejscieXY||[wej.cx,wej.cy];
+  REGIONS.arena.spawn=[st[0],st[1]];
+  P.x=st[0];P.y=st[1];resetFollowers();
+  /* SCHODY na kolejne piętro. Na ostatnim piętrze schodów nie ma: tam czeka
+     skrzynia (stawia ją `domUpdate`), a `>` wskazuje tylko komnatę finałową. */
+  if(!ostPietro){
+    if(DOM.schodyXY)DOM.stairs={x:DOM.schodyXY[0],y:DOM.schodyXY[1]};
+    else{
+      const rm=DOM.rooms[DOM.wyjscie];    // schody czekają w komnacie na końcu labiryntu
+      let sx=rm.cx+30,sy=rm.cy;
+      if(SOLID(at(Math.floor(sx/16),Math.floor(sy/16)))){sx=rm.cx;sy=rm.cy-30;}
+      if(SOLID(at(Math.floor(sx/16),Math.floor(sy/16)))){sx=rm.cx-30;sy=rm.cy;}
+      DOM.stairs={x:sx,y:sy};
+      set(Math.floor(sx/16),Math.floor(sy/16),cfg.floor);
+    }
+  }
+  /* Krata, siatka bezpieczeństwa i naprawianie kluczy dotyczą WYŁĄCZNIE plansz
+     losowanych. Ręcznej mapy nikt nie „poprawia" za autorem — zamiast tego
+     sprawdzamy ją twardo (`domSprawdzMape`) i krzyczymy do konsoli. */
+  if(!def){
+    domKrataOverlay(cfg,fk);
+    domPrzekop(cfg,fk);
+    domNaprawKlucze(cfg,fk); // twarda gwarancja: każdy klucz do wzięcia przed swoją kłódką
+    domZweryfikujZamki(cfg,fk);  // …i że kłódka, która została, naprawdę czegoś broni
+  }
+  /* surowce do ZBIERANIA + kryształy domeny */
+  if(reczna){
+    for(const[x,y]of reczna.surowce)forage.push({x:x*16+8,y:y*16+8,type:domPick(cfg.ing),ready:true,t:0});
+    const ile=1+Math.min(2,lvl);
+    reczna.krysztaly.slice(0,ile).forEach(([x,y])=>DOM.crystals.push({x:x*16+8,y:y*16+8,taken:false}));
+  }else{
+    /* mapa kafli, na których gracz NA PEWNO stanie (bez liczenia na kładki) */
+    const chodne=domPrzejezdne(true,false,true);
+    const put=(arr,room,mk)=>{const rm=DOM.rooms[Math.min(room,DOM.rooms.length-1)];
+      for(let a=0;a<40;a++){
+        const x=rm.cx+(domRng()-.5)*rm.r*1.4,y=rm.cy+(domRng()-.5)*rm.r*1.1;
+        const tx=Math.floor(x/16),ty=Math.floor(y/16);
+        if(tx<0||ty<0||tx>=MW||ty>=MH)continue;
+        if(SOLID(at(tx,ty))||PIT(at(tx,ty))||at(tx,ty)===43)continue;
+        if(!chodne[ty*MW+tx])continue;
+        if(Math.hypot(x-rm.cx,y-rm.cy)<20)continue;
+        arr.push(mk(x,y));return;}};
+    for(let i=0;i<4;i++)put(forage,i%DOM.rooms.length,(x,y)=>({x,y,type:domPick(cfg.ing),ready:true,t:0}));
+    for(let i=0;i<1+Math.min(2,lvl);i++)put(DOM.crystals,(i+1)%DOM.rooms.length,(x,y)=>({x,y,taken:false}));
+  }
+  if(def){
+    const bledy=domSprawdzMape();
+    if(bledy.length)console.error('MAPA '+DOM.cur+' piętro '+(idx+1)+': '+bledy.join(' | '));
+  }
+  /* zegar piętra — tylko tam, gdzie rodzaj piętra go przewiduje */
+  DOM.tLimit=fk.limit||0;DOM.tLeft=DOM.tLimit;
+  /* chwila na rozejrzenie się po wejściu na piętro — obsada nie budzi się
+     w tej samej klatce, w której gracz się materializuje */
+  DOM.grace=idx>0?1.2:0;
+  /* piętro bez walki (przedsionek) jest zaliczone od razu — inaczej schody
+     nigdy by się nie odblokowały i gracz utknąłby na dole */
+  if(DOM.rooms.every(r=>r.cleared))domFloorDone(true);
   camX=Math.max(0,Math.min(MW*16-W,P.x-W/2));camY=Math.max(0,Math.min(MH*16-H,P.y-H/2));
   scene='world';hurtT=1.2;
-  toast('🌀 '+cfg.n+' — POZIOM '+(lvl+1)+'<br>Przebij się przez 4 komnaty! Zbieraj surowce i kryształy 💠',4200);
+}
+function enterDomain(id){
+  const cfg=DOMAINS[id],lvl=S.domLvl[id]||0,pie=domPietra(id);
+  /* domena otwiera się tylko w swoje dni — i mówi wprost, kiedy wrócić */
+  if(!domDayOpen(id)){
+    SFX.no();
+    toast('🔒 '+cfg.n+' dziś ZAMKNIĘTA.<br>Otwarte: '+domDayTxt(id)+
+          ' — za '+fmtLeft(domNextOpen(id)),4200);
+    return;
+  }
+  DOM={cur:id,floor:0,kind:null,rooms:[],crystals:[],usedMini:[],
+    chest:null,stairs:null,exit2:null,prevReg:REG,prevX:P.x,prevY:P.y,done:false,
+    seed:(Date.now()^(Math.random()*1e9))>>>0,tLimit:0,tLeft:0,wyjT:0,grace:0,
+    masz:[],bomby:[],carry:null,zap:[],regen:[],
+    zamki:[],klucze:[],mam:{},wejscie:0,wyjscie:0,sciezka:[],
+    deko:DEKO_PUSTE(),reczna:false,wejscieXY:null,schodyXY:null};
+  REG='arena';
+  domSeedSet(DOM.seed);
+  domLoadFloor(0);
+  toast('🌀 '+cfg.n+' — POZIOM '+(lvl+1)+'<br>'+pie.length+' pięter do przejścia. '+
+        'Wypad albo wipe = CAŁA domena od nowa, byku!',4600);
   SFX.ok();
   stopVoice();                       // radio/monolog nie wchodzi do domeny
   initAudio().then(startBattleMusic); // specjalna muzyka bitewna (ściszona)
 }
-/* obsada komnat: 2=hałastra, 3=hałastra+ELITA, 4=STRAŻNIK+eskorta */
+function domNextFloor(){
+  const pie=domPietra(DOM.cur);
+  if(DOM.floor+1>=pie.length)return;
+  const nr=DOM.floor+1;
+  fxRing(P.x,P.y,40,DOMAINS[DOM.cur].col,{life:.5,w:3});
+  domLoadFloor(nr);
+  const fk=flKind();
+  toast('🪜 PIĘTRO '+(nr+1)+'/'+pie.length+' — '+fk.n+'<br>'+(fk.opis||''),3400);
+  SFX.ok();
+}
+/* obsada komnaty — wykonanie planu ułożonego przez generator */
 function domSpawnRoom(i){
-  const cfg=DOMAINS[DOM.cur],lvl=S.domLvl[DOM.cur]||0,rm=DOM.rooms[i];
-  const ring=(n,t,rr)=>{for(let k=0;k<n;k++){const a=k/n*6.28+Math.random();
+  const cfg=DOMAINS[DOM.cur],rm=DOM.rooms[i],plan=rm.plan||[];
+  const ring=(n,t,rr)=>{for(let k=0;k<n;k++){const a=k/n*6.28+domRng();
     let x=rm.cx+Math.cos(a)*rr,y=rm.cy+Math.sin(a)*rr*.7;
     if(SOLID(at(Math.floor(x/16),Math.floor(y/16)))){x=rm.cx+Math.cos(a)*rr*.45;y=rm.cy+Math.sin(a)*rr*.35;} // nie w ścianie
     foes.push(mkDomFoe(t,x,y,i));}};
   const eliteSpawn=(t,ox,oy)=>{
     const f=mkDomFoe(t,rm.cx+(ox||0),rm.cy+(oy||0),i);f.stun=1;foes.push(f);
-    fxRing(f.x,f.y,34,DOMAINS[DOM.cur].col,{life:.5,w:3});
-    fxSparks(f.x,f.y-10,DOMAINS[DOM.cur].col,14,140,{life:.6});
+    fxRing(f.x,f.y,34,cfg.col,{life:.5,w:3});
+    fxSparks(f.x,f.y-10,cfg.col,14,140,{life:.6});
     addShake(3,.3);
     toast((FOE_TYPES[t].mini?'💀 MINI-BOSS: ':'⚠️ ')+FOE_TYPES[t].en+'!',2800);};
-  /* mini-boss z puli odblokowanej poziomem domeny (bez powtórek w jednym runie) */
+  /* mini-boss z JAWNEJ puli domeny (bez powtórek w jednym runie) */
   const pickMini=()=>{
-    const pool=Object.keys(FOE_TYPES).filter(k=>{const t2=FOE_TYPES[k];
-      return t2.mini&&t2.unlock<=lvl+1&&!DOM.usedMini.includes(k);});
+    const lvl=S.domLvl[DOM.cur]||0;
+    const pool=(cfg.mini||[]).filter(k=>FOE_TYPES[k]&&
+      FOE_TYPES[k].unlock<=lvl+1&&!DOM.usedMini.includes(k));
     if(!pool.length)return null;
     const top=Math.max(...pool.map(k=>FOE_TYPES[k].unlock));      // preferuj najwyższy próg
     const best=pool.filter(k=>FOE_TYPES[k].unlock===top);
-    const id2=pickA(Math.random()<.7?best:pool);
+    const id2=domPick(domRng()<.7?best:pool);
     DOM.usedMini.push(id2);return id2;};
-  if(i===1){ring(3+Math.min(3,lvl),pickA(cfg.foes),58);ring(2,pickA(cfg.foes),86);
-    toast('⚔️ KOMNATA 2: hejterzy!');
-    if(S.ch==='edek')vsay('c_typy');   // „no wariacie, zobacz na tych typów jak idą"
-    if(lvl+1>=2){const mb=pickMini();if(mb)eliteSpawn(mb,0,-30);}}
-  if(i===2){ring(2+Math.min(3,lvl),pickA(cfg.foes),64);eliteSpawn(cfg.elite);
-    if(lvl+1>=5){const mb=pickMini();if(mb)eliteSpawn(mb,40,0);}}
-  if(i===3){
-    const td=FOE_TYPES.straznik,gh=Math.round(td.hp*(1+.45*lvl));
-    foes.push({t:'straznik',guard:true,room:3,gatk:Math.round(td.atk*.7)+Math.round(lvl*1.6),
-      x:rm.cx,y:rm.cy-24,hp:gh,hp0:gh,atk:td.atk+Math.round(lvl*1.6),
-      dx:0,dy:0,wt:.4,stun:.8,kb:0,kbx:0,kby:0,flash:0});
-    if(lvl>=1)eliteSpawn(cfg.elite,0,40);
-    if(lvl+1>=10){const mb=pickMini();if(mb)eliteSpawn(mb,-44,0);}
-    ring(2,pickA(cfg.foes),70);
-    toast('⚠️ OSTATNIA KOMNATA: STRAŻNIK DOMENY!<br>Uważaj na salwy!',3400);SFX.no();
+  let gadal=false;
+  for(const e of plan){
+    if(e.straz){
+      const lvl=S.domLvl[DOM.cur]||0,td=FOE_TYPES.straznik,gh=Math.round(td.hp*(1+.45*lvl)*bossScale().hp);
+      foes.push({t:'straznik',guard:true,room:i,gatk:Math.round(td.atk*.7)+Math.round(lvl*1.6),
+        x:rm.cx,y:rm.cy-24,hp:gh,hp0:gh,atk:td.atk+Math.round(lvl*1.6),
+        dx:0,dy:0,wt:.4,stun:.8,kb:0,kbx:0,kby:0,flash:0});
+      toast('⚠️ STRAŻNIK DOMENY!<br>Uważaj na salwy!',3400);
+    }
+    else if(e.mini){const mb=pickMini();if(mb)eliteSpawn(mb,e.ox,e.oy);}
+    else if(e.elite)eliteSpawn(e.t,e.ox,e.oy);
+    else{ring(e.n,e.t,e.r);gadal=true;}
   }
+  if(gadal&&S.ch==='edek'&&!curVoice&&Math.random()<.5)vsay('c_typy');
+  if(plan.length)SFX.no();
+}
+/* piętro zaliczone: schody się odsłaniają albo (na ostatnim) leci skrzynia */
+function domFloorDone(cicho){
+  if(DOM.done)return;
+  DOM.done=true;
+  const rm=DOM.rooms[DOM.wyjscie];
+  if(DOM.stairs){
+    if(!cicho){
+      fxRing(DOM.stairs.x,DOM.stairs.y,26,DOMAINS[DOM.cur].col,{life:.6,w:3});
+      toast('🪜 PIĘTRO CZYSTE! Schody czekają — [E]');SFX.ok();
+    }
+    return;
+  }
+  DOM.chest={x:rm.cx,y:rm.cy,open:false};
+  /* portal wyjściowy TUŻ PRZY skrzyni — bez zasuwania na początek */
+  let ex=rm.cx+34,ey=rm.cy;
+  if(SOLID(at(Math.floor(ex/16),Math.floor(ey/16)))){ex=rm.cx;ey=rm.cy+34;}
+  if(SOLID(at(Math.floor(ex/16),Math.floor(ey/16)))){ex=rm.cx-34;ey=rm.cy;}
+  DOM.exit2={x:ex,y:ey};
+  fxRing(ex,ey,20,'#8f88b0',{life:.5,w:2});
+  toast('🏆 DOMENA UKOŃCZONA!<br>Odbierz skrzynię — wyjście czeka obok!',3200);
+  SFX.buy();burstConfetti();
+  if(!curVoice)vsay('v_elegancko');
+}
+function domCzasMinal(){
+  const dn=DOMAINS[DOM.cur].n;
+  exitDomain();
+  for(const id of S.party)PHP[id]=Math.round(chHpMax(id)*.5);
+  hurtT=2.5;
+  toast('⏱ ZAWALIŁEŚ CZAS!<br>'+dn+': cały przebieg OD NOWA.',4600);
   SFX.no();
 }
-function domOpenGate(gi){
-  const g=DOM.gates[gi];if(!g||g.open)return;
-  g.open=true;
-  const fl=DOMAINS[DOM.cur].floor;
-  for(const[x,y]of g.cells)set(x,y,fl);
-  fxRing(g.x,g.y,30,DOMAINS[DOM.cur].col,{life:.5,w:3});
-  fxSparks(g.x,g.y,DOMAINS[DOM.cur].col,12,120,{life:.5});
-  addShake(2,.2);
-  toast('🚪 BRAMA OTWARTA! Dalej, byku!');SFX.ok();
-  if(Math.random()<.4&&!curVoice&&S.ch==='edek')vsay('c_spokoj');   // „spokój, spokój"
-}
-function domUpdate(){
-  if(REG!=='arena'||!DOM.cur||DOM.done)return;
+function domUpdate(dt){
+  if(REG!=='arena'||!DOM.cur)return;
+  if(DOM.wyjT>0)DOM.wyjT-=dt;
+  domMaszynyUpdate(dt);
+  domAmbientUpdate(dt);
+  domChlapUpdate(dt);
+  domPitCheck(dt);
+  domZapUpdate(dt);
+  domKluczeUpdate();
+  domSmyczLatajacych();
+  /* zegar piętra — na ostatnich 20 s robi się nerwowo */
+  if(DOM.tLimit>0&&!DOM.done){
+    const przed=DOM.tLeft;
+    DOM.tLeft-=dt;
+    if(DOM.tLeft<=0){domCzasMinal();return;}
+    if(DOM.tLeft<20&&Math.floor(DOM.tLeft)!==Math.floor(przed)){beep(300,.07,'square',.05,220);addShake(1,.12);}
+  }
+  if(DOM.done)return;
+  if(DOM.grace>0){DOM.grace-=dt;return;}
   /* wejście gracza do komnaty budzi jej obsadę */
-  for(let i=1;i<DOM.rooms.length;i++){
+  for(let i=0;i<DOM.rooms.length;i++){
     const rm=DOM.rooms[i];
     if(!rm.spawned&&Math.hypot(P.x-rm.cx,P.y-rm.cy)<rm.r*.8){rm.spawned=true;domSpawnRoom(i);}
   }
-  /* komnata czysta -> otwórz bramę dalej / koniec domeny */
+  domZatorUpdate(dt);
+  /* komnata czysta -> zaliczona; wyczyszczona komnata WYJŚCIOWA kończy piętro */
   for(let i=0;i<DOM.rooms.length;i++){
     const rm=DOM.rooms[i];
     if(!rm.spawned||rm.cleared)continue;
     if(!foes.some(f=>f.room===i&&!f.dead)){
       rm.cleared=true;
-      if(i<3)domOpenGate(i);
-      else{
-        DOM.done=true;
-        DOM.chest={x:rm.cx,y:rm.cy,open:false};
-        /* portal wyjściowy TUŻ PRZY skrzyni — bez zasuwania na początek */
-        let ex=rm.cx+34,ey=rm.cy;
-        if(SOLID(at(Math.floor(ex/16),Math.floor(ey/16)))){ex=rm.cx;ey=rm.cy+34;}
-        if(SOLID(at(Math.floor(ex/16),Math.floor(ey/16)))){ex=rm.cx-34;ey=rm.cy;}
-        DOM.exit2={x:ex,y:ey};
-        fxRing(ex,ey,20,'#8f88b0',{life:.5,w:2});
-        toast('🏆 DOMENA UKOŃCZONA!<br>Odbierz skrzynię — wyjście czeka obok!',3200);
-        SFX.buy();burstConfetti();
-        if(!curVoice)vsay('v_elegancko');
-      }
+      if(i===DOM.wyjscie)domFloorDone();
+      else{fxRing(rm.cx,rm.cy,40,DOMAINS[DOM.cur].col,{life:.4,w:2});
+        if(Math.random()<.35&&!curVoice&&S.ch==='edek')vsay('c_spokoj');}
     }
   }
 }
@@ -3290,11 +4906,12 @@ function domTakeCrystal(c){
   c.taken=true;
   const lvl=S.domLvl[DOM.cur]||0;
   const ch=2+(Math.random()<.5?1:0),di=(lvl>=2&&Math.random()<.5)?1:0;
-  S.mats.ch+=ch;if(di)S.mats.di+=di;save();refreshHUD();
+  const mk=matOfDom(DOM.cur),mn=(lvl>=2&&mk&&Math.random()<.5)?1:0;
+  S.mats.ch+=ch;if(di)S.mats.di+=di;if(mn)matDodaj(mk,mn);save();refreshHUD();
   fxStarFlash(c.x,c.y-8,'#b98cf0',10,{life:.3});
   fxRing(c.x,c.y-4,20,'#b98cf0',{life:.3,w:2});
   fxSparks(c.x,c.y-8,'#b98cf0',10,110,{life:.5});
-  addHit(c.x,c.y-16,'+'+ch+'⚙️'+(di?' +1💠':''),'#b98cf0');
+  addHit(c.x,c.y-16,'+'+ch+'⚙️'+(di?' +1💠':'')+(mn?' +1'+DOM_MATS[mk].ic:''),'#b98cf0');
   SFX.dia();
 }
 function domOpenChest(){
@@ -3303,6 +4920,9 @@ function domOpenChest(){
   const id=DOM.cur,lvl=S.domLvl[id]||0;
   const sr=10+lvl*4,ch=3+lvl*2,di=lvl>=1?1:0,dd=20+lvl*8;
   S.mats.sr+=sr;S.mats.ch+=ch;S.mats.di+=di;S.dia+=dd;
+  /* UNIKALNY SUROWIEC — nie do zdobycia nigdzie indziej */
+  const mk=matOfDom(id),mn=mk?3+lvl:0;
+  if(mk)matDodaj(mk,mn);
   /* artefakt z domeny (im wyższy poziom, tym lepsze gwiazdki) */
   let artTxt='';
   const maxStar=2+Math.min(3,lvl);
@@ -3313,14 +4933,28 @@ function domOpenChest(){
   }
   S.domLvl[id]=lvl+1;save();refreshHUD();
   worldFlash=.5;burstConfetti();SFX.buy();
-  toast('🎁 SKRZYNIA: +'+sr+'🔩 +'+ch+'⚙️'+(di?' +'+di+'💠':'')+' +'+dd+'💎'+artTxt+'<br>Domena wbija na poziom '+(lvl+2)+'!',5000);
+  toast('🎁 SKRZYNIA: '+(mk?'<b style="color:'+DOM_MATS[mk].col+'">+'+mn+' '+DOM_MATS[mk].ic+' '+DOM_MATS[mk].n+'</b><br>':'')+
+    '+'+sr+'🔩 +'+ch+'⚙️'+(di?' +'+di+'💠':'')+' +'+dd+'💎'+artTxt+'<br>Domena wbija na poziom '+(lvl+2)+'!',5600);
   addViews(6000+lvl*3000,true);
   if(Math.random()<.4)setTimeout(()=>postFilm('CZYSZCZĘ DOMENĘ: '+DOMAINS[id].n,18000),1500);
 }
+/* wyjście w połowie domeny kosztuje CAŁY przebieg, więc pytamy drugim [E] */
+function tryExitDomain(){
+  if(DOM.chest&&DOM.chest.open){exitDomain();return;}     // po skrzyni bez pytania
+  if(DOM.wyjT>0){exitDomain();return;}
+  DOM.wyjT=3;SFX.no();
+  toast('🚪 Wyjdziesz — i CAŁA domena od nowa (piętro '+(DOM.floor+1)+'/'+
+        domPietra(DOM.cur).length+').<br>Jeszcze raz [E], jeśli na pewno.',3000);
+}
 function exitDomain(){
-  stopBattleMusic();
+  stopBattleMusic();domAmbientStop();
   const backReg=DOM.prevReg||'wawa',bx=DOM.prevX,by=DOM.prevY;
-  DOM={cur:null,rooms:[],gates:[],crystals:[],usedMini:[],chest:null,prevReg:null,prevX:0,prevY:0,done:false};
+  DOM={cur:null,floor:0,kind:null,fk:null,rooms:[],crystals:[],usedMini:[],
+    chest:null,stairs:null,exit2:null,prevReg:null,prevX:0,prevY:0,done:false,
+    seed:1,tLimit:0,tLeft:0,wyjT:0,grace:0,masz:[],bomby:[],carry:null,zap:[],regen:[],
+    zamki:[],klucze:[],mam:{},wejscie:0,wyjscie:0,sciezka:[],
+    deko:DEKO_PUSTE(),reczna:false,wejscieXY:null,schodyXY:null};
+  DHP=null;
   setRegion(backReg);
   P.x=bx;P.y=by;resetFollowers();
   camX=Math.max(0,Math.min(MW*16-W,P.x-W/2));camY=Math.max(0,Math.min(MH*16-H,P.y-H/2));
@@ -4058,19 +5692,71 @@ function gachaTimer(){
 function openGacha(){SFX.open();gachaTab='char';renderGacha(null);
   $('gacha').classList.remove('hidden');gachaTimer();}
 
+/* =====================================================================
+   UNIKALNE SUROWCE DOMEN — jeden na POSTAĆ i jeden na DOMENĘ (7:7:7).
+   Bez nich nie ma wzniesienia, a że domena stoi otworem tylko w swoje dni,
+   po brakujący surowiec czasem trzeba wrócić za dzień albo dwa.
+   Dodanie ósmej postaci = jeden wpis tutaj i jedna domena z tym `mat`.
+   ===================================================================== */
+const DOM_MATS={
+  szlif:   {n:'SZLIF ELEGANCJI',    ic:'🕶️',col:'#f5c542',ch:'edek',    dom:'piwnica',
+    d:'Odprysk lustra z piwnicy hejterów. Widać w nim wyłącznie eleganckich.'},
+  zuzel:   {n:'ŻUŻEL SMOCZY',       ic:'🔥',col:'#e04848',ch:'zenek',   dom:'jama',
+    d:'Wystygła kropla ze smoczego gardła. Spaw trzyma jak nic innego.'},
+  rosol:   {n:'ISKRA ROSOŁU',       ic:'🍲',col:'#7bc950',ch:'grazynka',dom:'wesele',
+    d:'Skwierczy od trzech dni. Grażynka twierdzi, że to esencja wesela.'},
+  kapsel:  {n:'KAPSEL PIERWOTNY',   ic:'🍺',col:'#e8a838',ch:'dych',    dom:'las',
+    d:'Kapsel z butelki, od której wszystko się zaczęło. Dziki jak Dych.'},
+  sprezyna:{n:'ZMARZNIĘTY TRYBIK',  ic:'⏱️',col:'#52e0cf',ch:'jarek',   dom:'grota',
+    d:'Chodzi wolniej, niż powinien. Jarek mówi, że tak trzeba.'},
+  perla:   {n:'PERŁA Z DNA',        ic:'🦪',col:'#3a72c8',ch:'bogdan',  dom:'molo_d',
+    d:'Bogdan wyłowił ją zamiast dorsza. Do dziś nie wie, czy to dobrze.'},
+  brokat:  {n:'BROKAT Z FESTIWALU', ic:'💘',col:'#e88ac8',ch:'julka',   dom:'pole',
+    d:'Sypie się z niego światło sceny. Nie schodzi z rąk przez tydzień.'},
+};
+/* surowiec wzniesienia danej postaci (i odwrotnie: z której domeny leci) */
+const matOf=chId=>Object.keys(DOM_MATS).find(k=>DOM_MATS[k].ch===chId);
+const matOfDom=domId=>Object.keys(DOM_MATS).find(k=>DOM_MATS[k].dom===domId);
+const matIle=k=>(S.dmats&&S.dmats[k])||0;
+const matDodaj=(k,n)=>{if(!S.dmats)S.dmats={};S.dmats[k]=(S.dmats[k]||0)+n;};
+
 /* --- BUDOWANIE POSTACI: poziom 1-90, wzniesienia, talenty, konstelacje --- */
 const MAXLVL=90;
 /* koszt jednego poziomu rośnie łagodnie, ale przez 90 poziomów robi się z tego
    prawdziwy grind — dokładnie o to chodzi, bo bossowie skalują się do ekipy */
 const lvlCost=lvl=>({sr:4+Math.round(lvl*1.7),ch:lvl>=15?Math.round((lvl-13)*.55):0,di:0});
 /* wzniesienie: brama co 20/40/50/60/70/80 — bez niego poziom staje w miejscu */
-const ascCost=asc=>({sr:80+asc*90,ch:12+asc*16,di:1+asc});
-const talCost=tl=>({sr:0,ch:6+tl*7,di:tl>=5?1:0});
+/* ile UNIKALNEGO surowca kosztuje kolejne wzniesienie. Pierwsze (na 40) jest
+   łagodne, dalej rośnie — i to ono jest powodem, żeby wracać do domeny. */
+const ASC_MAT=[2,4,8,12,16,20,24];
+function ascCost(asc,chId){
+  const c={sr:80+asc*90,ch:12+asc*16,di:1+asc,dm:{}};
+  const m=chId&&matOf(chId);
+  if(m)c.dm[m]=ASC_MAT[Math.min(ASC_MAT.length-1,asc)];
+  return c;
+}
+const talCost=tl=>({sr:0,ch:6+tl*7,di:tl>=5?1:0,dm:{}});
 function costTxt(c){const p=[];if(c.sr)p.push(c.sr+'🔩');if(c.ch)p.push(c.ch+'⚙️');if(c.di)p.push(c.di+'💠');
+  for(const k in(c.dm||{}))p.push(c.dm[k]+DOM_MATS[k].ic);
   return p.length?p.join(' '):'za darmo';}
-function canAfford(c){return S.mats.sr>=c.sr&&S.mats.ch>=c.ch&&S.mats.di>=c.di;}
-function payCost(c){S.mats.sr-=c.sr;S.mats.ch-=c.ch;S.mats.di-=c.di;}
-const brakMat=()=>{SFX.no();toast('Brakuje materiałów! Wbijaj do domen i na bossów 🔩⚙️💠');};
+function canAfford(c){
+  if(S.mats.sr<c.sr||S.mats.ch<c.ch||S.mats.di<c.di)return false;
+  for(const k in(c.dm||{}))if(matIle(k)<c.dm[k])return false;
+  return true;}
+function payCost(c){S.mats.sr-=c.sr;S.mats.ch-=c.ch;S.mats.di-=c.di;
+  for(const k in(c.dm||{}))matDodaj(k,-c.dm[k]);}
+/* Komunikat ma MÓWIĆ, czego brakuje i gdzie po to iść — inaczej gracz stoi
+   przed zablokowanym przyciskiem i nie wie, co z tym zrobić. */
+function brakMat(c){
+  SFX.no();
+  for(const k in((c&&c.dm)||{})){
+    if(matIle(k)>=c.dm[k])continue;
+    const m=DOM_MATS[k],dm=DOMAINS[m.dom];
+    toast('Brakuje '+(c.dm[k]-matIle(k))+'× '+m.ic+' '+m.n+
+          '<br>🌀 '+dm.n+' — '+domDayTxt(m.dom)+' · '+domStanTxt(m.dom),4600);
+    return;
+  }
+  toast('Brakuje materiałów! Wbijaj do domen i na bossów 🔩⚙️💠');}
 /* ile poziomów da się kupić na raz (przycisk ×10 / MAX) */
 function lvlUpMany(id,ile){
   const d=S.chars[id];if(!d)return 0;
@@ -4098,8 +5784,8 @@ function tryAscend(id){
   const a=d.asc||0;
   if(a>=6){toast('✨ Pełne wzniesienie — dalej już tylko konstelacje!');return;}
   if(d.lvl<ascCap(a)){toast('🔒 Najpierw dobij do poziomu '+ascCap(a)+', potem wzniesienie.');SFX.no();return;}
-  const c=ascCost(a);
-  if(!canAfford(c)){brakMat();return;}
+  const c=ascCost(a,id);
+  if(!canAfford(c)){brakMat(c);return;}
   payCost(c);d.asc=a+1;save();SFX.lvl();burstConfetti();burstConfetti();
   if(id===S.ch)applyChar();
   PHP[id]=chHpMax(id);
@@ -4115,7 +5801,7 @@ function tryTalent(id,k){
   const limit=Math.min(MAXTAL,2+(d.asc||0)*2);
   if(tl>=limit){toast('🔒 Talent czeka na WZNIESIENIE (limit '+limit+').');SFX.no();return;}
   const c=talCost(tl);
-  if(!canAfford(c)){brakMat();return;}
+  if(!canAfford(c)){brakMat(c);return;}
   payCost(c);d.tal[k]=tl+1;save();SFX.lvl();
   const T=TALENTS.find(t=>t.k===k);
   toast(T.ic+' '+T.n+' — POZIOM '+d.tal[k]+'/'+MAXTAL+'!');
@@ -4193,7 +5879,21 @@ function openShop(id){SFX.open();curShop=id;renderShop();$('shop').classList.rem
 function renderBag(){
   $('bagDia').textContent='💎 '+S.dia;
   const el=$('bagBody');let html='';
-  html+='<h3 style="font-size:11px;color:var(--acc);margin:4px 0 8px">🍴 JEDZENIE (Q = zjedz szybko)</h3>';
+  /* SUROWCE DOMEN — jedyne miejsce, gdzie widać całość naraz: co masz,
+     z której domeny to leci i czy dziś w ogóle da się tam wejść */
+  html+='<h3 style="font-size:11px;color:var(--acc);margin:4px 0 8px">🌀 SUROWCE DOMEN (wzniesienia postaci)</h3>';
+  for(const k of Object.keys(DOM_MATS)){
+    const m=DOM_MATS[k],dm=DOMAINS[m.dom],otw=domDayOpen(m.dom),post=CHARS[m.ch];
+    html+='<div class="matRow" style="border-left:3px solid '+m.col+
+      (otw?'':';opacity:.62')+'">'+
+      '<b style="color:'+m.col+'">'+m.ic+' '+m.n+'</b> '+
+      '<span style="color:'+(matIle(k)?'var(--ok)':'var(--text-dim)')+'">×'+matIle(k)+'</span>'+
+      '<small>dla: '+(post?post.n:'—')+' · 🌀 '+dm.n+' · '+domDayTxt(m.dom)+'</small>'+
+      '<small>'+(otw?'<span style="color:var(--ok)">✅ dziś OTWARTA — jeszcze '+fmtLeft(domOpenLeft(m.dom))+'</span>'
+                    :'<span style="color:var(--danger)">🔒 otwarcie za '+fmtLeft(domNextOpen(m.dom))+'</span>')+'</small>'+
+      '</div>';
+  }
+  html+='<h3 style="font-size:11px;color:var(--acc);margin:12px 0 8px">🍴 JEDZENIE (Q = zjedz szybko)</h3>';
   const foods=Object.keys(S.food);
   if(!foods.length)html+='<p style="font-size:10px;color:var(--text-dim)">Pusto! Jedzenie kupisz w Dino, na targu, w smażalni...</p>';
   el.innerHTML=html;
@@ -4342,7 +6042,9 @@ function renderHero(){
   const id=curHero;if(!id||!S.chars[id])return;
   const c=CHARS[id],d=chData(id);
   $('heroTitle').textContent='🎴 POSTACIE — BUDOWANIE (drużyna max 3)';
-  $('heroMats').innerHTML='💎'+S.dia+' · 🔩'+S.mats.sr+' ⚙️'+S.mats.ch+' 💠'+S.mats.di;
+  const mk0=matOf(id);
+  $('heroMats').innerHTML='💎'+S.dia+' · 🔩'+S.mats.sr+' ⚙️'+S.mats.ch+' 💠'+S.mats.di+
+    (mk0?' · <b style="color:'+DOM_MATS[mk0].col+'">'+DOM_MATS[mk0].ic+matIle(mk0)+'</b>':'');
   /* --- lewa kolumna: zakładki --- */
   const tb=$('buildTabs');tb.innerHTML='';
   for(const t of BUILD_TABS){
@@ -4382,7 +6084,10 @@ function renderHero(){
       (own&&S.party.includes(oid)?' party':'');
     const cv=document.createElement('canvas');cv.width=40;cv.height=40;
     const g2=cv.getContext('2d');g2.imageSmoothingEnabled=false;
-    g2.save();g2.translate(12,4);g2.scale(1.15,1.15);drawCharBody(g2,oid,0,0,0,0);g2.restore();
+    /* kadr 40×40 — offset liczony od czubka sylwetki, żeby wyższym postaciom
+       (Dych) nie ucinało czapki */
+    g2.save();g2.translate(12,4-(chTop(oid)+2.6)*1.15);g2.scale(1.15,1.15);
+    drawCharBody(g2,oid,0,0,0,0);g2.restore();
     if(!own){g2.globalCompositeOperation='source-atop';g2.fillStyle='rgba(20,17,39,.85)';g2.fillRect(0,0,40,40);}
     b.appendChild(cv);
     b.insertAdjacentHTML('beforeend','<b>'+(own?CHARS[oid].n.split(' ')[0]:'???')+'</b>'+
@@ -4427,14 +6132,33 @@ function paneLvl(id){
   h+='<h3 style="margin-top:14px">🌟 WZNIESIENIE '+a+'/6</h3>';
   if(a>=6)h+='<p style="color:var(--acc)">✨ Pełne wzniesienie — dalej tylko konstelacje.</p>';
   else{
-    const ac=ascCost(a),gotowy=d.lvl>=cap;
+    const ac=ascCost(a,id),gotowy=d.lvl>=cap;
     h+='<p>Podnosi limit poziomu do <u style="color:var(--info)">'+ascCap(a+1)+'</u>'+
        ' oraz dokłada +ATK, +HP, +DEF, +CRIT DMG i odblokowuje wyższe TALENTY.</p>'+
+       matWiersz(id,ac)+
        '<div class="bBtns"><button class="chbtn" data-act="asc"'+
        (gotowy&&canAfford(ac)?'':' disabled')+'>🌟 WZNIEŚ — '+costTxt(ac)+'</button></div>'+
        (gotowy?'':'<p style="color:var(--text-dim)">Najpierw dobij do poziomu '+cap+'.</p>');
   }
   return h;
+}
+/* Wiersz o UNIKALNYM SUROWCU: ile masz, ile trzeba, z której domeny leci
+   i czy ta domena jest dziś otwarta. Bez tego gracz widzi tylko zablokowany
+   przycisk i nie ma pojęcia, co ma z tym zrobić. */
+function matWiersz(id,koszt){
+  const k=matOf(id);if(!k)return '';
+  const m=DOM_MATS[k],dm=DOMAINS[m.dom];
+  const trzeba=(koszt&&koszt.dm&&koszt.dm[k])||0,mam=matIle(k);
+  const brak=trzeba&&mam<trzeba;
+  const otw=domDayOpen(m.dom);
+  return '<div class="matRow" style="border-left:3px solid '+m.col+'">'+
+    '<b style="color:'+m.col+'">'+m.ic+' '+m.n+'</b> '+
+    '<span style="color:'+(brak?'var(--danger)':'var(--ok)')+'">'+mam+
+      (trzeba?' / '+trzeba:'')+'</span>'+
+    '<small>🌀 '+dm.n+' · '+domDayTxt(m.dom)+' · '+
+      (otw?'<span style="color:var(--ok)">dziś OTWARTA</span>'
+          :'<span style="color:var(--danger)">🔒 za '+fmtLeft(domNextOpen(m.dom))+'</span>')+
+    '</small><small style="opacity:.7">'+m.d+'</small></div>';
 }
 /* ---------- ZAKŁADKA: BROŃ ---------- */
 function paneWeap(id){
@@ -5018,7 +6742,7 @@ $('dlg').addEventListener('pointerdown',()=>{
 function drawPortrait(who){
   const c=$('dlgPortrait').getContext('2d');c.clearRect(0,0,32,32);c.imageSmoothingEnabled=false;
   if(who==='Edek'){drawEdekHead(c,4,7,24,S.equip);}
-  else if(who==='Dych Dziki'){c.save();c.scale(2,2);drawDychBody(c,0,5,0,0);c.restore();}
+  else if(who==='Dych Dziki'){c.save();c.scale(2,2);drawDychBody(c,0,10,0,0);c.restore();}
   else{
     const npc=NPCS.find(n=>n.n===who)||{c:'#888',hair:'#333'};
     c.fillStyle='#e8c9a0';c.fillRect(8,8,16,16);
@@ -5041,7 +6765,10 @@ function doAction(){
   else if(prompt.domain)enterDomain(prompt.domain);
   else if(prompt.chest)domOpenChest();
   else if(prompt.crystal)domTakeCrystal(prompt.crystal);
-  else if(prompt.exit)exitDomain();
+  else if(prompt.bombDrop)domDropBomb();
+  else if(prompt.masz)domTakeBomb(prompt.masz);
+  else if(prompt.stairs)domNextFloor();
+  else if(prompt.exit)tryExitDomain();
   else if(prompt.pomost)wyslijDycha();
   else if(prompt.kid)dajNapoj(prompt.kid);
 }
@@ -5099,13 +6826,25 @@ function findPrompt(){
   if(!prompt&&REG!=='arena'){
     for(const[id,dm]of Object.entries(DOMAINS)){
       if(dm.r!==REG)continue;
-      if(Math.hypot(P.x-(dm.x*16+8),P.y-(dm.y*16+8))<24){prompt={domain:id,label:'🌀 Wejdź: '+dm.n};break;}
+      if(Math.hypot(P.x-(dm.x*16+8),P.y-(dm.y*16+8))<24){
+        prompt=domDayOpen(id)?{domain:id,label:'🌀 Wejdź: '+dm.n}
+                             :{domain:id,label:'🔒 '+dm.n+' — '+domDayTxt(id)};
+        break;}
     }
     /* bossów się już nie wyzywa na [E] — każdy budzi się sam po wejściu na arenę
        (patrz pętla „KAŻDY BOSS BUDZI SIĘ SAM"), a boss stoi w środku swojej niecki */
   }
+  if(!prompt&&REG==='arena'&&!POL.on&&DOM.carry){
+    prompt={bombDrop:1,label:'💣 Upuść bombę ('+DOM.carry.t.toFixed(1)+' s)'};
+  }
+  if(!prompt&&REG==='arena'&&!POL.on){
+    for(const m of DOM.masz)if(m.ready&&Math.hypot(P.x-m.x,P.y-m.y)<24){
+      prompt={masz:m,label:'💣 Weź bombę'};break;}
+  }
   if(!prompt&&REG==='arena'&&!POL.on){
     if(DOM.chest&&!DOM.chest.open&&Math.hypot(P.x-DOM.chest.x,P.y-DOM.chest.y)<24)prompt={chest:1,label:'🎁 Skrzynia!'};
+    else if(DOM.done&&DOM.stairs&&Math.hypot(P.x-DOM.stairs.x,P.y-DOM.stairs.y)<24)
+      prompt={stairs:1,label:'🪜 Piętro '+(DOM.floor+2)+'/'+domPietra(DOM.cur).length};
     else if(Math.hypot(P.x-REGIONS.arena.spawn[0],P.y-REGIONS.arena.spawn[1])<22)prompt={exit:1,label:'Wyjście z domeny'};
     else if(DOM.exit2&&Math.hypot(P.x-DOM.exit2.x,P.y-DOM.exit2.y)<22)prompt={exit:1,label:'Wyjście z domeny'};
     if(!prompt)for(const c of DOM.crystals){
@@ -5711,6 +7450,20 @@ function enterDoor(d){
 function openTravel(){
   SFX.open();
   const el=$('travelList');el.innerHTML='';
+  /* CO DZIŚ OTWARTE — ekran „gdzie właściwie mam dziś iść". Domeny chodzą
+     po dwóch dniach w tygodniu, a w niedzielę stoją otworem wszystkie. */
+  const dzis=domOtwarteDzis(),ndz=domWeekday()===0;
+  const zamk=Object.keys(DOMAINS).filter(id=>!domDayOpen(id)).map(domNextOpen);
+  el.insertAdjacentHTML('beforeend',
+    '<div class="travelDom"><b>🌀 DZIŚ OTWARTE'+(ndz?' — NIEDZIELA, WSZYSTKO STOI OTWOREM, BYKU!':'')+'</b>'+
+    dzis.map(id=>{
+      const dm=DOMAINS[id],mk=matOfDom(id);
+      return '<span style="border-left:3px solid '+dm.col+'">'+
+        (mk?DOM_MATS[mk].ic+' ':'')+dm.n+
+        '<i>'+REGIONS[dm.r].ic+' '+REGIONS[dm.r].n+' · poz. '+((S.domLvl[id]||0)+1)+'</i></span>';
+    }).join('')+
+    '<small>Zmiana o 4:00 rano'+(zamk.length?' · najbliższa z reszty za '+fmtLeft(Math.min(...zamk)):'')+
+    '</small></div>');
   for(const[id,cfg]of Object.entries(REGIONS)){
     if(id==='arena')continue;
     const here=id===REG;
@@ -6082,49 +7835,73 @@ function drawItemIcon(c,id){
     if(id==='kalosze')R(c,6,8,6,8,sc2);
     if(id==='buty_diament')R(c,18,17,3,2,'#fff');}
 }
-/* DYCH DZIKI — drugi robot z YT (kanoniczny wygląd z shortów Edka):
-   biały robot G1, czarna czapka z daszkiem, czarna koszulka „DYCH DZIKI” */
+/* DYCH DZIKI — drugi robot z YT. KANON = jego baner (assets/banners/dych.svg):
+   BARDZO WYSOKI biało-srebrny robot, CZARNE OCZY na jasnej twarzy (żadnego
+   wizjera!) i czarna czapka z daszkiem założona DO TYŁU. Sylwetka rośnie
+   w GÓRĘ — stopy i cień zostają tam, gdzie u reszty ekipy (y≈23/24.6),
+   więc wszystkie wywołania zakotwiczone w stopach działają bez zmian. */
+const DYCH_COL={
+  body:'#ece9f4',   // korpus i głowa — biel jak na banerze
+  limb:'#cdc8e0',   // ramiona i nogi — srebro (ciemniejsze, żeby odcinały się od korpusu)
+  back:'#c0bad6',   // tył głowy, cienie
+  joint:'#3a3454',  // przeguby
+  boot:'#1a1a24',   // buty
+  shirt:'#16161e',  // koszulka „DYCH DZIKI”
+  cap:'#16161e',    // czapka
+  capL:'#2e2b3e',   // kant czapki i daszka
+  eye:'#22212c',    // CZARNE oczy i uśmiech
+  chain:'#f5c542',  // złoty łańcuch
+};
 function drawDychBody(c,x,y,dir,f){
+  const D=DYCH_COL;
   c.save();c.translate(x,y);
   const legL=f?1:0,legR=f?0:1;
   c.fillStyle='rgba(0,0,0,.32)';c.beginPath();c.ellipse(8,24.6,6.5,2.2,0,0,7);c.fill();
-  // białe nogi robota
-  R(c,4,19+legL,3.4,5-legL,'#d6d2e6');R(c,9,19+legR,3.4,5-legR,'#d6d2e6');
-  rr(c,4,18.4+legL,3.4,2,1,'#3a3454');rr(c,9,18.4+legR,3.4,2,1,'#3a3454'); // przeguby
-  rr(c,3.4,23+legL,4.6,1.8,.8,'#1a1a24');rr(c,8.4,23+legR,4.6,1.8,.8,'#1a1a24'); // czarne buty
-  // korpus — czarna koszulka „DYCH DZIKI” na białym robocie
-  rr(c,2.6,9.6,10.8,9.8,2,'#ece9f4');
-  rr(c,3.2,10,9.6,7.2,1.6,'#16161e');                 // koszulka
-  c.fillStyle='#ece9f4';c.font='3.4px monospace';      // napis DD
-  R(c,5.2,11.4,2.2,.9,'#ece9f4');R(c,8.6,11.4,2.2,.9,'#ece9f4');
-  R(c,5.2,13,2.2,.9,'#c9c4dd');R(c,8.6,13,2.2,.9,'#c9c4dd');
-  rr(c,5.6,17.4,4.8,2,1,'#3a3454');                    // biodro-przegub
-  // białe ramiona z przegubem
-  if(dir===1){rr(c,1.6,11,3.4,7.4,1.4,'#d6d2e6');rr(c,1.9,13.6,2.8,1.4,.6,'#3a3454');}
-  else if(dir===2){rr(c,11,11,3.4,7.4,1.4,'#d6d2e6');rr(c,11.3,13.6,2.8,1.4,.6,'#3a3454');}
-  else{rr(c,1.2,11,2.8,7.4,1.2,'#d6d2e6');rr(c,12,11,2.8,7.4,1.2,'#d6d2e6');
-    rr(c,1.5,13.6,2.2,1.3,.5,'#3a3454');rr(c,12.3,13.6,2.2,1.3,.5,'#3a3454');}
+  // DŁUGIE, cienkie nogi — stąd wzrost; stopy dalej kończą na y=24 jak u reszty ekipy
+  R(c,4.4,15.6+legL,3,8.4-legL,D.limb);R(c,8.6,15.6+legR,3,8.4-legR,D.limb);
+  rr(c,4.4,15+legL,3,1.8,.9,D.joint);rr(c,8.6,15+legR,3,1.8,.9,D.joint);   // przeguby
+  rr(c,3.8,23+legL,4.2,1.8,.8,D.boot);rr(c,8.2,23+legR,4.2,1.8,.8,D.boot); // czarne buty
+  // KORPUS — dłuższy niż głowa; czarna koszulka „DYCH DZIKI” na białym robocie
+  rr(c,3.2,2.6,9.6,12,2,D.body);
+  rr(c,3.8,3.2,8.4,8.4,1.6,D.shirt);                   // koszulka
+  R(c,5.2,5.4,2,.9,D.body);R(c,8.8,5.4,2,.9,D.body);   // napis DD
+  R(c,5.2,7,2,.9,D.back);R(c,8.8,7,2,.9,D.back);
+  rr(c,5.6,12.4,4.8,1.9,.9,D.joint);                   // biodro-przegub
+  R(c,6.8,1.2,2.4,1.8,D.joint);                        // szyja
+  // DŁUGIE ramiona — ciemniejsze od korpusu + szew, żeby nie zlewały się w plamę
+  if(dir===1){rr(c,1.6,3.6,3.2,9.6,1.4,D.limb);R(c,4.4,3.6,.4,9.6,D.back);
+    rr(c,1.9,8,2.6,1.3,.6,D.joint);}
+  else if(dir===2){rr(c,11.2,3.6,3.2,9.6,1.4,D.limb);R(c,11.2,3.6,.4,9.6,D.back);
+    rr(c,11.5,8,2.6,1.3,.6,D.joint);}
+  else{rr(c,1.2,3.6,2.7,9.6,1.2,D.limb);rr(c,12.1,3.6,2.7,9.6,1.2,D.limb);
+    R(c,3.5,3.6,.4,9.6,D.back);R(c,12.1,3.6,.4,9.6,D.back);
+    rr(c,1.5,8,2.1,1.3,.5,D.joint);rr(c,12.4,8,2.1,1.3,.5,D.joint);}
   // złoty łańcuch na koszulce
-  if(dir!==3){R(c,4.5,10.2,7,1,'#f5c542');R(c,7.2,11.2,1.6,1.6,'#f5c542');}
-  // GŁOWA — biała jak G1, ciemny wizjer, bursztynowe oczy
+  if(dir!==3){R(c,4.8,3.4,6.4,1,D.chain);R(c,7.2,4.4,1.6,1.6,D.chain);}
+  /* GŁOWA — wyraźnie mniejsza od tułowia (mały łeb na długim ciele = „wysoki”),
+     jasna twarz BEZ wizjera, czapka z daszkiem założona DO TYŁU */
   if(dir===3){
-    rr(c,2,-.5,12,10.5,3,'#ece9f4');rr(c,4,1.5,8,5.5,2,'#c9c4dd');
-    R(c,1.5,-1.6,13,2.6,'#16161e');                    // czapka z tyłu
+    rr(c,3.4,-7,9.2,8.4,2.6,D.body);rr(c,4.6,-5.4,6.8,5,2,D.back);  // potylica
+    rr(c,1.6,-6.4,12.8,2.6,1,D.cap);                   // DASZEK — z tyłu widać go w całości
+    R(c,2,-6.4,12,.5,D.capL);                          // kant daszka
+    rr(c,2.6,-8.6,10.8,3.8,1.6,D.cap);                 // czasza
   }else if(dir===0){
-    rr(c,2,-.5,12,10.5,3,'#ece9f4');
-    rr(c,3,1,10,7.4,2.4,'#0e1420');
-    c.fillStyle='rgba(245,160,50,.22)';c.fillRect(4.2,2.4,3,3);c.fillRect(8.6,2.4,3,3);
-    rr(c,4.8,3,1.9,1.9,.9,'#f5a032');rr(c,9.2,3,1.9,1.9,.9,'#f5a032'); // bursztynowe oczy
-    c.fillStyle='#fff';c.fillRect(5.2,3.4,.6,.6);c.fillRect(9.6,3.4,.6,.6);
-    R(c,5.6,6.7,4.8,1.1,'#f5a032');                    // pasek-uśmiech
-    rr(c,1.5,-1.8,13,2.8,1,'#16161e');R(c,4,-2.6,8,1.6,'#16161e'); // czapka + daszek w przód
+    rr(c,3.4,-7,9.2,8.4,2.6,D.body);
+    rr(c,5,-3.4,1.9,2.3,.9,D.eye);rr(c,9.1,-3.4,1.9,2.3,.9,D.eye);  // CZARNE oczy
+    c.fillStyle='#fff';c.fillRect(5.4,-3,.55,.55);c.fillRect(9.5,-3,.55,.55);
+    R(c,6.2,-.2,3.6,.7,D.eye);R(c,5.6,-.6,.7,.7,D.eye);R(c,9.7,-.6,.7,.7,D.eye); // uśmiech
+    R(c,1.8,-6.6,1.8,1.4,D.cap);R(c,12.4,-6.6,1.8,1.4,D.cap);       // daszek wystaje z TYŁU
+    rr(c,2.6,-8.6,10.8,3.8,1.6,D.cap);                 // czasza
+    R(c,7,-5.6,2,1,D.capL);                            // zapinka — z przodu, bo daszek jest z tyłu
   }else{
     const fl=dir===1;
-    rr(c,2,-.5,12,10.5,3,'#ece9f4');
-    rr(c,fl?2.4:5.6,1,8,7.2,2.4,'#0e1420');
-    rr(c,fl?3.6:10.4,3,1.9,1.9,.9,'#f5a032');
-    R(c,fl?3.2:9.4,6.7,3.4,1.1,'#f5a032');
-    rr(c,1.5,-1.8,13,2.8,1,'#16161e');R(c,fl?-1.5:12.5,-.6,5,1.6,'#16161e'); // daszek w bok
+    rr(c,3.4,-7,9.2,8.4,2.6,D.body);
+    rr(c,fl?4.4:9.7,-3.4,1.9,2.3,.9,D.eye);
+    c.fillStyle='#fff';c.fillRect(fl?4.8:10.1,-3,.55,.55);
+    R(c,fl?4.2:8.4,-.2,3.4,.7,D.eye);                  // uśmiech
+    rr(c,2.6,-8.6,10.8,3.8,1.6,D.cap);                 // czasza
+    R(c,fl?12.2:0,-6.6,3.8,1.8,D.cap);                 // DASZEK po stronie PRZECIWNEJ do patrzenia
+    R(c,fl?12.2:0,-6.6,3.8,.5,D.capL);                 // kant daszka
   }
   c.restore();
 }
@@ -6222,6 +7999,11 @@ function drawCharBody(c,id,x,y,dir,f){
   else if(HUMAN_CFG[id])drawHumanChar(c,id,x,y,dir,f);
   else drawEdekBody(c,x,y,dir,f,1,S?S.equip:DEFAULT_SAVE.equip);
 }
+/* Miary sylwetki dla miejsc, które kadrują po GŁOWIE, a nie po stopach.
+   Domyślnie wszyscy mieszczą się w 16×26 z głową w (8, 4.6); Dych jest wyższy
+   i ma własne wartości we wpisie CHARS (patrz `head` / `top`). */
+const chHead=id=>(CHARS[id]&&CHARS[id].head)||[8,4.6,5.2];
+const chTop=id=>(CHARS[id]&&CHARS[id].top!==undefined)?CHARS[id].top:-2.6;
 /* portal domeny */
 function drawPortal(px,py,col,label){
   if(px<-40||px>W+40||py<-40||py>H+40)return;
@@ -6248,6 +8030,29 @@ function drawChest(sx,sy,open){
   R(cx,-9,-2,18,1.6,'#f5c542');R(cx,-1.6,open?-14:-4,3.2,open?4:5,'#f5c542');
   if(open){cx.fillStyle='rgba(255,247,214,.7)';
     for(let i=0;i<4;i++)R(cx,-6+i*4,-18-Math.sin(anim*5+i)*3,2,2,'#fff7d6');}
+  cx.restore();
+}
+/* SCHODY NA KOLEJNE PIĘTRO DOMENY — dopóki piętro nie jest czyste, są ciemne
+   i bez podpisu; po wyczyszczeniu świecą kolorem domeny i wołają [E]. */
+function drawStairs(sx,sy,gotowe){
+  if(sx<-40||sx>W+40||sy<-40||sy>H+40)return;
+  const col=DOMAINS[DOM.cur]?DOMAINS[DOM.cur].col:'#8f88b0';
+  cx.save();cx.translate(sx,sy);
+  if(gotowe){const g=1+Math.sin(anim*3)*.25;
+    cx.fillStyle=alpha(col,.16);cx.beginPath();cx.arc(0,-2,17*g,0,7);cx.fill();}
+  cx.fillStyle='rgba(9,7,18,.55)';cx.beginPath();cx.ellipse(0,6,13,4,0,0,7);cx.fill();
+  /* trzy stopnie w perspektywie — im wyżej, tym jaśniej */
+  for(let i=0;i<3;i++){
+    const w=22-i*5,h=4;
+    rr(cx,-w/2,2-i*4,w,h,1,gotowe?alpha(col,.35+i*.2):'#2a2440');
+    R(cx,-w/2,2-i*4,w,1,gotowe?alpha(col,.9):'#3a3454');
+  }
+  if(gotowe){
+    cx.font='6px "Press Start 2P"';cx.textAlign='center';
+    cx.fillStyle='#000';cx.fillText('WYŻEJ [E]',1,-15);
+    cx.fillStyle=col;cx.fillText('WYŻEJ [E]',0,-16);
+    cx.textAlign='left';
+  }
   cx.restore();
 }
 /* BOSSOWIE — duże sprite'y */
@@ -7047,7 +8852,7 @@ function drawNPC(c,n,sx,sy){
     const avail=q&&qs(q[0])===0,active=q&&qs(q[0])===1;
     if((avail||active)&&Math.floor(anim*2)%2===0){
       c.font='8px "Press Start 2P"';c.fillStyle=avail?'#f5c542':'#6fd8e8';
-      c.fillText(avail?'!':'…',sx+6,sy-6);
+      c.fillText(avail?'!':'…',sx+6,sy-11);   // Dych jest wysoki — znacznik nad czapką
     }
     return;
   }
@@ -7164,8 +8969,8 @@ function drawHeadIcon(id,hx,hy,r){
   const g=cx.createRadialGradient(hx,hy-r*.3,1,hx,hy,r);
   g.addColorStop(0,CHARS[id].col+'55');g.addColorStop(1,CHARS[id].col+'00');
   cx.fillStyle=g;cx.beginPath();cx.arc(hx,hy,r,0,7);cx.fill();
-  const s=r/5.2;
-  cx.translate(hx-8*s,hy-4.6*s);cx.scale(s,s);
+  const hd=chHead(id),s=r/hd[2];
+  cx.translate(hx-hd[0]*s,hy-hd[1]*s);cx.scale(s,s);
   drawCharBody(cx,id,0,0,0,0);
   cx.restore();
 }
@@ -7379,7 +9184,8 @@ function updateWorld(dt){
   const[dx,dy]=moveVec();
   P.moving=dx!==0||dy!==0;
   /* SPRINT: tylko w ruchu, przy zdrowej nodze i gdy starczy wytrzymałości */
-  P.sprint=P.moving&&wantsSprint()&&!STAM.tired&&STAM.v>0&&!P.slow&&honeyT<=0;
+  P.sprint=P.moving&&wantsSprint()&&!STAM.tired&&STAM.v>0&&!P.slow&&honeyT<=0
+    &&!(DOM.cur&&DOM.carry);      // z tykającą bombą w łapach się nie sprintuje
   updateStamina(dt,P.sprint);
   if(P.moving){
     /* BIEG NA UKOS. Wcześniej na dokładnej przekątnej wygrywała oś PIONOWA, więc
@@ -7390,7 +9196,7 @@ function updateWorld(dt){
     if(Math.abs(dx)>=Math.abs(dy))P.dir=dx<0?1:2;else P.dir=dy<0?3:0;
     P.diag=naUkos?(dy<0?-1:1):0;
     let sp=P.speed*(S.ch==='edek'?(SHOE_SPD[S.equip.shoes]||1):1)*(P.slow?.55:1)*(honeyT>0?.6:1)*(BUFF.t>0?1+BUFF.spd:1)
-           *(P.sprint?SPRINT_MULT:1);
+           *(P.sprint?SPRINT_MULT:1)*((DOM.cur&&DOM.carry)?.85:1);
     const nx=P.x+dx*sp*dt,ny=P.y+dy*sp*dt;
     const wolnoX=canWalk(nx,P.y),wolnoY=canWalk(P.x,ny);
     if(wolnoX)P.x=nx;
@@ -7441,7 +9247,7 @@ function updateWorld(dt){
       addDmgNum(P.x,P.y-18,'-'+poison.dmg,'#7bc950');
     }}
   updateFoes(dt);
-  domUpdate();
+  domUpdate(dt);
   for(const id in bossCdT)if(bossCdT[id]>0)bossCdT[id]-=dt;
   if(S.ch!=='edek'){
     dychIdleT-=dt;
@@ -7554,9 +9360,30 @@ function drawMapOverlay(){
 const TCOL={0:'#2e5a34',1:'#a08a5a',2:'#3a3a48',7:'#2e5a34',8:'#d8c084',9:'#8a6a42',16:'#7a7a8c',17:'#e8eef8',
   18:'#2e5a34',19:'#2e5a34',20:'#2e5a34',21:'#2e5a34',22:'#2e5a34',23:'#7a5636',24:'#2e5a34',25:'#2e5a34',
   26:'#2e5a34',27:'#2e5a34',28:'#2e5a34',29:'#2e5a34',30:'#2e5a34',31:'#2e5a34',
-  32:'#2e5a34',33:'#2e5a34',34:'#a08a5a',35:'#2e5a34',36:'#3a3a48',37:'#9a9aa4'};
+  32:'#2e5a34',33:'#2e5a34',34:'#a08a5a',35:'#2e5a34',36:'#3a3a48',37:'#9a9aa4',
+  /* kafle domen — kolor podkładu na minimapie i pod dekoracją */
+  39:'#8a5a2a',40:'#b03028',41:'#6e6e7e',42:'#3a3550',43:'#8e8aa4',44:'#08060f',
+  45:'#4a5060',46:'#5a5470',47:'#3e3a52',48:'#3c3560',49:'#3c3560',50:'#3c3560',
+  /* kafle klimatyczne ręcznie robionych map */
+  51:'#2a4a6e',52:'#1e3a58',53:'#5a4028',54:'#2c4a30',55:'#4e4a5e',56:'#3a3450',
+  57:'#4a4458',58:'#4a4450',59:'#2a2636',60:'#3a3448',61:'#4a4658',
+  /* kafle leśne */
+  62:'#c8562a',63:'#12301c',64:'#2c4a30',65:'#6b675e',66:'#7a5a36',67:'#6e5030',
+  68:'#0e2214',69:'#55522f',70:'#12181a'};
 /* podłoże pod asset (trawa/piasek/śnieg wg regionu) — spójne tło dekoracji */
 function baseTile(){return REG==='morze'?8:REG==='tatry'?17:0;}
+/* PODKŁAD POD ASSETEM ŚWIATA. Poza domeną to trawa/piach/śnieg regionu, ale
+   w RĘCZNEJ domenie musi to być JEJ podłoga — inaczej staw, pieniek czy ognisko
+   przynosiły ze sobą kwadrat zielonej trawy w środku piwnicy albo strumienia. */
+let wPodkladzie=false;
+function podklad(g,sx,sy,tx,ty){
+  if(REG==='arena'&&DOM.cur&&!wPodkladzie){
+    wPodkladzie=true;                      // bezpiecznik: podłoga domeny nie maluje sama siebie
+    try{domFloorBase(g,sx,sy,tx,ty);}finally{wPodkladzie=false;}
+    return;
+  }
+  R(g,sx,sy,16,16,baseCol());
+}
 function baseCol(){return REG==='morze'?'#d8c084':REG==='tatry'?'#e8eef8':'#2e5a34';}
 /* =====================================================================
    SŁOWNIK KAFLI TERENU
@@ -7696,7 +9523,7 @@ const TILES={
       if(at(tx,ty+1)===16)R(g,sx,sy+14,16,2,'#cfdcec');
   }},
   18:{paint(g,sx,sy,tx,ty){// BRZOZA
-      R(g,sx,sy,16,16,baseCol());
+      podklad(g,sx,sy,tx,ty);
       g.fillStyle='rgba(0,0,0,.2)';g.beginPath();g.ellipse(sx+8,sy+14,6,2.2,0,0,7);g.fill();
       R(g,sx+7,sy+6,2.6,9,'#ece9f4');R(g,sx+7,sy+8,2.6,1.2,'#2a2a30');R(g,sx+7,sy+11,2.6,1,'#2a2a30');
       g.fillStyle='#5a9a4a';g.beginPath();g.arc(sx+8,sy+3,5.5,0,7);g.fill();
@@ -7704,13 +9531,13 @@ const TILES={
       g.fillStyle='#8fd070';g.beginPath();g.arc(sx+10,sy+2,2.4,0,7);g.fill();
   }},
   19:{paint(g,sx,sy,tx,ty){// KRZAK z jagodami
-      R(g,sx,sy,16,16,baseCol());
+      podklad(g,sx,sy,tx,ty);
       g.fillStyle='#2a5a2e';g.beginPath();g.arc(sx+5,sy+10,4.4,0,7);g.arc(sx+10,sy+10,4.6,0,7);g.arc(sx+8,sy+7,4,0,7);g.fill();
       g.fillStyle='#357a3a';g.beginPath();g.arc(sx+6,sy+8,2.4,0,7);g.fill();
       for(let i=0;i<3;i++)R(g,sx+4+i*3,sy+9+((i*5)%3),1.6,1.6,'#5a6ad0');
   }},
   20:{paint(g,sx,sy,tx,ty){// GŁAZ
-      R(g,sx,sy,16,16,baseCol());
+      podklad(g,sx,sy,tx,ty);
       g.fillStyle='rgba(0,0,0,.22)';g.beginPath();g.ellipse(sx+8,sy+14,7,2.4,0,0,7);g.fill();
       g.fillStyle='#8a8a98';g.beginPath();g.moveTo(sx+2,sy+14);g.lineTo(sx+4,sy+5);g.lineTo(sx+9,sy+3);g.lineTo(sx+14,sy+7);g.lineTo(sx+14,sy+14);g.fill();
       g.fillStyle='#a2a2b0';g.beginPath();g.moveTo(sx+4,sy+5);g.lineTo(sx+9,sy+3);g.lineTo(sx+8,sy+8);g.fill();
@@ -7718,12 +9545,12 @@ const TILES={
       R(g,sx+3,sy+11,3,1,'#42424e');
   }},
   21:{paint(g,sx,sy,tx,ty){// KAMYKI (deptalne)
-      R(g,sx,sy,16,16,baseCol());
+      podklad(g,sx,sy,tx,ty);
       R(g,sx+4,sy+6,3,2,'#8a8a98');R(g,sx+4,sy+6,3,1,'#a2a2b0');
       R(g,sx+9,sy+10,2.4,1.6,'#7c7c8a');R(g,sx+7,sy+4,1.6,1.4,'#9a9aa8');
   }},
   22:{paint(g,sx,sy,tx,ty){// ALTANKA (gazebo)
-      R(g,sx,sy,16,16,baseCol());
+      podklad(g,sx,sy,tx,ty);
       g.fillStyle='rgba(0,0,0,.2)';g.beginPath();g.ellipse(sx+8,sy+14,8,2.4,0,0,7);g.fill();
       R(g,sx+2,sy+4,2,11,'#6e4a28');R(g,sx+12,sy+4,2,11,'#6e4a28');      // słupki
       R(g,sx+2,sy+11,12,1.6,'#5a3a1e');                                    // barierka
@@ -7740,7 +9567,7 @@ const TILES={
       if(at(tx,ty+1)!==23)R(g,sx,sy+14,16,2,'#5e4326');
   }},
   24:{anim:true,paint(g,sx,sy,tx,ty){// STAW z lilią
-      R(g,sx,sy,16,16,baseCol());
+      podklad(g,sx,sy,tx,ty);
       g.fillStyle='#2f6db0';g.beginPath();g.ellipse(sx+8,sy+9,7,5.5,0,0,7);g.fill();
       g.fillStyle='#4a8ad0';g.beginPath();g.ellipse(sx+8,sy+8,5,3.6,0,0,7);g.fill();
       if(Math.floor(anim*2+tx)%3===0)R(g,sx+5,sy+6,3,1,'rgba(255,255,255,.5)');
@@ -7748,20 +9575,20 @@ const TILES={
       R(g,sx+9.4,sy+9.4,1.4,1.4,'#e88ac8');
   }},
   25:{anim:true,paint(g,sx,sy,tx,ty){// TRZCINA / SITOWIE (deptalne)
-      R(g,sx,sy,16,16,baseCol());
+      podklad(g,sx,sy,tx,ty);
       const sw=Math.sin(anim*3+tx)*(reduceMotion?0:1);
       for(let i=0;i<4;i++){const bx=sx+3+i*3;R(g,bx+sw*(i-1.5)*.4,sy+4,1.2,10,'#4a7a3a');
         R(g,bx+sw*(i-1.5)*.4-.4,sy+3,2,2.4,'#6e5a2a');}
   }},
   26:{paint(g,sx,sy,tx,ty){// PIENIEK
-      R(g,sx,sy,16,16,baseCol());
+      podklad(g,sx,sy,tx,ty);
       g.fillStyle='rgba(0,0,0,.2)';g.beginPath();g.ellipse(sx+8,sy+13,5,1.8,0,0,7);g.fill();
       rr(g,sx+4,sy+7,8,6,2,'#6e5236');R(g,sx+4,sy+6,8,2.4,'#8a6a44');
       g.strokeStyle='#5a4028';g.lineWidth=1;g.beginPath();g.arc(sx+8,sy+7.2,2.4,0,7);g.stroke();g.beginPath();g.arc(sx+8,sy+7.2,1.1,0,7);g.stroke();
       R(g,sx+4,sy+7,3,1.4,'#3a7a3e');
   }},
   27:{anim:true,paint(g,sx,sy,tx,ty){// OGNISKO
-      R(g,sx,sy,16,16,baseCol());
+      podklad(g,sx,sy,tx,ty);
       R(g,sx+3,sy+11,10,2.4,'#6e4a28');R(g,sx+4,sy+12,8,1.4,'#5a3a1e');
       R(g,sx+2,sy+12,12,1,'#42424e');   // kamienie
       const fl=reduceMotion?1:1+Math.sin(anim*14+tx)*.35;
@@ -7771,13 +9598,27 @@ const TILES={
       if(!reduceMotion&&Math.floor(anim*6+tx)%3===0)R(g,sx+8,sy+1,1.4,1.4,'#f5a032');
   }},
   28:{paint(g,sx,sy,tx,ty){// ŁĄKA KWIETNA (deptalna)
-      R(g,sx,sy,16,16,'#357a3a');
+      /* nie wypełniamy kafla na płasko — pojedyncza kępa wychodziła wtedy
+         jaskrawym kwadratem w środku runa. Owal + dolewka w stronę sąsiedniej
+         łąki sprawia, że sąsiadujące kafle zlewają się w jedną polanę. */
+      podklad(g,sx,sy,tx,ty);
+      const laka=(dx,dy)=>at(tx+dx,ty+dy)===28;
+      g.fillStyle='#357a3a';
+      g.beginPath();g.ellipse(sx+8,sy+8,7.6,7.4,0,0,7);g.fill();
+      if(laka(-1,0))R(g,sx,sy+2,8,12,'#357a3a');
+      if(laka(1,0))R(g,sx+8,sy+2,8,12,'#357a3a');
+      if(laka(0,-1))R(g,sx+2,sy,12,8,'#357a3a');
+      if(laka(0,1))R(g,sx+2,sy+8,12,8,'#357a3a');
+      if(laka(-1,0)&&laka(0,-1))R(g,sx,sy,8,8,'#357a3a');
+      if(laka(1,0)&&laka(0,-1))R(g,sx+8,sy,8,8,'#357a3a');
+      if(laka(-1,0)&&laka(0,1))R(g,sx,sy+8,8,8,'#357a3a');
+      if(laka(1,0)&&laka(0,1))R(g,sx+8,sy+8,8,8,'#357a3a');
       const cc=['#e04848','#f5c542','#e88ac8','#ece9f4','#6fd8e8','#c86fa8'];
-      for(let i=0;i<5;i++){const fx=sx+2+((tx*7+i*5+ty*3)%12),fy=sy+3+((ty*5+i*7+tx)%11);
+      for(let i=0;i<5;i++){const fx=sx+3+((tx*7+i*5+ty*3)%10),fy=sy+3+((ty*5+i*7+tx)%10);
         R(g,fx,fy,2,2,cc[(tx+ty+i)%6]);R(g,fx+.6,fy+.6,.8,.8,'#fff7d6');}
   }},
   29:{paint(g,sx,sy,tx,ty){// DROGOWSKAZ
-      R(g,sx,sy,16,16,baseCol());
+      podklad(g,sx,sy,tx,ty);
       g.fillStyle='rgba(0,0,0,.2)';g.beginPath();g.ellipse(sx+8,sy+14,3,1.4,0,0,7);g.fill();
       R(g,sx+7,sy+3,2,11,'#6e4a28');
       R(g,sx+8,sy+4,7,2.6,'#c8a86a');g.fillStyle='#c8a86a';g.beginPath();g.moveTo(sx+15,sy+4);g.lineTo(sx+17,sy+5.3);g.lineTo(sx+15,sy+6.6);g.fill();
@@ -7785,7 +9626,7 @@ const TILES={
       R(g,sx+9,sy+4.8,4,1,'#5a3a1e');R(g,sx+1,sy+8.3,3,1,'#5a3a1e');
   }},
   30:{paint(g,sx,sy,tx,ty){// DĄB — duży, rozłożysty
-      R(g,sx,sy,16,16,baseCol());
+      podklad(g,sx,sy,tx,ty);
       g.fillStyle='rgba(0,0,0,.24)';g.beginPath();g.ellipse(sx+8,sy+14,7.5,2.6,0,0,7);g.fill();
       R(g,sx+6,sy+8,4.5,7,'#5a4028');R(g,sx+7,sy+9,1.4,5,'#6e5236');
       g.fillStyle='#245026';g.beginPath();g.arc(sx+8,sy+2,7.5,0,7);g.fill();
@@ -7794,14 +9635,14 @@ const TILES={
       if((tx*7+ty)%3===0)R(g,sx+10,sy+4,1.4,1.4,'#8a6a2e');
   }},
   31:{paint(g,sx,sy,tx,ty){// PAPROĆ (deptalna)
-      R(g,sx,sy,16,16,baseCol());
+      podklad(g,sx,sy,tx,ty);
       g.strokeStyle='#3a7a3e';g.lineWidth=1.2;
       for(const a of[-.6,-.2,.2,.6]){g.beginPath();g.moveTo(sx+8,sy+14);
         g.quadraticCurveTo(sx+8+a*10,sy+8,sx+8+a*16,sy+4);g.stroke();}
       R(g,sx+7.4,sy+11,1.4,3,'#2e6a34');
   }},
   32:{paint(g,sx,sy,tx,ty){// NAMIOT FESTIWALOWY
-      R(g,sx,sy,16,16,baseCol());
+      podklad(g,sx,sy,tx,ty);
       g.fillStyle='rgba(0,0,0,.22)';g.beginPath();g.ellipse(sx+8,sy+14,8,2.4,0,0,7);g.fill();
       const tc=['#e04848','#f5c542','#6fd8e8','#7bc950','#c86fa8'][(tx*3+ty)%5];
       g.fillStyle=tc;g.beginPath();g.moveTo(sx+8,sy-1);g.lineTo(sx+1,sy+14);g.lineTo(sx+15,sy+14);g.fill();
@@ -7811,7 +9652,7 @@ const TILES={
       if((tx+ty)%3===0)R(g,sx+12,sy+11,3,3,'#8a5a2a');
   }},
   33:{anim:true,paint(g,sx,sy,tx,ty){// WIEŻA GŁOŚNIKOWA (scena)
-      R(g,sx,sy,16,16,baseCol());
+      podklad(g,sx,sy,tx,ty);
       g.fillStyle='rgba(0,0,0,.25)';g.beginPath();g.ellipse(sx+8,sy+14,6,2.2,0,0,7);g.fill();
       rr(g,sx+2,sy-6,12,20,1.5,'#1a1a24');R(g,sx+2,sy-6,12,2,'#3a3a48');
       const pu=reduceMotion?0:Math.sin(anim*9+tx)*.8;
@@ -7827,7 +9668,7 @@ const TILES={
   }},
   35:{anim:true,paint(g,sx,sy,tx,ty){// KABINA TOI TOI — środkowa (43,40) to WC TRON Edka
       const tron=(tx===43&&ty===40);
-      R(g,sx,sy,16,16,baseCol());
+      podklad(g,sx,sy,tx,ty);
       g.fillStyle='rgba(0,0,0,.25)';g.beginPath();g.ellipse(sx+8,sy+14,6,2.2,0,0,7);g.fill();
       rr(g,sx+2,sy-3,12,17,1.5,tron?'#2f66c0':'#3a7ad0');
       R(g,sx+2,sy-3,12,2.4,tron?'#7bc950':'#2a5a9a');              // dach
@@ -7861,7 +9702,7 @@ const TILES={
       if(at(tx,ty+1)!==37)R(g,sx,sy+14,16,2,'#82828c');            // krawężnik od dołu
   }},
   38:{anim:true,paint(g,sx,sy,tx,ty){// UL PASIEKI — drewniana skrzynka z daszkiem i wylotkiem
-      R(g,sx,sy,16,16,baseCol());
+      podklad(g,sx,sy,tx,ty);
       g.fillStyle='rgba(0,0,0,.25)';g.beginPath();g.ellipse(sx+8,sy+14,6,2.2,0,0,7);g.fill();
       R(g,sx+3,sy+13,10,2,'#5a3a1e');                              // podstawka
       rr(g,sx+3,sy+2,10,11,1.4,'#c8935a');                         // korpus
@@ -7873,8 +9714,543 @@ const TILES={
       if(!reduceMotion){const a=anim*2.4+tx*1.7+ty;
         R(g,sx+8+Math.cos(a)*6,sy+4+Math.sin(a*1.3)*4,1.6,1.6,'#f5c542');}
   }},
+  /* =================== KAFLE DOMEN (39–47) ===================
+     Występują WYŁĄCZNIE wewnątrz domeny. Żaden nie jest `anim` — wszystko,
+     co się rusza (lampka maszyny, pękająca płyta, lont bomby), rysuje
+     `drawDomain` na wierzchu terenu, dzięki czemu kafle siedzą w cache
+     i piętro pełne rupieci nie kosztuje ani klatki więcej. */
+  39:{paint(g,sx,sy,tx,ty){// SKRZYNIA — rozwalasz zwykłym ciosem
+      domFloorBase(g,sx,sy,tx,ty);   // podłoga DOMENY, nie trawa regionu
+      g.fillStyle='rgba(0,0,0,.3)';g.beginPath();g.ellipse(sx+8,sy+14.5,6,2,0,0,7);g.fill();
+      rr(g,sx+1.5,sy+3,13,11,1.5,'#8a5a2a');
+      R(g,sx+1.5,sy+3,13,2,'#a87038');                              // jaśniejsza pokrywa
+      R(g,sx+1.5,sy+8,13,1.4,'#5e3c18');R(g,sx+7.2,sy+3,1.4,11,'#5e3c18');  // deski
+      R(g,sx+2.5,sy+4,2,1,'#c89050');                               // odblask
+      if((tx*5+ty*3)%4===0)R(g,sx+11,sy+10,2,2,'#5e3c18');          // wykruszenie
+  }},
+  40:{paint(g,sx,sy,tx,ty){// BECZKA — cios albo wybuch, a ona detonuje dalej
+      domFloorBase(g,sx,sy,tx,ty);   // podłoga DOMENY, nie trawa regionu
+      g.fillStyle='rgba(0,0,0,.3)';g.beginPath();g.ellipse(sx+8,sy+14.5,5.5,2,0,0,7);g.fill();
+      rr(g,sx+3,sy+2,10,12,2,'#b03028');
+      R(g,sx+3,sy+5,10,1.4,'#7a1c16');R(g,sx+3,sy+10,10,1.4,'#7a1c16');   // obręcze
+      R(g,sx+4,sy+3,1.6,9,'#d8564a');                               // odblask
+      R(g,sx+6.6,sy+6.4,2.8,3.2,'#20242a');                         // znak wybuchu
+      R(g,sx+7.4,sy+.6,1.4,2,'#3a2a12');                            // lont
+  }},
+  41:{paint(g,sx,sy,tx,ty){// PUSTAK — ciosem nie ruszysz, TYLKO bomba
+      if(domSkin(41,g,sx,sy,tx,ty))return;
+      R(g,sx,sy,16,16,'#6e6e7e');
+      R(g,sx,sy,16,1.4,'#8a8a9a');R(g,sx,sy+14.6,16,1.4,'#4e4e5c');
+      R(g,sx+7.4,sy,1.2,16,'#5a5a68');
+      R(g,sx+2,sy+3.5,3.4,3.4,'#4a4a58');R(g,sx+10.6,sy+3.5,3.4,3.4,'#4a4a58'); // otwory
+      R(g,sx+2,sy+9,3.4,3.4,'#4a4a58');R(g,sx+10.6,sy+9,3.4,3.4,'#4a4a58');
+      if((tx*3+ty*7)%6===0)R(g,sx+5,sy+12,3,1,'#8a8a9a');
+  }},
+  42:{paint(g,sx,sy,tx,ty){// FILAR — szkielet kraty, nie rusza go nic
+      if(domSkin(42,g,sx,sy,tx,ty))return;
+      R(g,sx,sy,16,16,'#3a3550');
+      R(g,sx+1,sy+1,14,14,'#4a4468');
+      R(g,sx+1,sy+1,14,2,'#5e5684');R(g,sx+1,sy+13,14,2,'#2e2a44');
+      R(g,sx+3,sy+4,2,8,'#5e5684');R(g,sx+11,sy+4,2,8,'#2e2a44');
+      if((tx+ty)%2===0)R(g,sx+6.5,sy+6.5,3,3,'#6e64a0');            // ćwiek
+  }},
+  43:{paint(g,sx,sy,tx,ty){// KRUCHA PŁYTA — wejdziesz, to się zawali
+      if(domSkin(43,g,sx,sy,tx,ty))return;
+      R(g,sx,sy,16,16,'#8e8aa4');
+      R(g,sx,sy,16,1.2,'#a6a2bc');R(g,sx,sy+14.8,16,1.2,'#6a6684');
+      /* rysy — zawsze te same dla danego kafla, bo liczone z tx/ty */
+      R(g,sx+2,sy+4,6,1,'#6a6684');R(g,sx+8,sy+5,4,1,'#6a6684');
+      R(g,sx+4,sy+10,7,1,'#6a6684');R(g,sx+((tx*5+ty)%8),sy+7,3,1,'#6a6684');
+      R(g,sx+1,sy+1,2,2,'#a6a2bc');R(g,sx+13,sy+12,2,2,'#6a6684');
+  }},
+  44:{paint(g,sx,sy,tx,ty){// PRZEPAŚĆ — wejdziesz, to spadniesz
+      if(domSkin(44,g,sx,sy,tx,ty))return;
+      R(g,sx,sy,16,16,'#08060f');
+      if(!PIT(at(tx,ty-1)))R(g,sx,sy,16,3,'#1a1628');               // krawędzie tylko przy brzegu
+      if(!PIT(at(tx,ty+1)))R(g,sx,sy+13,16,3,'#120f20');
+      if(!PIT(at(tx-1,ty)))R(g,sx,sy,3,16,'#161228');
+      if(!PIT(at(tx+1,ty)))R(g,sx+13,sy,3,16,'#161228');
+      if((tx*7+ty*5)%9===0)R(g,sx+6,sy+7,2,2,'#241f38');            // odległe dno
+  }},
+  45:{paint(g,sx,sy,tx,ty){// MASZYNA BOMBOWA — co jakiś czas wypluwa bombę
+      if(domSkin(45,g,sx,sy,tx,ty))return;
+      domFloorBase(g,sx,sy,tx,ty);   // podłoga DOMENY, nie trawa regionu
+      g.fillStyle='rgba(0,0,0,.3)';g.beginPath();g.ellipse(sx+8,sy+14.5,6.5,2,0,0,7);g.fill();
+      rr(g,sx+1,sy+2,14,12,2,'#4a5060');
+      R(g,sx+1,sy+2,14,2,'#68707e');R(g,sx+1,sy+12,14,2,'#343a48');
+      rr(g,sx+3,sy+5,10,5,1,'#20242e');                             // okienko podajnika
+      R(g,sx+4,sy+6,2,3,'#343a48');R(g,sx+10,sy+6,2,3,'#343a48');
+      R(g,sx+2,sy+11,3,1.4,'#8a92a4');R(g,sx+11,sy+11,3,1.4,'#8a92a4');
+  }},
+  46:{paint(g,sx,sy,tx,ty){// PŁYTA NACISKOWA — coś ciężkiego otwiera bramę
+      R(g,sx,sy,16,16,'#5a5470');
+      rr(g,sx+1.5,sy+1.5,13,13,2,'#6e6888');
+      rr(g,sx+3.5,sy+3.5,9,9,1.5,'#4a4460');
+      R(g,sx+6.5,sy+6.5,3,3,'#8e88ac');
+  }},
+  47:{paint(g,sx,sy,tx,ty){// KOLCE — wysuwają się cyklicznie (rytm rysuje drawDomain)
+      R(g,sx,sy,16,16,'#3e3a52');
+      R(g,sx,sy,16,1.2,'#524c6c');
+      for(let i=0;i<4;i++)R(g,sx+1.5+i*4,sy+11,1.6,1.6,'#241f38');  // otwory
+  }},
+  /* KŁÓDKI 48–50 — kolor bierze się z rejestru KLUCZE, więc dołożenie
+     czwartego koloru to jeden wpis tam i jeden wiersz tutaj. */
+  48:{paint(g,sx,sy,tx,ty){domZamekPaint(g,sx,sy,tx,ty,'#f5c542');}},
+  49:{paint(g,sx,sy,tx,ty){domZamekPaint(g,sx,sy,tx,ty,'#e04848');}},
+  50:{paint(g,sx,sy,tx,ty){domZamekPaint(g,sx,sy,tx,ty,'#6fd8e8');}},
+  /* =================== KAFLE KLIMATYCZNE (51–59) ===================
+     Tylko dekoracja — od nich zależy, czy ręcznie robiona plansza wygląda
+     jak MIEJSCE, czy jak siatka kafli. Rysunek statyczny siedzi w cache,
+     a wszystko, co się rusza (spadająca woda, płomień, kapiąca rura),
+     dokłada `drawDomainDeko` na wierzchu.                              */
+  51:{paint(g,sx,sy,tx,ty){// WODOSPAD — ściana, po której leje się woda
+      domWallBase(g,sx,sy,tx,ty);
+      R(g,sx,sy,16,16,'#16283e');
+      R(g,sx+1,sy,14,16,'#2f6396');                              // tafla wody
+      R(g,sx+2.4,sy,2.6,16,'#4d95c8');R(g,sx+7.4,sy,2,16,'#5fabdc');  // pasma
+      R(g,sx+11.4,sy,1.8,16,'#3f80b0');
+      R(g,sx+8.2,sy,.8,16,'#9ad4ee');                            // jasny rdzeń strugi
+      R(g,sx,sy,1,16,'#101c2e');R(g,sx+15,sy,1,16,'#101c2e');    // mokre krawędzie skały
+      if((ty*5+tx*3)%4===0)R(g,sx+4.6,sy+((tx*7+ty*5)%12),2,4,'#bfe4f4');  // odblaski
+      if(at(tx,ty-1)!==51){                                      // PRÓG, z którego spada
+        R(g,sx+1,sy,14,1.6,'#0d1626');
+        R(g,sx+1,sy+1.6,14,1.4,'#a8daf0');                       // grzbiet przelewu
+        R(g,sx+3,sy+1.6,3,1.4,'#e8f8ff');R(g,sx+9,sy+1.6,3,1.4,'#e8f8ff');
+      }
+      if(at(tx,ty+1)!==51){                                      // DÓŁ kaskady = piana
+        R(g,sx,sy+10,16,6,'#6fb6dc');
+        R(g,sx+1,sy+11,5,4,'#cdeaf8');R(g,sx+8,sy+12,6,3,'#cdeaf8');
+        R(g,sx+3,sy+13,3,2,'#ffffff');R(g,sx+10,sy+14,3,1.6,'#ffffff');
+      }
+  }},
+  52:{paint(g,sx,sy,tx,ty){// WODA — rozlana po podłodze, płytka i przejezdna
+      domFloorBase(g,sx,sy,tx,ty);
+      R(g,sx,sy,16,16,'rgba(30,78,120,.78)');
+      const brzeg=(dx,dy)=>at(tx+dx,ty+dy)!==52&&at(tx+dx,ty+dy)!==51;
+      if(brzeg(0,-1))R(g,sx,sy,16,1.6,'#4f92bc');
+      if(brzeg(0,1))R(g,sx,sy+14.4,16,1.6,'#16304c');
+      if(brzeg(-1,0))R(g,sx,sy,1.6,16,'#3d7ba6');
+      if(brzeg(1,0))R(g,sx+14.4,sy,1.6,16,'#3d7ba6');
+      if((tx*7+ty*11)%5===0)R(g,sx+3,sy+5,5,1,'#79b8d8');        // statyczne zmarszczki
+      if((tx*13+ty*3)%7===0)R(g,sx+8,sy+10,4,1,'#5ea0c4');
+      if((tx*5+ty*17)%11===0)R(g,sx+10,sy+3,2,1,'#a8dcf0');
+  }},
+  53:{paint(g,sx,sy,tx,ty){// REGAŁ — stare piwniczne półki z książkami
+      domWallBase(g,sx,sy,tx,ty);
+      R(g,sx,sy,16,16,'#3a2a18');
+      rr(g,sx+.5,sy+.5,15,15,1,'#5a4028');                       // korpus
+      R(g,sx+.5,sy+.5,15,1.2,'#7a5a3a');                         // górna listwa
+      for(let p=0;p<3;p++){                                      // trzy półki
+        const py=sy+2.6+p*4.6;
+        R(g,sx+1.2,py+3.4,13.6,1.2,'#3a2a18');                   // deska
+        let bx=sx+1.6;
+        for(let i=0;i<5&&bx<sx+14;i++){
+          const s=(tx*13+ty*29+p*7+i*11)%6;
+          if(s===5){bx+=1.6;continue;}                           // luka po książce
+          const w=1.4+(s%3)*.6,h=3.2-(s%2)*.5;
+          R(g,bx,py+3.4-h,w,h,['#8a3038','#2e5a70','#6a5a2a','#4a3a6a','#7a4a20'][s%5]);
+          R(g,bx,py+3.4-h,w,.6,'rgba(255,255,255,.18)');
+          bx+=w+.5;
+        }
+      }
+      R(g,sx,sy,1,16,'#2a1e10');R(g,sx+15,sy,1,16,'#2a1e10');
+      if((tx+ty)%3===0)R(g,sx+11,sy+9,3,4,'#6a5a3a');            // przekrzywiony tom
+  }},
+  54:{paint(g,sx,sy,tx,ty){// ZIELSKO — paprocie i mech w szczelinach
+      domFloorBase(g,sx,sy,tx,ty);
+      const b=(tx*7+ty*13)%3;
+      g.fillStyle='rgba(30,70,40,.5)';g.beginPath();g.ellipse(sx+8,sy+12,6,2.6,0,0,7);g.fill();
+      for(let i=0;i<5;i++){                                      // wachlarz liści
+        const a=(i-2)*.42+((tx*5+ty*3)%3-1)*.1,dl=5+((tx*3+ty*7+i)%3);
+        g.strokeStyle=['#2e6236','#3d8a44','#48814f'][(i+b)%3];g.lineWidth=1.2;
+        g.beginPath();g.moveTo(sx+8,sy+13);
+        g.quadraticCurveTo(sx+8+Math.sin(a)*dl*.7,sy+13-dl*.6,sx+8+Math.sin(a)*dl,sy+13-dl);
+        g.stroke();
+      }
+      if(b===0){R(g,sx+3,sy+11,2,2,'#4a8a4a');R(g,sx+12,sy+12,2,2,'#3d7346');}   // kępki mchu
+      if((tx*11+ty*5)%7===0){R(g,sx+10,sy+8,1.6,1.6,'#c8d84a');R(g,sx+11,sy+7,1.4,1.4,'#e8e84a');} // kwiatek
+  }},
+  55:{paint(g,sx,sy,tx,ty){// GŁAZ — bryła betonu albo skały, nie do ruszenia
+      domFloorBase(g,sx,sy,tx,ty);
+      g.fillStyle='rgba(0,0,0,.34)';g.beginPath();g.ellipse(sx+8,sy+13.5,6.6,2.4,0,0,7);g.fill();
+      const w=(tx*7+ty*11)%3;
+      g.fillStyle='#4e4a5e';g.beginPath();
+      g.moveTo(sx+1.5,sy+13);g.lineTo(sx+3-w*.4,sy+5);g.lineTo(sx+8,sy+1.5);
+      g.lineTo(sx+13+w*.3,sy+5.5);g.lineTo(sx+14.5,sy+13);g.closePath();g.fill();
+      g.fillStyle='#66627a';g.beginPath();
+      g.moveTo(sx+3,sy+6);g.lineTo(sx+8,sy+2.4);g.lineTo(sx+10,sy+6.5);g.lineTo(sx+5,sy+8.5);g.closePath();g.fill();
+      R(g,sx+9,sy+8,4,1,'#3a3648');R(g,sx+4,sy+10.5,5,1,'#3a3648');            // spękania
+      if(w===1){R(g,sx+10,sy+3.6,3,1.4,'#2e6236');R(g,sx+11,sy+2.8,1.4,1.4,'#3d8a44');} // mech na czubku
+  }},
+  56:{paint(g,sx,sy,tx,ty){// LAMPA — kaganek na ścianie, jedyne ciepłe światło
+      domWallBase(g,sx,sy,tx,ty);
+      R(g,sx+5,sy+7,6,7,'#2a2636');                              // wspornik
+      R(g,sx+6,sy+13,4,1.6,'#5a5470');
+      rr(g,sx+4,sy+4.5,8,5,1.4,'#3a3450');                       // czasza
+      R(g,sx+4.6,sy+5,6.8,1.2,'#5e5684');
+      R(g,sx+6,sy+8.6,4,1.4,'#f5a032');                          // żar (płomień dorysowuje overlay)
+      R(g,sx+7,sy+2.6,2,2,'#4a4468');
+  }},
+  57:{paint(g,sx,sy,tx,ty){// GRUZ — sypie się z sufitu od lat
+      domFloorBase(g,sx,sy,tx,ty);
+      const s=(tx*13+ty*7)%4;
+      R(g,sx+2+s,sy+9,4,2.6,'#4a4458');R(g,sx+2+s,sy+9,4,.8,'#66627a');
+      R(g,sx+8,sy+11-s*.5,3.4,2.2,'#403a50');R(g,sx+8,sy+11-s*.5,3.4,.7,'#5c5670');
+      R(g,sx+11,sy+5,2.4,1.8,'#4a4458');
+      R(g,sx+4,sy+4+s,1.6,1.4,'#57516a');
+      if(s===2){R(g,sx+6,sy+13,5,1,'#312c40');R(g,sx+7,sy+12,1.4,1.4,'#6e6884');}
+      if((tx+ty)%5===0)R(g,sx+12,sy+12,1.4,1.4,'#8a8298');       // odprysk
+  }},
+  58:{paint(g,sx,sy,tx,ty){// RURY — instalacja pod sufitem piwnicy, wiecznie cieknie
+      domWallBase(g,sx,sy,tx,ty);
+      const pion=at(tx,ty-1)===58||at(tx,ty+1)===58;
+      if(pion){
+        R(g,sx+4,sy,3.6,16,'#4a4450');R(g,sx+4,sy,1.2,16,'#6e6878');R(g,sx+7,sy,.8,16,'#33303c');
+        R(g,sx+9.5,sy,2.4,16,'#3e3a48');R(g,sx+9.5,sy,.9,16,'#5e5866');
+        if((ty*7+tx)%4===0){R(g,sx+3,sy+6,5.6,2.4,'#8a8298');R(g,sx+3,sy+6,5.6,.8,'#a29ab0');}  // złączka
+      }else{
+        R(g,sx,sy+4,16,3.6,'#4a4450');R(g,sx,sy+4,16,1.2,'#6e6878');R(g,sx,sy+7,16,.8,'#33303c');
+        R(g,sx,sy+9.5,16,2.4,'#3e3a48');R(g,sx,sy+9.5,16,.9,'#5e5866');
+        if((tx*7+ty)%4===0){R(g,sx+6,sy+3,2.4,5.6,'#8a8298');R(g,sx+6,sy+3,.8,5.6,'#a29ab0');}
+      }
+      if((tx*5+ty*11)%6===0)R(g,sx+11,sy+11,3,2.4,'#2e6236');    // pleśń pod przeciekiem
+  }},
+  59:{paint(g,sx,sy,tx,ty){// KRATKA ŚCIEKOWA — tu ucieka cała ta woda
+      domFloorBase(g,sx,sy,tx,ty);
+      rr(g,sx+1.5,sy+2.5,13,11,1,'#2a2636');
+      R(g,sx+1.5,sy+2.5,13,1,'#5a5470');
+      for(let i=0;i<5;i++)R(g,sx+2.6+i*2.4,sy+3.6,1.4,8.8,'#4a4458');
+      R(g,sx+2,sy+7.6,12,1,'#3a3648');
+      R(g,sx+3,sy+4.4,1,3,'#6e6884');
+  }},
+  60:{paint(g,sx,sy,tx,ty){// MUR PIWNICY — cegła z odpadającym tynkiem
+      R(g,sx,sy,16,16,'#3a3448');
+      for(let r=0;r<4;r++){                                      // wiązanie cegieł
+        const py=sy+r*4,off=((ty*4+r)%2)*4;
+        for(let c=-1;c<3;c++){
+          const px=sx+off+c*8;
+          if(px+7.4<sx||px>sx+16)continue;
+          const t=(tx*7+ty*13+r*5+c*3)%5;
+          R(g,Math.max(sx,px),py,Math.min(7.4,sx+16-Math.max(sx,px)),3.4,
+            ['#4a4256','#443d50','#514860','#403a4c','#4d4459'][t]);
+        }
+      }
+      R(g,sx,sy,16,16,'rgba(20,16,30,.16)');
+      if((tx*11+ty*5)%7===0)R(g,sx+3,sy+5,6,5,'#5a5468');        // łata tynku
+      if((tx*3+ty*17)%9===0)R(g,sx+9,sy+2,4,7,'#332e42');        // zaciek
+      if(!SOLID(at(tx,ty+1)))R(g,sx,sy+13.4,16,2.6,'#262135');   // cień u podstawy
+      if(!SOLID(at(tx,ty-1)))R(g,sx,sy,16,1.4,'#5e5674');        // światło na krawędzi
+  }},
+  61:{paint(g,sx,sy,tx,ty){// POSADZKA — betonowe płyty, zaplamione i popękane
+      if(domSkin(61,g,sx,sy,tx,ty))return;
+      R(g,sx,sy,16,16,'#4a4658');
+      const t=(tx*7+ty*11)%4;
+      R(g,sx,sy,16,16,['rgba(255,255,255,.02)','rgba(0,0,0,.05)','rgba(255,255,255,.045)','rgba(0,0,0,.02)'][t]);
+      R(g,sx,sy,16,.8,'#565266');R(g,sx,sy+15.2,16,.8,'#3c3848');   // fugi
+      R(g,sx,sy,.8,16,'#565266');R(g,sx+15.2,sy,.8,16,'#3c3848');
+      if((tx*13+ty*3)%6===0)R(g,sx+3,sy+6,7,1,'#3a3646');           // rysa
+      if((tx*5+ty*19)%11===0){R(g,sx+9,sy+9,4,3,'#413d4e');R(g,sx+10,sy+10,2,1,'#4e4a5c');}  // plama
+      if((tx*3+ty*7)%13===0)R(g,sx+5,sy+12,2,2,'#514d60');
+  }},
+  /* =================== KAFLE LEŚNE (62–69) ===================
+     Wyposażenie DZIKIEGO LASU. Reszta drzew (brzoza 18, dąb 30, paproć 31,
+     pieniek 26, ognisko 27, ścieżka 23, staw 24) już była w grze — te kafle
+     tylko dokładają to, czego lasowi brakowało.                          */
+  62:{paint(g,sx,sy,tx,ty){// KLON — jesienna korona, każdy trochę inny
+      podklad(g,sx,sy,tx,ty);
+      g.fillStyle='rgba(0,0,0,.24)';g.beginPath();g.ellipse(sx+8,sy+14,7,2.4,0,0,7);g.fill();
+      R(g,sx+6.4,sy+7,3.4,8,'#5e4226');R(g,sx+7.2,sy+8,1.2,6,'#75543a');
+      const p=(tx*7+ty*11)%3;
+      const A=['#c8562a','#d2762a','#b8402a'][p],B=['#e08a34','#e8a83c','#d2622a'][p];
+      g.fillStyle=A;g.beginPath();g.arc(sx+8,sy+3,7,0,7);g.fill();
+      g.fillStyle=B;g.beginPath();g.arc(sx+4.6,sy+2,4,0,7);g.arc(sx+11.4,sy+2.4,3.6,0,7);g.fill();
+      g.fillStyle='#f5c542';g.beginPath();g.arc(sx+7,sy,2.6,0,7);g.fill();
+      if(p!==2){R(g,sx+2,sy+12,2,1.4,A);R(g,sx+12,sy+13,2,1.4,B);}   // opadłe liście u stóp
+  }},
+  63:{paint(g,sx,sy,tx,ty){// STARY ŚWIERK — wysoki, ciemny, sypie szyszkami
+      podklad(g,sx,sy,tx,ty);
+      g.fillStyle='rgba(0,0,0,.3)';g.beginPath();g.ellipse(sx+8,sy+14.5,6,2.2,0,0,7);g.fill();
+      R(g,sx+6.6,sy+9,3,6,'#3a2a1a');
+      g.fillStyle='#12301c';                                        // trzy piętra igliwia
+      g.beginPath();g.moveTo(sx+8,sy-11);g.lineTo(sx+1.5,sy+1);g.lineTo(sx+14.5,sy+1);g.fill();
+      g.beginPath();g.moveTo(sx+8,sy-6);g.lineTo(sx,sy+6);g.lineTo(sx+16,sy+6);g.fill();
+      g.beginPath();g.moveTo(sx+8,sy-1);g.lineTo(sx-.5,sy+11);g.lineTo(sx+16.5,sy+11);g.fill();
+      g.fillStyle='#1c4a28';
+      g.beginPath();g.moveTo(sx+8,sy-5);g.lineTo(sx+2.4,sy+5);g.lineTo(sx+9,sy+5);g.fill();
+      g.beginPath();g.moveTo(sx+8,sy);g.lineTo(sx+1.6,sy+10);g.lineTo(sx+9,sy+10);g.fill();
+      g.fillStyle='#28663a';
+      g.beginPath();g.moveTo(sx+8,sy-10);g.lineTo(sx+4.4,sy-4);g.lineTo(sx+9,sy-4);g.fill();
+      if((tx*5+ty*3)%3===0){R(g,sx+10.4,sy+2,1.6,3,'#6e4a28');R(g,sx+10.4,sy+2,1.6,.8,'#8a6a44');} // szyszka
+      if((tx+ty)%4===0)R(g,sx+3,sy+13,2.4,1.4,'#6e4a28');           // szyszka pod drzewem
+  }},
+  64:{paint(g,sx,sy,tx,ty){// MECH — miękkie, głębokie runo (deptalne)
+      /* Mech NIE wypełnia kafla na płasko — inaczej poduchy mchu wychodziły
+         idealnymi kwadratami. Rysujemy owalną kępę i dolewamy ją w stronę
+         sąsiada, jeśli tam też jest mech: sąsiednie kafle zlewają się w plamę. */
+      domFloorBase(g,sx,sy,tx,ty);
+      const mchy=(dx,dy)=>at(tx+dx,ty+dy)===64;
+      const t=(tx*7+ty*13)%4;
+      g.fillStyle='#2c4a30';
+      g.beginPath();g.ellipse(sx+8,sy+8,7.4,7.2,0,0,7);g.fill();
+      if(mchy(-1,0))R(g,sx,sy+2,8,12,'#2c4a30');
+      if(mchy(1,0))R(g,sx+8,sy+2,8,12,'#2c4a30');
+      if(mchy(0,-1))R(g,sx+2,sy,12,8,'#2c4a30');
+      if(mchy(0,1))R(g,sx+2,sy+8,12,8,'#2c4a30');
+      if(mchy(-1,0)&&mchy(0,-1))R(g,sx,sy,8,8,'#2c4a30');
+      if(mchy(1,0)&&mchy(0,-1))R(g,sx+8,sy,8,8,'#2c4a30');
+      if(mchy(-1,0)&&mchy(0,1))R(g,sx,sy+8,8,8,'#2c4a30');
+      if(mchy(1,0)&&mchy(0,1))R(g,sx+8,sy+8,8,8,'#2c4a30');
+      for(let i=0;i<4;i++){
+        const px=sx+3+((tx*5+i*7+ty*3)%10),py=sy+3+((ty*7+i*5+tx)%10);
+        g.fillStyle=['#3d7346','#48814f','#356b3c'][(i+t)%3];
+        g.beginPath();g.arc(px,py,1.8+((i+tx)%2)*.7,0,7);g.fill();
+      }
+      if((tx*3+ty*7)%9===0){R(g,sx+10,sy+9,1.4,2.4,'#e8dcc0');      // grzybek w mchu
+        g.fillStyle='#c8562a';g.beginPath();g.arc(sx+10.7,sy+9,2.2,Math.PI,0);g.fill();}
+      if((tx*11+ty*5)%13===0)R(g,sx+5,sy+6,1.4,1.4,'#8fd070');
+  }},
+  65:{paint(g,sx,sy,tx,ty){// RUINA — resztka kamiennego muru, zarośnięta
+      podklad(g,sx,sy,tx,ty);
+      g.fillStyle='rgba(0,0,0,.26)';g.beginPath();g.ellipse(sx+8,sy+14.4,7.4,2.2,0,0,7);g.fill();
+      const wys=[0,1.6,.8,2.4][(tx*5+ty*3)%4];                      // nierówna korona muru
+      R(g,sx,sy+wys,16,16-wys,'#8a8578');
+      for(let r=0;r<4;r++){                                         // kamienne ciosy
+        const py=sy+wys+r*4,off=((tx+r)%2)*4;
+        if(py>sy+15)break;
+        for(let c=-1;c<3;c++){
+          const px=sx+off+c*8;
+          if(px+7.4<sx||px>sx+16)continue;
+          const t=(tx*7+ty*13+r*5+c*3)%5;
+          R(g,Math.max(sx,px),py,Math.min(7.4,sx+16-Math.max(sx,px)),3.4,
+            ['#9b9689','#8a8578','#a8a294','#7c776a','#948f80'][t]);
+          R(g,Math.max(sx,px),py,Math.min(7.4,sx+16-Math.max(sx,px)),.7,'#b5b0a0');
+        }
+      }
+      R(g,sx,sy+wys,16,1.2,'#c2bcaa');                              // rozświetlona korona
+      if(at(tx,ty+1)!==65)R(g,sx,sy+14,16,2,'#3e3a32');             // cień u podstawy
+      if((tx*3+ty*11)%3===0){R(g,sx+1,sy+wys,3,4,'#2e6236');R(g,sx+2,sy+wys+3,2,3,'#3d8a44');}  // bluszcz
+      if((tx*7+ty)%5===0)R(g,sx+11,sy+8,3,5,'#2e6236');
+      if((tx+ty)%6===0)R(g,sx+5,sy+11,4,1.4,'#4e4a44');             // wykruszony kamień
+  }},
+  66:{paint(g,sx,sy,tx,ty){// STOS DREWNA — drwale ułożyli i zapomnieli
+      podklad(g,sx,sy,tx,ty);
+      g.fillStyle='rgba(0,0,0,.28)';g.beginPath();g.ellipse(sx+8,sy+14.4,7.4,2.2,0,0,7);g.fill();
+      for(let r=0;r<3;r++){
+        const py=sy+4.4+r*3.4;
+        for(let c=0;c<3;c++){
+          const px=sx+1+c*5+((r%2)*1.4);
+          if(px>sx+13)continue;
+          const t=(tx*5+ty*7+r*3+c)%4;
+          g.fillStyle=['#7a5a36','#6e5030','#82603c','#684a2c'][t];
+          g.beginPath();g.ellipse(px+2.2,py,2.4,1.7,0,0,7);g.fill();
+          g.fillStyle='#c8a86a';g.beginPath();g.ellipse(px+2.2,py-.2,1.3,1,0,0,7);g.fill();
+          g.strokeStyle='#8a6a44';g.lineWidth=.6;
+          g.beginPath();g.arc(px+2.2,py-.2,.6,0,7);g.stroke();
+        }
+      }
+      R(g,sx,sy+13.4,16,2,'#4e3820');                               // podkłady
+  }},
+  67:{paint(g,sx,sy,tx,ty){// SZAŁAS DRWALI — deski, papa, blaszany komin
+      podklad(g,sx,sy,tx,ty);
+      g.fillStyle='rgba(0,0,0,.3)';g.beginPath();g.ellipse(sx+8,sy+14.6,8,2.4,0,0,7);g.fill();
+      R(g,sx+1,sy+6,14,8.6,'#6e5030');                              // ściana z desek
+      for(let i=0;i<4;i++)R(g,sx+1+i*3.6,sy+6,.8,8.6,'#4e3820');
+      g.fillStyle='#3a3630';g.beginPath();                          // dach z papy
+      g.moveTo(sx+8,sy-.5);g.lineTo(sx-.5,sy+7);g.lineTo(sx+16.5,sy+7);g.fill();
+      g.fillStyle='#4d4840';g.beginPath();
+      g.moveTo(sx+8,sy+.8);g.lineTo(sx+2,sy+6.4);g.lineTo(sx+8,sy+6.4);g.fill();
+      R(g,sx+11,sy+.6,2.4,4,'#5e5a52');R(g,sx+10.6,sy+.2,3.2,1,'#7a746a');   // komin
+      R(g,sx+6,sy+9,4,5.6,'#2a2018');                               // wejście
+      R(g,sx+6,sy+9,4,.8,'#4e3820');
+      if((tx+ty)%2===0)R(g,sx+2.4,sy+8.4,2.4,2.4,'#8ab0c8');        // okienko
+  }},
+  68:{paint(g,sx,sy,tx,ty){// GĘSTWINA — ściana lasu, dalej nie przejdziesz
+      R(g,sx,sy,16,16,'#0e2214');
+      const s1=(tx*7+ty*5)%3,s2=(tx*3+ty*11)%3;
+      g.fillStyle='#143018';g.beginPath();g.arc(sx+4,sy+5+s1,6.5,0,7);g.fill();
+      g.fillStyle='#102a15';g.beginPath();g.arc(sx+12,sy+8-s2,6,0,7);g.fill();
+      g.fillStyle='#1a3f20';g.beginPath();g.arc(sx+8,sy+12+s2*.6,5.4,0,7);g.fill();
+      g.fillStyle='#22502a';g.beginPath();g.arc(sx+3+s2,sy+2,3,0,7);g.arc(sx+13,sy+3+s1,2.6,0,7);g.fill();
+      R(g,sx+6.6,sy+6,1.6,10,'#1c1610');                            // pnie w gąszczu
+      if(s1===0)R(g,sx+12.6,sy+2,1.4,14,'#181209');
+      /* GRZBIET od strony polany — bez niego ściana lasu zlewała się z runem */
+      if(at(tx,ty-1)!==68){g.fillStyle='#2e6236';
+        g.beginPath();g.arc(sx+4,sy+2,4,0,7);g.arc(sx+11,sy+1.6,3.6,0,7);g.fill();
+        R(g,sx,sy,16,1.2,'#3d8a44');}
+      if(at(tx,ty+1)!==68)R(g,sx,sy+14.4,16,1.6,'#07140a');         // cień u podstawy
+      if((tx*5+ty*3)%7===0)R(g,sx+2,sy+9,2,2,'#5a6ad0');            // jagody w cieniu
+      if((tx+ty)%5===0)R(g,sx+10,sy+13,2.4,1.6,'#2e6236');
+  }},
+  69:{paint(g,sx,sy,tx,ty){// ŚCIÓŁKA — igliwie, listki i patyki (deptalna)
+      /* wyraźnie jaśniejsza i cieplejsza od gęstwiny (68): gracz ma jednym
+         spojrzeniem wiedzieć, gdzie jest droga, a gdzie ściana lasu */
+      R(g,sx,sy,16,16,'#55522f');
+      const t=(tx*7+ty*11)%4;
+      R(g,sx,sy,16,16,['rgba(255,240,190,.06)','rgba(0,0,0,.06)','rgba(210,170,90,.08)','rgba(0,0,0,.02)'][t]);
+      const lc=['#8a7a3c','#9a7a4c','#7e8a42','#b09a52'];
+      for(let i=0;i<5;i++){
+        const px=sx+1+((tx*5+i*7+ty*3)%13),py=sy+1+((ty*7+i*5+tx*3)%13);
+        R(g,px,py,2,1.2,lc[(i+t)%4]);
+      }
+      if((tx*3+ty*7)%5===0)R(g,sx+3,sy+9,5,.9,'#6e5a32');           // patyk
+      if((tx*11+ty*5)%9===0){R(g,sx+10,sy+4,1.2,2,'#e8dcc0');       // grzybek
+        g.fillStyle='#a8703a';g.beginPath();g.arc(sx+10.6,sy+4,1.8,Math.PI,0);g.fill();}
+      if((tx*13+ty*3)%11===0)R(g,sx+12,sy+11,2.4,1.4,'#2e6236');    // kępka trawy
+  }},
+  70:{paint(g,sx,sy,tx,ty){// DNO ROZPADLINY Z WODĄ — dalej PRZEPAŚĆ, tylko widać, co na dole
+      R(g,sx,sy,16,16,'#12181a');
+      const pit=(dx,dy)=>PIT(at(tx+dx,ty+dy));
+      if(!pit(0,-1))R(g,sx,sy,16,3.4,'#3a3228');                  // urwisko od góry
+      if(!pit(0,1))R(g,sx,sy+12.6,16,3.4,'#2a2a24');
+      if(!pit(-1,0))R(g,sx,sy,3,16,'#2a2620');
+      if(!pit(1,0))R(g,sx+13,sy,3,16,'#2a2620');
+      /* nitka wody na samym dnie — węższa niż kafel, żeby wiła się przez jar */
+      const g0=at(tx,ty-1)===70?0:3.6, g1=at(tx,ty+1)===70?16:12.4;
+      R(g,sx,sy+g0,16,g1-g0,'#1d3d4e');
+      R(g,sx,sy+g0,16,1,'#2e5c74');
+      R(g,sx+((tx*7+ty*3)%11),sy+g0+1.6,4,1,'#4d86a4');
+      if((tx*5+ty*3)%3===0)R(g,sx+2,sy+g0+3,3,1,'#7fb6cc');
+      if((tx*11+ty*7)%5===0)R(g,sx+9,sy+g0+2.4,2,2,'#3a4038');    // kamień w nurcie
+  }},
 };
-const TILE_ANIM=new Uint8Array(64);
+/* =====================================================================
+   SKINY KAFLI — ta sama MECHANIKA, inny WYGLĄD w każdej domenie
+   ---------------------------------------------------------------------
+   Pustak, filar, krucha płyta, przepaść i maszyna bombowa mają swoje
+   twarde reguły i nie ma sensu ich mnożyć. Ale betonowy pustak w środku
+   lasu wygląda jak pomyłka — więc domena może dorzucić własny rysunek.
+   Jeden wpis = jeden kafel przemalowany. Reszta zostaje domyślna.
+   ===================================================================== */
+const SKINY={
+  las:{
+    41(g,sx,sy,tx,ty){                     // pustak → GŁAZ NARZUTOWY (tylko dynamit)
+      domFloorBase(g,sx,sy,tx,ty);
+      g.fillStyle='rgba(0,0,0,.3)';g.beginPath();g.ellipse(sx+8,sy+14,7.4,2.6,0,0,7);g.fill();
+      g.fillStyle='#6e6a76';g.beginPath();
+      g.moveTo(sx+.5,sy+14);g.lineTo(sx+1.5,sy+5);g.lineTo(sx+7,sy+.8);
+      g.lineTo(sx+14,sy+4.5);g.lineTo(sx+15.5,sy+14);g.closePath();g.fill();
+      g.fillStyle='#8a8694';g.beginPath();
+      g.moveTo(sx+2,sy+5.5);g.lineTo(sx+7,sy+1.4);g.lineTo(sx+10,sy+6);g.lineTo(sx+4,sy+9);g.closePath();g.fill();
+      R(g,sx+9,sy+8,5,1.2,'#4e4a58');R(g,sx+3,sy+11,6,1.2,'#4e4a58');
+      if((tx*5+ty*3)%3===0){R(g,sx+9,sy+2.6,4,1.6,'#2e6236');R(g,sx+10,sy+1.6,2,1.6,'#3d8a44');}
+      if((tx+ty)%2===0)R(g,sx+2,sy+12,3,1.4,'#9a96a6');
+    },
+    42(g,sx,sy,tx,ty){                     // filar → KARPA (wykrot, nie rusza go nic)
+      domFloorBase(g,sx,sy,tx,ty);
+      g.fillStyle='rgba(0,0,0,.28)';g.beginPath();g.ellipse(sx+8,sy+14,7,2.6,0,0,7);g.fill();
+      rr(g,sx+2,sy+5,12,9,2.5,'#5a4028');                       // pniak
+      R(g,sx+2,sy+4,12,3,'#7a5a38');                            // ścięta góra
+      g.strokeStyle='#4a3220';g.lineWidth=1;
+      g.beginPath();g.arc(sx+8,sy+5.4,3.6,0,7);g.stroke();
+      g.beginPath();g.arc(sx+8,sy+5.4,1.8,0,7);g.stroke();
+      for(const dx of[-1,1]){                                   // korzenie wychodzące z ziemi
+        g.strokeStyle='#4a3220';g.lineWidth=2;
+        g.beginPath();g.moveTo(sx+8+dx*4,sy+12);
+        g.quadraticCurveTo(sx+8+dx*7,sy+13,sx+8+dx*8,sy+15);g.stroke();
+      }
+      R(g,sx+3,sy+8,4,1.6,'#2e6236');R(g,sx+10,sy+10,3,1.4,'#3d8a44');   // mech
+    },
+    43(g,sx,sy,tx,ty){                     // krucha płyta → SPRÓCHNIAŁA KŁADKA
+      R(g,sx,sy,16,16,'#241c14');
+      for(let i=0;i<3;i++){
+        const py=sy+.6+i*5.2,t=(tx*7+ty*5+i*3)%4;
+        R(g,sx,py,16,4.4,['#7a5a36','#6e5030','#82603c','#6a4c2e'][t]);
+        R(g,sx,py,16,.9,'#96724a');R(g,sx,py+3.6,16,.8,'#4e3820');
+        if((tx*3+i)%3===0)R(g,sx+3+((ty*5)%8),py+1.4,3,1.4,'#523a22');   // wyżarte słoje
+      }
+      R(g,sx+((tx*5+ty)%12),sy+2,1.4,12,'#3a2a1a');            // pęknięcie w poprzek desek
+    },
+    44(g,sx,sy,tx,ty){                     // przepaść → JAR, a na dnie rzeczka
+      R(g,sx,sy,16,16,'#161a18');
+      const brzeg=(dx,dy)=>!PIT(at(tx+dx,ty+dy));
+      if(brzeg(0,-1)){                                          // urwisko po górnej stronie
+        R(g,sx,sy,16,4,'#3a3228');R(g,sx,sy,16,1.4,'#57492f');
+        R(g,sx+2,sy+2.6,4,1.4,'#2a241c');R(g,sx+9,sy+3,5,1.2,'#2a241c');
+      }
+      if(brzeg(0,1)){R(g,sx,sy+12,16,4,'#2a2a24');R(g,sx,sy+14.6,16,1.4,'#3d4038');}
+      if(brzeg(-1,0))R(g,sx,sy,3,16,'#2a2620');
+      if(brzeg(1,0))R(g,sx+13,sy,3,16,'#2a2620');
+      /* zbocze: piarg i korzenie zwisające z krawędzi */
+      if((tx*7+ty*5)%9===0)R(g,sx+6,sy+3,2,2,'#2a3028');
+      if((tx*5+ty*11)%7===0)R(g,sx+3,sy+8,2.4,1.4,'#33372e');
+      if(brzeg(0,-1)){
+        g.strokeStyle='#4a3a24';g.lineWidth=1;
+        g.beginPath();g.moveTo(sx+4,sy+3);g.lineTo(sx+5,sy+8);g.stroke();
+        g.beginPath();g.moveTo(sx+11,sy+3.4);g.lineTo(sx+10,sy+7);g.stroke();
+      }
+    },
+    45(g,sx,sy,tx,ty){                     // maszyna → SKRZYNKA DYNAMITU drwali
+      domFloorBase(g,sx,sy,tx,ty);
+      g.fillStyle='rgba(0,0,0,.3)';g.beginPath();g.ellipse(sx+8,sy+14.5,6.5,2,0,0,7);g.fill();
+      rr(g,sx+1,sy+3,14,11,1.5,'#6e5030');                      // skrzynia
+      R(g,sx+1,sy+3,14,2,'#8a6a44');R(g,sx+1,sy+12,14,2,'#4e3820');
+      R(g,sx+1,sy+7.6,14,1.2,'#4e3820');R(g,sx+7.4,sy+3,1.2,11,'#4e3820');
+      R(g,sx+2.5,sy+4.6,3,2,'#c8384a');R(g,sx+9.5,sy+9,3,2,'#c8384a');   // laski dynamitu
+      R(g,sx+3.4,sy+4,1,1.6,'#3a2a12');R(g,sx+10.4,sy+8.4,1,1.6,'#3a2a12');
+      R(g,sx+11,sy+4.6,2.6,2,'#f5c542');                        // żółta naklejka
+    },
+    61(g,sx,sy,tx,ty){                     // posadzka → STARA PODŁOGA leśniczówki
+      R(g,sx,sy,16,16,'#5e5545');
+      const t=(tx*7+ty*11)%4;
+      R(g,sx,sy,16,16,['rgba(255,240,200,.05)','rgba(0,0,0,.07)','rgba(210,180,120,.06)','rgba(0,0,0,.02)'][t]);
+      R(g,sx,sy,16,.9,'#6e6452');R(g,sx,sy+15.1,16,.9,'#4a4234');    // spoiny
+      R(g,sx,sy,.9,16,'#6e6452');R(g,sx+15.1,sy,.9,16,'#4a4234');
+      if((tx*13+ty*3)%5===0)R(g,sx+3,sy+6,7,1,'#4a4234');            // pęknięcie
+      if((tx*5+ty*19)%7===0){R(g,sx+9,sy+9,4,3,'#2e6236');            // trawa w spoinie
+        R(g,sx+10,sy+8,1.4,2,'#3d8a44');}
+      if((tx*3+ty*7)%11===0)R(g,sx+4,sy+12,3,2,'#6a6050');
+    },
+    48(g,sx,sy,tx,ty,col){                 // kłódka → BRAMA Z ŻERDZI, opleciona bluszczem
+      domFloorBase(g,sx,sy,tx,ty);
+      R(g,sx,sy,16,16,'rgba(20,26,18,.35)');
+      for(let i=0;i<3;i++)R(g,sx+1.6+i*5,sy+1,2.6,14,'#6e5030');        // pionowe żerdzie
+      R(g,sx,sy+3.4,16,2.2,'#5a4028');R(g,sx,sy+10,16,2.2,'#5a4028');   // poprzeczki
+      R(g,sx,sy+3.4,16,.8,'#8a6a44');R(g,sx,sy+10,16,.8,'#8a6a44');
+      R(g,sx,sy+7,16,1.8,alpha(col,.8));                                // rygiel w kolorze klucza
+      if((tx+ty)%2===0){                                                // kłódka co drugi kafel
+        R(g,sx+6,sy+5.5,4,5,col);
+        R(g,sx+7,sy+3,2,3,'#e8e4f0');
+        R(g,sx+7.4,sy+7,1.2,2,'#241c14');
+      }else{R(g,sx+2,sy+12,4,2,'#2e6236');R(g,sx+11,sy+1,3,2.4,'#3d8a44');}   // bluszcz
+    },
+  },
+};
+/* zwraca true, jeśli skin domeny sam pomalował kafel */
+function domSkin(v,g,sx,sy,tx,ty,extra){
+  const s=DOM.cur&&SKINY[DOM.cur];
+  if(!s||!s[v])return false;
+  s[v](g,sx,sy,tx,ty,extra);
+  return true;
+}
+/* podkład pod dekoracją: kafle klimatyczne siadają na podłodze/ścianie
+   AKTUALNEJ domeny, dzięki czemu ta sama paproć pasuje i do piwnicy, i do lasu */
+function domMotyw(pole,dom){
+  const cfg=DOMAINS[(DOM&&DOM.cur)||dom||'piwnica']||{};
+  return cfg[pole]!==undefined?cfg[pole]:(pole==='wall'?20:2);
+}
+function domPodkladBase(g,sx,sy,tx,ty,v){
+  R(g,sx,sy,16,16,TCOL[v]||TCOL[0]);
+  const T=TILES[v];
+  if(T&&!T.anim)T.paint(g,sx,sy,tx,ty);
+}
+function domFloorBase(g,sx,sy,tx,ty){domPodkladBase(g,sx,sy,tx,ty,domMotyw('floor'));}
+function domWallBase(g,sx,sy,tx,ty){domPodkladBase(g,sx,sy,tx,ty,domMotyw('wall'));}
+function domZamekPaint(g,sx,sy,tx,ty,col){
+  if(domSkin(48,g,sx,sy,tx,ty,col))return;
+  R(g,sx,sy,16,16,'#2a2440');
+  R(g,sx+1,sy+1,14,14,'#3c3560');
+  R(g,sx,sy,16,1.5,alpha(col,.55));R(g,sx,sy+14.5,16,1.5,'#221d38');
+  /* pionowe pręty kraty — rysunek zależny WYŁĄCZNIE od tx/ty */
+  for(let i=0;i<3;i++)R(g,sx+2.5+i*5,sy+2,2,12,'#4e4680');
+  R(g,sx,sy+7,16,2,alpha(col,.75));                      // rygiel w kolorze klucza
+  /* kłódka co drugi kafel, żeby nie robić z tego tapety */
+  if((tx+ty)%2===0){
+    R(g,sx+6,sy+5.5,4,5,col);
+    R(g,sx+7,sy+3,2,3,'#e8e4f0');
+    R(g,sx+7.4,sy+7,1.2,2,'#2a2440');
+  }
+}
+const TILE_ANIM=new Uint8Array(96);
 for(const k in TILES)if(TILES[k].anim)TILE_ANIM[k]=1;
 
 /* =====================================================================
@@ -7891,7 +10267,7 @@ for(const k in TILES)if(TILES[k].anim)TILE_ANIM[k]=1;
    ===================================================================== */
 const CHUNK=8;                       // kafli na bok kawałka
 const CHUNK_PX=CHUNK*16;             // logicznych pikseli
-const CHUNK_CAP=32;                  // ile kawałków trzymamy w pamięci
+const CHUNK_CAP=40;                  // ile kawałków trzymamy w pamięci
 /* MARGINES. Część kafli maluje POZA swoją kratką — korona drzewa sięga 8 pikseli
    ponad kafel, cień kawałek poniżej. Przy pieczeniu na osobnym canvasie taka
    nadwyżka zostałaby obcięta i drzewa przy krawędzi kawałka traciłyby czubki.
@@ -7904,6 +10280,20 @@ function chunkClear(){chunkCache.clear();}
 /* zmiana pojedynczego kafla (skrypt questa, budowa areny) — wyrzucamy
    tylko ten kawałek, reszta mapy zostaje upieczona */
 function chunkDirty(x,y){chunkCache.delete(((x/CHUNK)|0)+','+((y/CHUNK)|0));}
+/* Kafel zmieniony w LOCIE (zniszczony blok, zapadnięta płyta) potrafi zabrudzić
+   sąsiedni kawałek: kafle malują do 16 px poza swoją kratkę, a część z nich
+   (droga, asfalt, chodnik) rysuje krawędzie wg sąsiada. Brudzimy więc też
+   sąsiadów, ale tylko gdy kafel faktycznie leży na brzegu kawałka. */
+function chunkDirtyAround(x,y,zbior){
+  const del=(cx2,cy2)=>{const k=cx2+','+cy2;if(zbior)zbior.add(k);else chunkCache.delete(k);};
+  const cx2=(x/CHUNK)|0,cy2=(y/CHUNK)|0,mx=x%CHUNK,my=y%CHUNK;
+  del(cx2,cy2);
+  const l=mx===0,r=mx===CHUNK-1,g=my===0,d=my===CHUNK-1;
+  if(l)del(cx2-1,cy2); if(r)del(cx2+1,cy2);
+  if(g)del(cx2,cy2-1); if(d)del(cx2,cy2+1);
+  if(l&&g)del(cx2-1,cy2-1); if(r&&g)del(cx2+1,cy2-1);
+  if(l&&d)del(cx2-1,cy2+1); if(r&&d)del(cx2+1,cy2+1);
+}
 function chunkBake(cxi,cyi){
   const c=document.createElement('canvas');
   c.width=(CHUNK_PX+CHUNK_MG*2)*RES;c.height=(CHUNK_PX+CHUNK_MG*2)*RES;
@@ -7911,8 +10301,13 @@ function chunkBake(cxi,cyi){
   g.imageSmoothingEnabled=false;
   g.setTransform(RES,0,0,RES,CHUNK_MG*RES,CHUNK_MG*RES);
   const tx0=cxi*CHUNK,ty0=cyi*CHUNK;
+  /* POZA MAPĄ `at()` zwraca drzewo (4) — w świecie to sensowne obramowanie lasem,
+     ale w domenie za murem piwnicy wyrastał trawnik z drzewami. Tam brzeg mapy
+     ma być po prostu dalszym ciągiem muru. */
+  const poza=(tx,ty)=>tx<0||ty<0||tx>=MW||ty>=MH;
+  const domena=REG==='arena'&&DOM.cur;
   for(let ty=ty0;ty<ty0+CHUNK;ty++)for(let tx=tx0;tx<tx0+CHUNK;tx++){
-    const v=at(tx,ty),sx=(tx-tx0)*16,sy=(ty-ty0)*16;
+    const v=(domena&&poza(tx,ty))?domMotyw('wall'):at(tx,ty),sx=(tx-tx0)*16,sy=(ty-ty0)*16;
     R(g,sx,sy,16,16,TCOL[v]||TCOL[0]);
     const T=TILES[v];
     if(T&&!T.anim)T.paint(g,sx,sy,tx,ty);
@@ -8051,7 +10446,20 @@ function drawWorld(){
   if(REG!=='arena'){
     for(const[id,dm]of Object.entries(DOMAINS)){
       if(dm.r!==REG)continue;
-      drawPortal(dm.x*16+8-camX,dm.y*16+8-camY,dm.col,'🌀 '+dm.n+' (poz. '+((S.domLvl[id]||0)+1)+')');
+      const otw=domDayOpen(id),mk=matOfDom(id);
+      cx.save();if(!otw)cx.globalAlpha=.45;
+      drawPortal(dm.x*16+8-camX,dm.y*16+8-camY,dm.col,
+        (otw?'🌀 ':'🔒 ')+dm.n+' (poz. '+((S.domLvl[id]||0)+1)+')');
+      /* druga linijka: co tu leci i kiedy — żeby gracz wiedział, po co wracać */
+      const px=dm.x*16+8-camX,py=dm.y*16+8-camY;
+      if(px>-60&&px<W+60&&py>-60&&py<H+60){
+        cx.font='6px "Press Start 2P"';cx.textAlign='center';
+        const t2=(mk?DOM_MATS[mk].ic+' ':'')+(otw?domDayTxt(id):'za '+fmtLeft(domNextOpen(id)));
+        cx.fillStyle='#000';cx.fillText(t2,px+1,py-8);
+        cx.fillStyle=otw?alpha(UI.text,.8):UI.danger;cx.fillText(t2,px,py-9);
+        cx.textAlign='left';
+      }
+      cx.restore();
     }
     for(const[id,b]of Object.entries(BOSSES)){
       if(b.r!==REG||bossOnMap(id))continue;
@@ -8103,8 +10511,11 @@ function drawWorld(){
     }
   }else{
     // arena: wyjście + skrzynia + kryształy domeny (w obławie policji nie ma wyjścia!)
+    drawDomainDeko();      // woda, światło i mrok — najniższa warstwa nad terenem
     if(!POL.on)drawPortal(REGIONS.arena.spawn[0]-camX,REGIONS.arena.spawn[1]-camY,'#8f88b0','WYJŚCIE [E]');
     if(DOM.exit2)drawPortal(DOM.exit2.x-camX,DOM.exit2.y-camY,'#8f88b0','WYJŚCIE [E]');
+    if(DOM.stairs)drawStairs(DOM.stairs.x-camX,DOM.stairs.y-camY,DOM.done);
+    drawDomain();
     if(DOM.chest)drawChest(DOM.chest.x-camX,DOM.chest.y-camY,DOM.chest.open);
     for(const c of DOM.crystals){
       if(c.taken)continue;
@@ -8178,6 +10589,23 @@ function drawWorld(){
     drawCharBody(cx,a.ch,a.x-8-camX,a.y-20-camY,a.dir,a.fr);
     cx.globalAlpha=1;}});
   ents.push({y:P.y,d:()=>drawHero(S.ch,P.x+DV[atkDir][0]*lunge,P.y+DV[atkDir][1]*lunge,P.dir,Math.floor(P.frame)%2,hurtT>0&&hurtT<1.2)});
+  /* BOMBA NIESIONA NAD GŁOWĄ — pulsuje coraz szybciej i pokazuje sekundy,
+     żeby nie dało się o niej zapomnieć w środku walki */
+  if(DOM.cur&&DOM.carry)ents.push({y:P.y+.02,d:()=>{
+    const t=Math.max(0,DOM.carry.t),szyb=t<1.5?16:t<3?9:5;
+    const g=.5+Math.abs(Math.sin(anim*szyb))*.5;
+    const bx=P.x-camX,by=P.y-38-camY+Math.sin(anim*3)*1.2;
+    cx.fillStyle=alpha('#f5a032',.10+g*.18);
+    cx.beginPath();cx.arc(bx,by,11+g*3,0,7);cx.fill();
+    cx.fillStyle=t<1.5&&g>.5?'#6a5a3a':'#20242a';
+    cx.beginPath();cx.arc(bx,by,5.5,0,7);cx.fill();
+    R(cx,bx-.7,by-9,1.4,4,'#3a2a12');
+    cx.fillStyle=g>.5?'#fff7d6':'#f5a032';cx.fillRect(bx-1,by-11,2,2);
+    cx.font='6px "Press Start 2P"';cx.textAlign='center';
+    cx.fillStyle='#000';cx.fillText(t.toFixed(1),bx+1,by-15);
+    cx.fillStyle=t<1.5?'#e04848':'#f5a032';cx.fillText(t.toFixed(1),bx,by-16);
+    cx.textAlign='left';
+  }});
   for(const f of foes)ents.push({y:f.y,d:()=>{
     /* „punch" po trafieniu: chwilowe rozepchnięcie sprite'a */
     const pk=(f.flash>0&&!reduceMotion)?f.flash/.15:0;
@@ -8329,7 +10757,7 @@ function drawWorld(){
     /* pięść robota na czele smugi */
     cx.globalAlpha=Math.min(1,fade+.3);
     const fx2=Math.cos(cur)*(R1-3),fy2=Math.sin(cur)*(R1-3);
-    cx.fillStyle=S.ch==='dych'?'#4a4f66':'#d6d2e6';
+    cx.fillStyle=S.ch==='dych'?DYCH_COL.limb:'#d6d2e6';
     cx.beginPath();cx.arc(fx2,fy2,3.4,0,7);cx.fill();
     cx.fillStyle='#3a3454';cx.beginPath();cx.arc(fx2,fy2,1.7,0,7);cx.fill();
     cx.restore();cx.globalAlpha=1;
@@ -8452,12 +10880,41 @@ function drawWorld(){
   // licznik fal w domenie
   if(REG==='arena'&&DOM.cur){
     cx.font='7px "Press Start 2P"';cx.textAlign='center';
-    const cl=DOM.rooms.filter(r=>r.cleared).length,liv=foes.filter(f=>!f.dead).length;
-    const txt=DOM.done?'✔ ODBIERZ SKRZYNIĘ':liv?('KOMNATA '+cl+'/4 — wrogowie: '+liv):('KOMNATA '+cl+'/4 — idź dalej ➜');
-    cx.fillStyle='#000';cx.fillText(txt,W/2+1,23);
-    cx.fillStyle=DOMAINS[DOM.cur].col;cx.fillText(txt,W/2,22);
-    cx.fillStyle=alpha(UI.text,.6);cx.font='6px "Press Start 2P"';
-    cx.fillText('🌀 '+DOMAINS[DOM.cur].n+' · poziom '+((S.domLvl[DOM.cur]||0)+1),W/2,34);
+    const ile=DOM.rooms.length,cl=DOM.rooms.filter(r=>r.cleared).length;
+    const liv=foes.filter(f=>!f.dead).length,pie=domPietra(DOM.cur),fk=flKind();
+    const txt=DOM.done?(DOM.stairs?'✔ SCHODY WYŻEJ [E]':'✔ ODBIERZ SKRZYNIĘ')
+      :liv?('KOMNATA '+Math.min(ile,cl+1)+'/'+ile+' — wrogowie: '+liv)
+           :('KOMNATA '+Math.min(ile,cl+1)+'/'+ile+' — idź dalej ➜');
+    /* Zaczynamy NIŻEJ niż pasek przycisków HUD — inaczej pierwsza linijka
+       chowa się pod ikonami i nie da się odczytać numeru piętra. */
+    const nag='PIĘTRO '+(DOM.floor+1)+'/'+pie.length+' · '+fk.n;
+    cx.fillStyle='#000';cx.fillText(nag,W/2+1,39);
+    cx.fillStyle=DOMAINS[DOM.cur].col;cx.fillText(nag,W/2,38);
+    cx.font='6px "Press Start 2P"';
+    cx.fillStyle=alpha(UI.text,.75);cx.fillText(txt,W/2,49);
+    cx.fillStyle=alpha(UI.text,.6);
+    cx.fillText('🌀 '+DOMAINS[DOM.cur].n+' · poziom '+((S.domLvl[DOM.cur]||0)+1),W/2,59);
+    /* KLUCZE: co masz w kieszeni i ile kłódek jeszcze stoi */
+    const zamk=DOM.zamki.filter(z=>!z.open);
+    if(zamk.length||Object.values(DOM.mam).some(v=>v>0)){
+      const szt=[];
+      for(const kk of KLUCZE){
+        const mam=DOM.mam[kk.k]||0,jest=zamk.some(z=>z.kolor===kk.k);
+        if(!mam&&!jest)continue;
+        szt.push({ic:mam?kk.ic:'🔒',col:mam?kk.col:alpha(kk.col,.45)});
+      }
+      let px2=W/2-(szt.length*11)/2;
+      for(const it of szt){cx.fillStyle=it.col;cx.fillText(it.ic,px2+5,70);px2+=11;}
+    }
+    /* ZEGAR PIĘTRA — tylko tam, gdzie rodzaj piętra go ma */
+    if(DOM.tLimit>0&&!DOM.done){
+      const u=Math.max(0,DOM.tLeft)/DOM.tLimit,mal=DOM.tLeft<20;
+      const bw=120,bx=W/2-bw/2;
+      cx.fillStyle='rgba(9,7,18,.75)';cx.fillRect(bx-1,65,bw+2,7);
+      cx.fillStyle=mal?'#e04848':DOMAINS[DOM.cur].col;cx.fillRect(bx,66,bw*u,5);
+      cx.fillStyle=mal?'#ffd7d7':alpha(UI.text,.8);
+      cx.fillText('⏱ '+Math.max(0,Math.ceil(DOM.tLeft))+' s',W/2,80);
+    }
     cx.textAlign='left';
   }
   drawQuestArrow();
@@ -8479,7 +10936,9 @@ function drawWorld(){
   /* PRZERYWNIK SUPER-HITU: pełnoekranowa scenka jak burst w Genshinie */
   if(burstCut>0){
     const dych=burstChar==='dych';
-    const mainCol=dych?'#2f6b33':'#f5c542',glowCol=dych?'#7bc950':'#f5c542';
+    /* kolory scenki bierzemy z rejestru postaci — jedno źródło prawdy */
+    const bcf=(CHARS[burstChar]&&CHARS[burstChar].burst)||{};
+    const mainCol=bcf.col||'#f5c542',glowCol=bcf.bar||'#f5c542';
     const k=1-burstCut/burstCut0;
     const a=Math.min(1,k*6,(1-k)*6);   // szybkie wejście i zejście
     cx.fillStyle='rgba(9,7,18,'+(.62*a)+')';cx.fillRect(0,0,W,H);
@@ -8502,8 +10961,9 @@ function drawWorld(){
       cx.save();cx.translate(W/2,H/2+40+drop);
       cx.rotate(rot);cx.scale(4,4);cx.globalAlpha=a;
       drawCharBody(cx,'dych',-8,-24,0,0);
-      /* ciemnozielona butelka po piwie w łapie */
-      cx.save();cx.translate(8.5,-9);cx.rotate(.45+rot*.4);
+      /* ciemnozielona butelka po piwie w łapie (łapa siedzi niżej, bo Dych ma
+         dłuższe ramiona — patrz drawDychBody) */
+      cx.save();cx.translate(5.6,-11);cx.rotate(.45+rot*.4);
       R(cx,-1.5,-6.5,3,8,'#1e4a26');       // korpus
       R(cx,-.7,-10,1.4,4,'#1e4a26');       // szyjka
       R(cx,-.9,-3.2,1.8,2.4,'#d8cf9a');    // etykieta
@@ -10204,4 +12664,5 @@ function frame(ts){
   }
   requestAnimationFrame(loop);
 }
+dmatsBonus();   // dopiero tu, bo potrzebuje rejestrów DOM_MATS i ASC_MAT
 document.fonts.load('8px "Press Start 2P"').finally(()=>requestAnimationFrame(loop));

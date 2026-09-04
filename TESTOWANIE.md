@@ -1,5 +1,97 @@
 # 🧪 Testowanie gry — skróty i przydatne komendy
 
+## 🌀 DOMENY 3.0 (Genshin × Bomberman)
+
+Domena to teraz **5 pięter** ładowanych po kolei (`PRZEDSIONEK → KRATA → KOMNATY →
+ZAPADNIA → SKARBIEC`), razem **10–15 minut**. Wipe drużyny, przekroczony czas
+albo wyjście = **CAŁA domena od nowa** (wyjście pyta drugim `[E]`).
+
+### Plansze są RĘCZNIE RYSOWANE (od v22)
+
+**PIWNICA HEJTERÓW** i **DZIKI LAS** mają po pięć plansz narysowanych znak po znaku
+w `js/mapy.js` — takich samych przy każdym wejściu:
+
+| | PIWNICA HEJTERÓW | DZIKI LAS |
+|---|---|---|
+| 1 | ZALANA PRALNIA — kaskada z pękniętego pionu | SKRAJ LASU — ścieżka, strumień, drogowskaz |
+| 2 | KOTŁOWNIA — beton i dwie kłódki | WYRĄB — karpy, stosy, skrzynki dynamitu |
+| 3 | BIBLIOTEKA PIWNICZNA — regały i sadzawka | STARY BÓR — świerki, mech, kręgi grzybów |
+| 4 | ZAWALONY STROP — przepaść i kruche płyty | JAR — rzeczka na dnie, spróchniałe kładki |
+| 5 | SALA POD KASKADĄ — strażnik | RUINY LEŚNICZÓWKI — mury, sadzawka, strażnik |
+
+Legenda znaków i zasady autorskie: `DODAWANIE-TRESCI.md`.
+Dźwięk domeny jest **syntezowany**: w piwnicy szum kaskady, w lesie dodatkowo
+wiatr w koronach i ptaki (`amb:{wiatr,ptaki}` we wpisie domeny).
+
+Pozostałe pięć domen **nadal się losuje** — do czasu, aż dostaną swoje mapy.
+Opis niżej dotyczy właśnie ich.
+
+Piętro losowane to **LABIRYNT komnat na siatce** (`siatka:[kolumny,rzędy]`) —
+losowe drzewo korytarzy plus kilka pętli, więc wykorzystany jest cały prostokąt
+mapy, a nie jeden korytarz przez środek. Postęp blokują **KLUCZE i KŁÓDKI**:
+klucz podnosisz samym dotknięciem, a kłódka puszcza, gdy podejdziesz do niej
+z właściwym kolorem. Klucz **zawsze** leży w części labiryntu osiągalnej PRZED
+swoją kłódką — i najchętniej w bocznej odnodze, żeby było po co zwiedzać.
+Kłódka, którą dałoby się **obejść** pętlą, jest po zbudowaniu planszy usuwana
+razem ze swoim kluczem (`domZweryfikujZamki`) — udawana bramka wygląda jak
+zepsuta gra. Przy losowaniu odpadało tak ponad **połowa** kłódek.
+
+| Kolor | Kłódka |
+|---|---|
+| 🔑 ZŁOTY | kafel 48 |
+| 🗝️ CZERWONY | kafel 49 |
+| 🔐 NIEBIESKI | kafel 50 |
+
+Na **ZAPADNI** część przepraw prowadzi WYŁĄCZNIE po kruchych płytach — kładka
+zawala się pod stopami, ale odrasta po 7 s, więc nieudana próba kosztuje HP
+i nerwy, nigdy przejścia.
+
+**Co jest na piętrach:**
+
+| Kafel | Co to | Jak to rozwalić |
+|---|---|---|
+| 🟫 skrzynia | sypie 🔩⚙️💎 i jedzeniem | zwykły **CIOS** |
+| 🛢 beczka | detonuje jak bomba, robi łańcuch | cios albo wybuch |
+| 🧱 pustak | – | **TYLKO BOMBA** (cios się odbija) |
+| ⬛ filar | nic go nie ruszy | – |
+| 🕳 przepaść | −12 % HP i cofnięcie na twardy grunt | wroga **wepchniętego** odrzutem zabija |
+| ▨ krucha płyta | zawala się 0,65 s po wejściu, wraca po 7 s | – |
+| 🏭 maszyna bombowa | co 14 s wypluwa bombę | – |
+
+**Bomba:** podchodzisz do maszyny, `[E]` bierze bombę, **lont tyka od podniesienia**
+(5,5 s). Niesiesz ją nad głową, bez sprintu i wolniej; `[E]` upuszcza w miejscu
+(przyciąga do środka kafla). Wybuch to **okrąg**, który rani też Ciebie.
+
+**Kalendarz:** każda domena stoi otworem w **dwa dni tygodnia**, w niedzielę
+otwarte jest wszystko, doba skacze o **4:00 rano** czasu lokalnego.
+
+| Dzień | Otwarte |
+|---|---|
+| PON · CZW | PIWNICA HEJTERÓW (Edek) · SMOCZA JAMA (Zenek) · WESELE W REMIZIE (Grażynka) |
+| WT · PT | DZIKI LAS (Dych) · LODOWA GROTA (Jarek) |
+| ŚR · SOB | ZATOPIONE MOLO (Bogdan) · POLE NAMIOTOWE (Julka) |
+| NIEDZIELA | wszystko |
+
+Każda domena daje **jeden unikalny surowiec**, wymagany przy wzniesieniach
+przypisanej postaci (pierwszy próg to poz. 20, potem 40 i dalej). Nie ma go
+w sklepach ani u bossów — tylko w skrzyni na końcu domeny i w jej kryształach.
+
+**Skróty i komendy (konsola, F12):**
+
+```js
+DOM.mam = {zloty:1, czerwony:1, niebieski:1};   // wszystkie klucze w kieszeni
+DOM.zamki.forEach(z=>{z.open=true; z.cells.forEach(c=>set(c[0],c[1],DOMAINS[DOM.cur].floor));});
+domAlways = 1;              // wszystkie domeny otwarte, bez czekania na dzień
+domOffset = 86400;          // przeskocz o dobę (2*86400 = pojutrze…)
+domDayOpen('las');          // czy DZIKI LAS jest dziś czynny
+fmtLeft(domNextOpen('las'));// ile do otwarcia
+domOtwarteDzis();           // lista domen otwartych w tej dobie
+S.dmats.szlif = 99;         // surowiec wzniesienia Edka
+```
+
+`domAlways` i `domOffset` żyją do odświeżenia strony i nie zapisują się do `wrpg`.
+
+
 **Sterowanie (nowe):** `SHIFT` (trzymany) = SPRINT. Pomarańczowy pasek wytrzymałości
 pokazuje się pod postacią; po wyczerpaniu jest krótka ZADYSZKA. Klawisz można zmienić
 w menu Esc → STEROWANIE.
@@ -48,6 +140,10 @@ Po wejściu zrób **Ctrl+F5**, na ekranie tytułowym pojawi się plakietka
 | `?test=jezioro` | CHODZIEŻ, początek serii „Pływamy z Dych Dzikim" — gadaj z Sąsiadem Mietkiem |
 | `?test=plaza` | CHODZIEŻ, od razu na plaży nad Jeziorem Miejskim (dwa pierwsze zadania zrobione) |
 | `?test=torpeda` | CHODZIEŻ, przy Ratowniku Zbyszku — minigra SZALONY TORPEDA gotowa do odpalenia |
+| `?test=domena` | WARSZAWA, pod portalem PIWNICY HEJTERÓW — ekipa poz. 50, wszystkie domeny otwarte |
+| `?test=wesele` | CHODZIEŻ, pod portalem WESELA W REMIZIE (domena Grażynki) |
+| `?test=las` | CHODZIEŻ, pod portalem DZIKIEGO LASU — ręcznie rysowane plansze, wiatr i ptaki |
+| `?test=domenaboss` | jak `domena`, ale poziom 10 każdej domeny — pełna obsada mini-bossów |
 | `?test=reset` | kasuje zapis (start od zera) |
 
 Skrót nadpisuje zapis raz i dokłada: Dycha do ekipy, poziom 25 postaciom, 500 💎.
@@ -82,7 +178,7 @@ localStorage.setItem('wrpg', JSON.stringify(s)); location.reload();
 Klucze zapisu: `quests`, `col` (znajdźki), `mile` (nagrane miejsca), `dych`, `party`,
 `chars` (poziomy), `dia`, `rolex`, `pity`/`pityW` (gwarancje 5⭐),
 `pity4`/`pity4W` (gwarancje 4⭐), `guar`/`guarW` (50/50 i ścieżka marzeń), `subs`,
-`region`, `px`/`py`, `domLvl`, `bossLvl`.
+`region`, `px`/`py`, `domLvl`, `bossLvl`, `dmats` (unikalne surowce domen).
 
 **Stawki życzeń** (jak w Genshinie, tylko gwarancja ściągnięta na 80.):
 baza 0,6% na postać (broń 0,7%), miękka gwarancja od 65. życzenia (broń: 63.),
@@ -140,12 +236,77 @@ kłamie.
 
 ## Testy automatyczne (bez przeglądarki)
 
-Harness w Node uruchamia `game.js` w `vm` z atrapą DOM/canvas i sprawdza m.in.
-przejezdność map, przebieg minigier i całą obławę policji:
+Harness w Node (`harness.js`) uruchamia `game.js` w `vm` z atrapą DOM/canvas/audio.
+Gra nie wie, że nie ma przeglądarki — rysowanie idzie w próżnię, a test woła jej
+funkcje wprost i sprawdza stan świata.
 
 ```bash
-node /tmp/claude-1000/.../scratchpad/test_trasa.js   # ścieżkę podaje Claude przy uruchomieniu
+node test_domeny.js 120   # 7 domen × 5 pięter × 120 ziaren: przejezdność planszy
+node test_przebieg.js 4   # przejście domeny od wejścia po skrzynię (poziom 4)
+node test_bomba.js        # maszyna → niesienie → upuszczenie → wybuch → łańcuch
+node test_przepasc.js     # spadanie, kruche płyty, zegar piętra
+node test_kalendarz.js    # 7 dni × 4 pory doby × 7 domen + granica 4:00
+node test_surowce.js      # wzniesienia, łup ze skrzyń, migracja starych zapisów
+node test_latajace.js     # latający nie blokują piętra (smycz + wyłamywacz zatoru)
+node test_mapy.js         # RĘCZNE plansze: równe wiersze, przejezdność, kłódki-cięcia
+node podglad_pietra.js piwnica 7 1     # ASCII-podgląd piętra z zaznaczeniem osiągalności
 ```
+
+Co te testy faktycznie wyłapały przy budowie DOMEN 3.0:
+
+- piętro bez walki (PRZEDSIONEK) nigdy się nie kończyło — schody się nie
+  odblokowywały i gracz zostawał na dole **na zawsze**;
+- maszyny bombowe (kafel SOLID) lądowały na spawnie, na schodach i na środkach
+  komnat — start w ścianie i nieosiągalne wyjście;
+- surowce i kryształy rodziły się na wysepkach odciętych przepaścią;
+- droga do ostatniej komnaty potrafiła prowadzić wyłącznie przez kruchą płytę,
+  która zawala się pod stopami;
+- wyrównanie dla starych zapisów nigdy się nie naliczało, bo `DEFAULT_SAVE`
+  dokłada `dmats` przy każdym wczytaniu (warunek trzeba sprawdzać na
+  **wczytanym** obiekcie, nie na scalonym);
+- po wprowadzeniu labiryntu: kładka nad przepaścią kładła się WZDŁUŻ przecięcia
+  zamiast w poprzek (kierunek korytarza zgadywany z położenia komnat zamiast
+  odczytany z mapy), dwie kładki obok siebie rozjeżdżały się o jeden rząd,
+  BFS siatki bezpieczeństwa startował z `rooms[0]` zamiast z komnaty wejściowej,
+  a kłódka potrafiła odciąć komnatę z kluczem **do samej siebie**;
+- kłódka na dziesięć kafli: promień otwierania liczony od jej środka sprawiał,
+  że stojąc przy jej końcu nie dało się jej otworzyć (teraz liczymy do
+  NAJBLIŻSZEGO kafla bariery);
+- **ponad połowa (52 %) losowanych kłódek dawała się obejść** pętlą labiryntu —
+  zamknięta, a wyjście i tak osiągalne dookoła;
+- przy ręcznych mapach: znak `G` (głaz) wpadał w zakres `A`–`H` i za każdą skałą
+  robiła się komnata-widmo w litej ścianie, a BFS kontrolny traktował kłódkę jak
+  ścianę **nawet otwartą**, przez co wszystko za nią zgłaszało się jako
+  nieosiągalne;
+- przy DZIKIM LESIE (wyłapane okiem na zrzutach, nie przez test):
+  hasz rozsypujący detale `(x*7 + y*13) % 7` **nie zależy od `x`** (7x mod 7 = 0),
+  więc mech kładł się całymi rzędami przez pół planszy — teraz idzie przez xorshift;
+  stare kafle świata (staw, pieniek, ognisko) malowały pod sobą `baseCol()`, czyli
+  **trawę regionu**, i przynosiły zielony kwadrat w środek strumienia — od tego jest
+  `podklad()`, który w domenie kładzie JEJ podłogę;
+  wnęka z czerwonym kluczem dotykała rogiem półki ze schodami i całą kłódkę dawało
+  się obejść bokiem (skrypt autorski to złapał, zanim mapa trafiła do gry);
+  kładki nad jarem kładzione PRZED dekoracjami — rozsypany świerk siadał dokładnie
+  na zejściu z kładki i odcinał daleki brzeg.
+
+### Podgląd sylwetki bez odpalania gry
+
+```bash
+node podglad.py     # wycina rysowanie postaci z game.js i robi stronę-podgląd
+```
+
+### Zrzut z prawdziwej gry
+
+`scena.sh` dokleja do kopii `index.html` skrypt ustawiający scenę, rysuje
+**jedną klatkę synchronicznie** (czyli zanim poleci `load`) i zamraża pętlę —
+dzięki temu `--screenshot` łapie gotowy obraz i nie trzeba walczyć z `rAF`:
+
+```bash
+./scena.sh krata "domAlways=1;setRegion('wawa');enterDomain('piwnica');domLoadFloor(1);"
+```
+
+Flatpakowy Chrome **nie zapisze do `/tmp`** — zrzut leci do katalogu gry
+i dopiero potem jest przenoszony.
 
 ## Wypchnięcie zmian na żywo
 

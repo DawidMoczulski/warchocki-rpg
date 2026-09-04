@@ -453,6 +453,12 @@ body.nocursor #hud::after{
 .bStats u{text-decoration:none;color:var(--ok);font-size:8px}
 .bBtns{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
 .bBtns .chbtn{width:auto;flex:1;min-width:88px}
+/* wiersz o unikalnym surowcu domeny (panel WZNIESIENIA i plecak) */
+.matRow{background:linear-gradient(170deg,var(--surface),var(--surface-2-end));
+  border:2px solid var(--line);border-radius:9px;padding:8px 10px;margin:8px 0;
+  font-size:9px;line-height:1.8}
+.matRow small{display:block;color:var(--text-dim);font-size:8px;line-height:1.7}
+.matRow b{font-size:10px}
 .conNode{display:flex;align-items:center;gap:9px;border:2px solid var(--line);border-radius:10px;
   padding:9px 10px;margin-bottom:7px;font-size:9px;line-height:1.7;
   background:linear-gradient(170deg,var(--surface),var(--surface-2-end))}
@@ -481,3 +487,12 @@ body.nocursor #hud::after{
   border-top:2px solid var(--line);padding-top:8px}
 .buildCard b{display:block;font-size:8px;font-weight:400;color:var(--info);letter-spacing:-.2px}
 .buildCard i{display:block;font-style:normal;color:var(--text-dim);margin-top:2px}
+
+/* „DZIŚ OTWARTE” — lista domen dostępnych w bieżącej dobie (panel podróży) */
+.travelDom{background:linear-gradient(170deg,var(--surface),var(--surface-2-end));
+  border:2px solid var(--line);border-radius:11px;padding:10px 11px;margin-bottom:10px}
+.travelDom>b{display:block;color:var(--acc);font-size:10px;margin-bottom:7px;line-height:1.6}
+.travelDom span{display:block;padding:5px 9px;margin-bottom:5px;font-size:9px;line-height:1.7;
+  background:var(--sunk);border-radius:0 7px 7px 0}
+.travelDom span i{display:block;color:var(--text-dim);font-size:8px;font-style:normal}
+.travelDom small{display:block;color:var(--text-dim);font-size:8px;margin-top:6px}
