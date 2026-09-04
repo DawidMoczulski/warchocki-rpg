@@ -234,23 +234,53 @@ wyczyszczenia świata (auta, przechodnie, cząsteczki) i **wyłączenia cache
 przeglądarki** — bez tego strona potrafi wciągnąć stary `game.js` i cały pomiar
 kłamie.
 
-## Testy automatyczne (bez przeglądarki)
+## Testy automatyczne — katalog `testy/`
 
-Harness w Node (`harness.js`) uruchamia `game.js` w `vm` z atrapą DOM/canvas/audio.
-Gra nie wie, że nie ma przeglądarki — rysowanie idzie w próżnię, a test woła jej
-funkcje wprost i sprawdza stan świata.
+**Testy mieszkają w REPO.** Wcześniej pisało się je w katalogu tymczasowym sesji
+i przy budowie DOMEN 3.0 wyłapały mnóstwo błędów — po czym zniknęły razem z tym
+katalogiem, a `TESTOWANIE.md` przez jakiś czas wymieniało komendy do plików,
+których już nie było. Cokolwiek ma przeżyć do jutra, ląduje w `testy/`.
 
 ```bash
-node test_domeny.js 120   # 7 domen × 5 pięter × 120 ziaren: przejezdność planszy
-node test_przebieg.js 4   # przejście domeny od wejścia po skrzynię (poziom 4)
-node test_bomba.js        # maszyna → niesienie → upuszczenie → wybuch → łańcuch
-node test_przepasc.js     # spadanie, kruche płyty, zegar piętra
-node test_kalendarz.js    # 7 dni × 4 pory doby × 7 domen + granica 4:00
-node test_surowce.js      # wzniesienia, łup ze skrzyń, migracja starych zapisów
-node test_latajace.js     # latający nie blokują piętra (smycz + wyłamywacz zatoru)
-node test_mapy.js         # RĘCZNE plansze: równe wiersze, przejezdność, kłódki-cięcia
-node podglad_pietra.js piwnica 7 1     # ASCII-podgląd piętra z zaznaczeniem osiągalności
+./testy/sprawdz.sh test_brama.js      # brama pola: widoczność, przejezdność, patrol
+./testy/sprawdz.sh test_czcionki.js   # polskie znaki: ogonki, kreski, spójność wysokości
+node testy/test_mapy.js               # ręczne plansze domen: format i zdrowy rozsądek
 ```
+
+`sprawdz.sh` uruchamia test **w prawdziwej grze** — wstrzykuje go do kopii
+`index.html`, odpala bezgłowego Chrome i wyciąga wynik z DOM-u. Nie ma atrapy
+canvasu ani audio, więc nie ma też ryzyka, że atrapa rozjedzie się z grą.
+W teście masz do dyspozycji `T(nazwa, fn)`, `ok(warunek, komunikat)` i
+`eq(masz, ma_byc, komunikat)` oraz **wszystkie globalne gry** (`S`, `at`,
+`SOLID`, `setRegion`, `NPCS`, `talkTo`, `cx`…). Kod ruszą po `load`, więc
+zaczynaj od `bootWorld()`.
+
+`test_mapy.js` idzie czystym Node, bo `js/mapy.js` to sam opis plansz —
+nie potrzebuje ani canvasu, ani reszty gry.
+
+**Czego testy NIE złapią:** jakości obrazu. Czy brama wygląda jak brama, czy
+plansza się nie sypie, czy tekst nie wychodzi za ramkę — to się sprawdza
+ZRZUTAMI (patrz niżej). Test powie tylko, że kafel 72 stoi w (38,32).
+
+### Czego pilnuje `test_czcionki.js` (i dlaczego akurat tego)
+
+Press Start 2P **miało** komplet polskich glifów — `document.fonts.check`
+zwracało `true`. A mimo to „PRZEPAŚĆ" wyglądało jak „PRZEPAść", bo akcenty
+i ogonki były wciśnięte w pudełko wersalika: Ą nie miało podrzutu pod linię
+pisma, a kreska nad Ś nie wychodziła ponad wysokość S. **Obecność glifu niczego
+nie dowodzi — trzeba mierzyć, dokąd ten glif sięga.** Test porównuje więc każdą
+polską literę z jej odpowiednikiem bez znaku diakrytycznego.
+
+Drugi próg wziął się z odrzuconych kandydatów na krój:
+
+| Krój | Co było nie tak | Które sprawdzenie to łapie |
+|---|---|---|
+| Press Start 2P | ogonki i kreski wciśnięte w wersalik | podrzut Ą, wysokość Ś vs S |
+| Silkscreen | minuskuły to kapitaliki, ale „ł" i „ć" są prawdziwymi małymi literami — „Naładować" wychodzi jako „NAłADOWAć" | równa wysokość ł vs l, ą vs a |
+| Pixelify Sans | polszczyzna bez zarzutu, ale „5" nie do odróżnienia od „S" — „KRYT 55%" czyta się „KRYT SS%" | **żadne — to widać tylko okiem, na zrzucie z cyframi** |
+
+Morał: krój sprawdza się na tekście **mieszanym** i na **cyfrach**, nie na samych
+wersalikach. Sama próbka „ŻÓŁĆ GĘŚLĄ JAŹŃ" przepuściła dwa złe kroje z trzech.
 
 Co te testy faktycznie wyłapały przy budowie DOMEN 3.0:
 
@@ -297,12 +327,13 @@ node podglad.py     # wycina rysowanie postaci z game.js i robi stronę-podgląd
 
 ### Zrzut z prawdziwej gry
 
-`scena.sh` dokleja do kopii `index.html` skrypt ustawiający scenę, rysuje
+`testy/scena.sh` dokleja do kopii `index.html` skrypt ustawiający scenę, rysuje
 **jedną klatkę synchronicznie** (czyli zanim poleci `load`) i zamraża pętlę —
 dzięki temu `--screenshot` łapie gotowy obraz i nie trzeba walczyć z `rAF`:
 
 ```bash
-./scena.sh krata "domAlways=1;setRegion('wawa');enterDomain('piwnica');domLoadFloor(1);"
+./testy/scena.sh krata 'domAlways=1;setRegion("wawa");enterDomain("piwnica");domLoadFloor(1);'
+./testy/scena.sh brama 'S.quests={dych:2,graty:2,stop1:2,bateria:2,stop2:2,przyczepa:2,policja:1};bootWorld();setRegion("trasa");P.x=608;P.y=488;camX=Math.max(0,P.x-W/2);camY=Math.max(0,P.y-H/2+40);'
 ```
 
 Flatpakowy Chrome **nie zapisze do `/tmp`** — zrzut leci do katalogu gry

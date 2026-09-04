@@ -985,8 +985,15 @@ function buildTrasa(){
      Brama otwiera się dopiero, gdy ekipa dojedzie tu przyczepą (quest „przyczepa"). */
   for(let x=5;x<=53;x++){set(x,32,34);set(x,50,34);}
   for(let y=32;y<=50;y++){set(5,y,34);set(53,y,34);}
-  set(38,32,0);set(39,32,0);                         // światło bramy
-  if(!(typeof S!=='undefined'&&S&&qs('policja')===2)){set(38,32,34);set(39,32,34);}
+  /* BRAMA GŁÓWNA (37–40, 32) — cztery kafle: słupek · skrzydło · skrzydło · słupek.
+     Wcześniej wejście było zwykłą DZIURĄ w barierce i nie dało się go wypatrzeć
+     z drogi. Teraz stoją słupki z banerem „POLAND ROCK", a po skrzydłach widać
+     na pierwszy rzut oka, czy brama puszcza dalej. */
+  const bramaOtw=(typeof S!=='undefined'&&S&&qs('policja')===2);
+  set(37,32,71);set(40,32,71);                       // słupki z banerem nad przejściem
+  set(38,32,bramaOtw?73:72);set(39,32,bramaOtw?73:72);
+  set(38,33,23);set(39,33,23);                       // polna droga wchodzi na pole
+  set(41,29,29);                                     // drogowskaz przy drodze: tędy do bramy
   const tents=[[8,39],[12,44],[17,38],[20,43],[24,40],[28,44],[33,40],[37,43],[41,39],[45,43],
     [7,46],[16,47],[26,47],[36,47],[46,47],[49,39],[10,42],[31,38],[44,36],[19,35]];
   for(const[t0,t1]of tents)set(t0,t1,32);
@@ -1088,6 +1095,7 @@ PITF[44]=1;PITF[70]=1;              // 70 = dno rozpadliny z wodą (też się w 
 [51,53,55,56,58].forEach(v=>{SOLIDF[v]=1;});  // wodospad, regał, głaz, lampa, rury
 SOLIDF[60]=1;                                 // MUR PIWNICY (60) i POSADZKA (61)
 [62,63,65,66,67,68].forEach(v=>{SOLIDF[v]=1;});  // las: klon, świerk, ruina, stos drewna, szałas, gęstwina
+[71,72].forEach(v=>{SOLIDF[v]=1;});  // BRAMA POLA: słupek i ZAMKNIĘTE skrzydło (73 = otwarte przejście, przechodzi się)
 /* MECH (64) i ŚCIÓŁKA (69) są deptalne — to podłoga DZIKIEGO LASU */
 const ZAMEK={48:'zloty',49:'czerwony',50:'niebieski'};
 const jestZamek=v=>!!ZAMEK[v];
@@ -1169,6 +1177,13 @@ const NPCS=[
   {r:'trasa',id:'stopowiczka',n:'Autostopowiczka Ola',x:33*16,y:25*16,c:'#3a7a5a',hair:'#8a5a2a'},
   {r:'trasa',id:'kamperowiec',n:'Pan Mirek z kamperem',x:47*16,y:26*16,c:'#4a6a9a',hair:'#aaa'},
   {r:'trasa',id:'ochroniarz_bramy',n:'Ochroniarz z bramy',x:36*16,y:31*16,c:'#2a2a3a',hair:'#111'},
+  /* PATROL PRZY BRAMKACH — stoi tam tylko wtedy, kiedy ma stać: od chwili, gdy
+     ekipa dojedzie przyczepą, do końca obławy. Ochroniarz mówi „niech pan z nimi
+     pogada", więc ci, z którymi ma pogadać, muszą być WIDOCZNI przy bramie. */
+  {r:'trasa',id:'policjant_bramy',n:'Policjant',x:41.5*16,y:30*16,c:'#1e2a52',hair:'#2a2a2a',
+    when:()=>qs('przyczepa')===2&&qs('policja')!==2},
+  {r:'trasa',id:'policjantka_bramy',n:'Policjantka',x:43.5*16,y:31*16,c:'#2a3a68',hair:'#7a4a24',
+    when:()=>qs('przyczepa')===2&&qs('policja')!==2},
 ];
 
 /* ---------------- STAN ---------------- */
@@ -1231,6 +1246,13 @@ const diaDrop=n=>n>0?Math.max(1,Math.round(n*DIA_DROP)):0;
 /* ogrodzone pole festiwalowe na TRASIE: żadnych proceduralnych drzew/stawów w środku
    ani na płocie — inaczej generator zarasta pole i wycina dziury w ogrodzeniu */
 function insideFest(tx,ty){return REG==='trasa'&&tx>=4&&tx<=54&&ty>=31&&ty<=51;}
+/* insideFest to prostokąt HOJNY — jego zadaniem jest trzymać dziką roślinność
+   z dala od pola i od płotu, więc zahacza o wiersz przed ogrodzeniem. Do pytania
+   „czy gracz stoi NA POLU" jest przez to za szeroki: obejmuje polną drogę PRZED
+   bramą (y=31). Gracz, który zapisał się pod bramą, po wczytaniu dostawał teleport
+   na start i komunikat, że brama jest zamknięta. Płot stoi w y=32, więc pole
+   zaczyna się dopiero od 33. */
+function naPolu(tx,ty){return REG==='trasa'&&tx>=6&&tx<=52&&ty>=33&&ty<=49;}
 const hash3=(tx,ty,s)=>{let x=(((tx+7)*73856093)^((ty+13)*19349663)^(s*83492791))>>>0;return((x^(x>>>13))>>>0)/4294967296;};
 function wildFill(cfg){
   const base=baseTile(),prot=protectedPts(cfg);
@@ -1302,7 +1324,10 @@ function carvePath(x0,y0,x1,y1,w,tile){
        13 = PŁOT: ogrodzenie stawia się z rozmysłem (płot pasieki jest MUREM areny
        HORDY) — bez tego siatka bezpieczeństwa robiła w nim dziury jak w serze. */
     const v=at(tx,ty);
-    if(v===1||v===2||v===3||v===5||v===6||v===9||v===13||v===32||v===33||v===34)continue;
+    /* 71–73 = BRAMA POLA: słupki, skrzydła i samo przejście. Bez nich siatka
+       przekopywała ścieżkę przez baner i brama znikała z mapy. */
+    if(v===1||v===2||v===3||v===5||v===6||v===9||v===13||v===32||v===33||v===34
+       ||v===71||v===72||v===73)continue;
     if(v!==tile)set(tx,ty,tile);}};
   while((x!==x1||y!==y1)&&g++<2000){stamp(x,y);
     if(Math.abs(x1-x)>=Math.abs(y1-y))x+=Math.sign(x1-x);else y+=Math.sign(y1-y);}
@@ -4587,7 +4612,7 @@ function drawDomain(){
       cx.fillStyle='#7bc950';cx.fillRect(sx+4,sy+1,2,2);
     }else{
       cx.fillStyle='#e04848';cx.fillRect(sx+4,sy+1,2,2);
-      cx.font='6px "Press Start 2P"';cx.textAlign='center';
+      cx.font='6px "Jersey 25"';cx.textAlign='center';
       cx.fillStyle=alpha(UI.text,.7);cx.fillText(Math.ceil(m.t)+'',sx,sy-10);
       cx.textAlign='left';
     }
@@ -4633,7 +4658,7 @@ function drawDomain(){
     const g=.6+Math.abs(Math.sin(anim*(mam?5:2)))*.4;
     cx.fillStyle=alpha(kc.col,.10*g);
     cx.beginPath();cx.arc(sx,sy,20,0,7);cx.fill();
-    cx.font='7px "Press Start 2P"';cx.textAlign='center';
+    cx.font='7px "Jersey 25"';cx.textAlign='center';
     cx.fillStyle='#000';cx.fillText(mam?kc.ic:'🔒',sx+1,sy-13);
     cx.fillStyle=kc.col;cx.fillText(mam?kc.ic:'🔒',sx,sy-14);
     cx.textAlign='left';
@@ -5117,7 +5142,7 @@ function polDefeat(){
 }
 function drawPoliceHUD(){
   const total=POL_WAVES.length;
-  cx.font='7px "Press Start 2P"';cx.textAlign='center';
+  cx.font='7px "Jersey 25"';cx.textAlign='center';
   if(POL.cuffs>0){
     const done=POL_CUFFS-POL.cuffs;
     R(cx,W/2-70,34,140,10,'#2a2440');
@@ -5132,7 +5157,7 @@ function drawPoliceHUD(){
   }
   if(POL.msgT>0){
     cx.globalAlpha=Math.min(1,POL.msgT);
-    cx.font='8px "Press Start 2P"';cx.fillStyle='#000';cx.fillText(POL.msg,W/2+1,53);
+    cx.font='8px "Jersey 25"';cx.fillStyle='#000';cx.fillText(POL.msg,W/2+1,53);
     cx.fillStyle='#ece9f4';cx.fillText(POL.msg,W/2,52);cx.globalAlpha=1;
   }
   /* migający kogut po bokach ekranu */
@@ -6320,7 +6345,7 @@ function drawBuildStage(dt){
   /* podpowiedź, że postać zaraz coś pokaże */
   if(!sh&&buildIdle>2.4){
     g.globalAlpha=.35+Math.sin(buildT*5)*.2;
-    g.font='7px "Press Start 2P"';g.fillStyle='#8f88b0';g.textAlign='center';
+    g.font='7px "Jersey 25"';g.fillStyle='#8f88b0';g.textAlign='center';
     g.fillText('...',cv.width/2,18);g.globalAlpha=1;g.textAlign='left';
   }
 }
@@ -6491,12 +6516,12 @@ function togglePause(){
 function drawPauseOverlay(){
   cx.fillStyle=alpha(UI.bg0,.72);cx.fillRect(0,0,W,H);
   cx.textAlign='center';
-  cx.font='18px "Press Start 2P"';
+  cx.font='18px "Jersey 25"';
   cx.fillStyle='#000';cx.fillText('⏸ PAUZA',W/2+2,H/2-6);
   cx.fillStyle=UI.acc;cx.fillText('⏸ PAUZA',W/2,H/2-8);
-  cx.font='8px "Press Start 2P"';cx.fillStyle=UI.textDim;
+  cx.font='8px "Jersey 25"';cx.fillStyle=UI.textDim;
   cx.fillText('Edek czeka... [P] = gramy dalej',W/2,H/2+18);
-  if(Math.floor(anim)%2===0){cx.font='7px "Press Start 2P"';cx.fillStyle=UI.info;
+  if(Math.floor(anim)%2===0){cx.font='7px "Jersey 25"';cx.fillStyle=UI.info;
     cx.fillText('☕ przerwa na Picie Edwarda',W/2,H/2+38);}
   cx.textAlign='left';
 }
@@ -6821,7 +6846,7 @@ function findPrompt(){
       if(Math.hypot(P.x-(k.x+4),P.y-(k.y+4))<26){prompt={kid:k,label:'🥤 Daj Multiwitaminę'};break;}
     }
   }
-  if(!prompt)for(const n of NPCS){if(n.r===REG&&Math.hypot(P.x-n.x,P.y-n.y)<26){prompt={npc:n,label:n.n};break;}}
+  if(!prompt)for(const n of NPCS){if(n.r===REG&&(!n.when||n.when())&&Math.hypot(P.x-n.x,P.y-n.y)<26){prompt={npc:n,label:n.n};break;}}
   if(!prompt)for(const d of DOORS){if(d.r===REG&&Math.hypot(P.x-(d.x*16+8),P.y-(d.y*16+8))<26){prompt={door:d,label:d.n};break;}}
   if(!prompt&&REG!=='arena'){
     for(const[id,dm]of Object.entries(DOMAINS)){
@@ -7340,6 +7365,13 @@ function talkTo(n){
       ]);
       else say([L(n.n,'Opaska na ręce, panie Edwardzie — brama stoi otworem! Scena po prawej, food truck przy namiotach.'),
         L('Edek','Ale jazda! I widzicie ludziska — udało się. Kierunek Poland Rock Festival!','c_alejazda')]);
+      break;
+    /* PATROL PRZY BRAMKACH — zagadanie odpala finał serii. Do tej pory dało się
+       go uruchomić WYŁĄCZNIE podejściem pod bramę, więc gracz, który nie wiedział,
+       gdzie ta brama jest, nie miał czego kliknąć. */
+    case 'policjant_bramy':
+    case 'policjantka_bramy':
+      startPoliceEpisode();
       break;
     case 'kamperowiec':
       if(qs('stop2')!==2)say([L(n.n,'Kamper zatankowany, przyczepa spięta. Jak was zobaczę na trasie, to pomyślę.')]);
@@ -8016,7 +8048,7 @@ function drawPortal(px,py,col,label){
   cx.globalAlpha=1;
   cx.fillStyle='#0e0c1c';cx.beginPath();cx.arc(0,0,3.4,0,7);cx.fill();
   cx.restore();
-  cx.font='6px "Press Start 2P"';cx.textAlign='center';
+  cx.font='6px "Jersey 25"';cx.textAlign='center';
   cx.fillStyle='#000';cx.fillText(label,px+1,py-17);
   cx.fillStyle=col;cx.fillText(label,px,py-18);cx.textAlign='left';
 }
@@ -8048,7 +8080,7 @@ function drawStairs(sx,sy,gotowe){
     R(cx,-w/2,2-i*4,w,1,gotowe?alpha(col,.9):'#3a3454');
   }
   if(gotowe){
-    cx.font='6px "Press Start 2P"';cx.textAlign='center';
+    cx.font='6px "Jersey 25"';cx.textAlign='center';
     cx.fillStyle='#000';cx.fillText('WYŻEJ [E]',1,-15);
     cx.fillStyle=col;cx.fillText('WYŻEJ [E]',0,-16);
     cx.textAlign='left';
@@ -8328,7 +8360,7 @@ function drawFoeExtras(f,sx,sy){
   // pasek HP + aura żywiołu (elity: szerszy pasek + nazwa)
   const isElite=FOE_TYPES[f.t]&&FOE_TYPES[f.t].elite;
   if(isElite&&!f.sub){
-    cx.font='5px "Press Start 2P"';cx.textAlign='center';
+    cx.font='5px "Jersey 25"';cx.textAlign='center';
     cx.fillStyle='#000';cx.fillText(FOE_TYPES[f.t].en,sx+9,sy-11);
     cx.fillStyle='#f5c542';cx.fillText(FOE_TYPES[f.t].en,sx+8,sy-12);
     cx.textAlign='left';
@@ -8566,7 +8598,7 @@ function drawFoePrewencja(f,sx,sy,b){
   rr(cx,shx,sy+2+b,7,17,2,'#2f3a66');
   R(cx,shx+.8,sy+3+b,5.4,15,'#43507f');
   R(cx,shx+1.4,sy+8+b,4.2,1.6,'#f5f0a0');
-  cx.font='4px "Press Start 2P"';cx.fillStyle='#ece9f4';
+  cx.font='4px "Jersey 25"';cx.fillStyle='#ece9f4';
   cx.save();cx.translate(shx+3.4,sy+13+b);cx.rotate(-1.57);cx.textAlign='center';
   cx.fillText('POLICJA',0,1.4);cx.restore();cx.textAlign='left';
 }
@@ -8851,7 +8883,7 @@ function drawNPC(c,n,sx,sy){
     const q=Object.entries(QUESTS).find(([id,qq])=>qq.giver===n.id);
     const avail=q&&qs(q[0])===0,active=q&&qs(q[0])===1;
     if((avail||active)&&Math.floor(anim*2)%2===0){
-      c.font='8px "Press Start 2P"';c.fillStyle=avail?'#f5c542':'#6fd8e8';
+      c.font='8px "Jersey 25"';c.fillStyle=avail?'#f5c542':'#6fd8e8';
       c.fillText(avail?'!':'…',sx+6,sy-11);   // Dych jest wysoki — znacznik nad czapką
     }
     return;
@@ -8869,7 +8901,7 @@ function drawNPCHuman(c,n,sx,sy){
   const q=Object.entries(QUESTS).find(([id,qq])=>qq.giver===n.id);
   const avail=q&&qs(q[0])===0,active=q&&qs(q[0])===1;
   if((avail||active||(n.id==='spawacz'&&S.trip===1))&&Math.floor(anim*2)%2===0){
-    c.font='8px "Press Start 2P"';c.fillStyle=avail?'#f5c542':'#6fd8e8';
+    c.font='8px "Jersey 25"';c.fillStyle=avail?'#f5c542':'#6fd8e8';
     c.fillText(avail?'!':'…',sx+6,sy-6);
   }
 }
@@ -8907,7 +8939,7 @@ function drawKid(k,sx,sy){
     cx.fillStyle='#fff7f2';cx.beginPath();cx.arc(bx,by,3,-.6,.9);cx.fill();
   }
   if(k.want&&Math.floor(anim*2)%2===0){                                    // „chce napój!”
-    cx.font='7px "Press Start 2P"';cx.textAlign='center';
+    cx.font='7px "Jersey 25"';cx.textAlign='center';
     cx.fillStyle='#000';cx.fillText('!',sx+4,sy-7);
     cx.fillStyle='#f5c542';cx.fillText('!',sx+3.5,sy-7.5);cx.textAlign='left';
   }
@@ -8937,7 +8969,7 @@ function drawSelfieGirl(sx,sy){
   R(cx,sx+4,sy+3+bob,1.5,1.5,'#222');R(cx,sx+7,sy+3+bob,1.5,1.5,'#222');
   R(cx,sx+11,sy-4+bob,4,7,'#1a1a24');R(cx,sx+11.8,sy-3.2+bob,2.4,5,'#6fd8e8');
   if(selfie&&selfie.st==='wait'&&Math.floor(anim*2)%2===0){
-    cx.font='8px "Press Start 2P"';cx.fillStyle='#e88ac8';cx.fillText('!',sx+4,sy-8);
+    cx.font='8px "Jersey 25"';cx.fillStyle='#e88ac8';cx.fillText('!',sx+4,sy-8);
   }
 }
 function drawBoarTop(c,b,sx,sy){
@@ -9023,7 +9055,7 @@ function drawSkillOrb(ox,oy,r,fill,col,icon,ready,key,subtxt){
     cx.restore();
   }
   /* mały licznik (sekundy cd / % energii) + klawisz pod spodem */
-  cx.font='5px "Press Start 2P"';cx.textAlign='center';
+  cx.font='5px "Jersey 25"';cx.textAlign='center';
   if(!ready&&subtxt){cx.fillStyle='#000';cx.fillText(subtxt,ox+1,oy+r*.62+1);
     cx.fillStyle='#fff';cx.fillText(subtxt,ox,oy+r*.62);}
   cx.fillStyle=ready?UI.accLite:alpha(UI.text,.55);
@@ -9320,7 +9352,9 @@ const MAPCOL={0:'#2f6b3a',1:'#b39a68',2:'#454552',3:'#2f6db0',4:'#173a20',5:'#9a
   7:'#3a7a46',8:'#dcc888',9:'#8a6a42',16:'#7a7a8c',17:'#e8eef8',
   18:'#3a7a44',30:'#1f4a24',19:'#2a5a2e',20:'#7a7a8c',21:'#4a7050',22:'#a02c44',23:'#8a6746',
   24:'#2f6db0',25:'#4a7a3a',26:'#5a4028',27:'#e0662a',28:'#4a9a52',29:'#c8a86a',31:'#357a3e',
-  32:'#e04848',33:'#1a1a24',34:'#b0b0be',35:'#3a7ad0',36:'#d84848',37:'#9a9aa4'};
+  32:'#e04848',33:'#1a1a24',34:'#b0b0be',35:'#3a7ad0',36:'#d84848',37:'#9a9aa4',
+  /* BRAMA POLA — na minimapie ma się rzucać w oczy, bo to cel wędrówki */
+  71:'#f5c542',72:'#d02828',73:'#7bc950'};
 const mapColor=v=>MAPCOL[v]||(v>=10&&v<=15?'#6a6a80':'#2f6b3a');
 function drawMapOverlay(){
   cx.fillStyle='rgba(9,7,18,.93)';cx.fillRect(0,0,W,H);
@@ -9337,7 +9371,7 @@ function drawMapOverlay(){
   // znaczniki: domeny (🌀) i bossowie (⚔) oraz wejście do areny
   const mark=(tx,ty,col,txt)=>{const px=ox+tx*s,py=oy+ty*s;
     cx.fillStyle=col;cx.beginPath();cx.arc(px,py,2.6,0,7);cx.fill();
-    if(txt){cx.font='6px "Press Start 2P"';cx.fillStyle=col;cx.textAlign='center';cx.fillText(txt,px,py-4);cx.textAlign='left';}};
+    if(txt){cx.font='6px "Jersey 25"';cx.fillStyle=col;cx.textAlign='center';cx.fillText(txt,px,py-4);cx.textAlign='left';}};
   for(const[id,dm]of Object.entries(DOMAINS))if(dm.r===REG)mark(dm.x,dm.y,'#b98cf0','🌀');
   for(const[id,b]of Object.entries(BOSSES))if(b.r===REG&&!bossOnMap(id))mark(b.x,b.y,'#e04848','⚔');
   for(const d of DOORS)if(d.r===REG)mark(d.x,d.y,'rgba(245,197,66,.7)','');
@@ -9348,10 +9382,10 @@ function drawMapOverlay(){
   cx.fillStyle='#2f7fe0';cx.beginPath();cx.arc(px,py,pr,0,7);cx.fill();
   cx.fillStyle='#bfe0ff';cx.beginPath();cx.arc(px,py,1.6,0,7);cx.fill();
   // nagłówek + legenda
-  cx.font='11px "Press Start 2P"';cx.textAlign='center';
+  cx.font='11px "Jersey 25"';cx.textAlign='center';
   cx.fillStyle='#000';cx.fillText('🗺 '+REGIONS[REG].n,W/2+1,21);
   cx.fillStyle='#f5c542';cx.fillText('🗺 '+REGIONS[REG].n,W/2,20);
-  cx.font='6px "Press Start 2P"';cx.fillStyle='#8f88b0';
+  cx.font='6px "Jersey 25"';cx.fillStyle='#8f88b0';
   cx.fillText('🔵 Ty   ⚔ boss   🌀 domena      [M] / dotknij — zamknij',W/2,H-8);
   cx.textAlign='left';
 }
@@ -9369,7 +9403,9 @@ const TCOL={0:'#2e5a34',1:'#a08a5a',2:'#3a3a48',7:'#2e5a34',8:'#d8c084',9:'#8a6a
   57:'#4a4458',58:'#4a4450',59:'#2a2636',60:'#3a3448',61:'#4a4658',
   /* kafle leśne */
   62:'#c8562a',63:'#12301c',64:'#2c4a30',65:'#6b675e',66:'#7a5a36',67:'#6e5030',
-  68:'#0e2214',69:'#55522f',70:'#12181a'};
+  68:'#0e2214',69:'#55522f',70:'#12181a',
+  /* brama pola festiwalowego */
+  71:'#2e5a34',72:'#2e5a34',73:'#7a5636'};
 /* podłoże pod asset (trawa/piasek/śnieg wg regionu) — spójne tło dekoracji */
 function baseTile(){return REG==='morze'?8:REG==='tatry'?17:0;}
 /* PODKŁAD POD ASSETEM ŚWIATA. Poza domeną to trawa/piach/śnieg regionu, ale
@@ -9678,7 +9714,7 @@ const TILES={
       if(tron){                                                     // korona + napis
         R(g,sx+5,sy-6,6,3,'#f5c542');
         for(let i=0;i<3;i++)R(g,sx+5+i*2.4,sy-8,1.6,2.4,'#f5c542');
-        g.font='4px "Press Start 2P"';g.fillStyle='#fff7d6';g.textAlign='center';
+        g.font='4px "Jersey 25"';g.fillStyle='#fff7d6';g.textAlign='center';
         g.fillText('WC TRON',sx+8,sy+11);g.textAlign='left';
         if(!reduceMotion&&Math.floor(anim*3)%2===0)R(g,sx+13,sy-5,2,2,'#fff7d6');
       }
@@ -10112,7 +10148,65 @@ const TILES={
       if((tx*5+ty*3)%3===0)R(g,sx+2,sy+g0+3,3,1,'#7fb6cc');
       if((tx*11+ty*7)%5===0)R(g,sx+9,sy+g0+2.4,2,2,'#3a4038');    // kamień w nurcie
   }},
+  /* ------------------------------------------------------------------
+     BRAMA POLA FESTIWALOWEGO (71–73) — cztery kafle w rzędzie:
+     słupek (71) · skrzydło (72 zamknięte / 73 otwarte) · skrzydło · słupek.
+     Przed v23 wejście było DZIURĄ w płocie: dwa kafle zwykłej barierki,
+     nie do odróżnienia od reszty ogrodzenia. Gracz szedł polną drogą,
+     dochodził do jednolitej barierki i nie miał pojęcia, że stoi w bramie.
+     Teraz brama ma słupki, baner nad głową i skrzydła, po których widać,
+     czy puszcza dalej.
+     UWAGA: baner KAŻDY kafel rysuje sam, swój własny 16-pikselowy wycinek.
+     Kuszące jest rozciągnięcie go z jednego kafla na sąsiadów, ale teren
+     jest pieczony na kawałki i malowany po kolei — sąsiad zamalowałby to,
+     co wystaje, a na styku kawałków obraz zostałby przycięty.
+     ------------------------------------------------------------------ */
+  71:{paint(g,sx,sy,tx,ty){// SŁUPEK BRAMY
+      podklad(g,sx,sy,tx,ty);
+      bramaBaner(g,sx,sy,'');
+      g.fillStyle='rgba(0,0,0,.28)';g.beginPath();g.ellipse(sx+8,sy+14,6,2.4,0,0,7);g.fill();
+      rr(g,sx+4,sy-13,8,27,1.5,'#3a3a48');                         // słup — sięga POD baner
+      R(g,sx+5,sy-13,2,27,'#4e4e5e');R(g,sx+9,sy-13,2,27,'#2a2a34');
+      R(g,sx+3,sy+11,10,3,'#5c5c6e');                              // stopa betonowa
+      R(g,sx+3,sy-13,10,2.4,'#2a2a34');                            // okucie pod banerem
+      if(!reduceMotion&&Math.floor(anim*2)%2===0)R(g,sx+6,sy-9,4,3,'#f5c542'); // lampka
+  }},
+  72:{paint(g,sx,sy,tx,ty){// SKRZYDŁO BRAMY — ZAMKNIĘTE (kraty + kłódka)
+      podklad(g,sx,sy,tx,ty);
+      bramaBaner(g,sx,sy,at(tx-1,ty)===71?'POLAND':'ROCK');
+      R(g,sx,sy+2,16,12,'#2e2e3a');                                // rama skrzydła
+      R(g,sx,sy+2,16,1.6,'#5c5c6e');R(g,sx,sy+12.4,16,1.6,'#1a1a24');
+      for(let i=0;i<4;i++)R(g,sx+1.6+i*4,sy+3.6,1.6,8.8,'#4e4e5e'); // pręty
+      /* pas ostrzegawczy — ten sam język co szlaban policji (kafel 36) */
+      for(let i=0;i<4;i++)R(g,sx+i*4,sy+9.4,4,2.4,i%2?'#ece9f4':'#d02828');
+      if(at(tx-1,ty)===72){R(g,sx-2,sy+5,4,5,'#f5c542');R(g,sx-1,sy+6,2,3,'#8a6a1e');} // kłódka na styku skrzydeł
+  }},
+  73:{paint(g,sx,sy,tx,ty){// BRAMA OTWARTA — skrzydła odchylone, przejście wolne
+      R(g,sx,sy,16,16,'#7a5636');                                  // udeptane przejście
+      R(g,sx+((tx*7+ty*5)%9),sy+3,3,1.4,'#8f6a44');
+      R(g,sx+((tx*5+ty*3)%10),sy+10,4,1.2,'#66492e');
+      bramaBaner(g,sx,sy,at(tx-1,ty)===71?'POLAND':'ROCK');
+      /* skrzydło odchylone NA BOK, wzdłuż płotu — widać, że wejście jest wolne */
+      const lewe=(at(tx-1,ty)===71);
+      const bx=lewe?sx:sx+12;
+      R(g,bx,sy+1,4,13,'#2e2e3a');R(g,bx,sy+1,4,1.4,'#5c5c6e');
+      for(let i=0;i<3;i++)R(g,bx+1,sy+3+i*3.4,2,2.2,'#4e4e5e');
+      if(!reduceMotion&&Math.floor(anim*2)%2===0)R(g,lewe?sx+6:sx+8,sy-1,2,2,'#7bc950'); // zielone światło
+  }},
 };
+/* Baner „POLAND ROCK" rozpięty nad bramą pola. Wywołuje go każdy z czterech
+   kafli bramy dla SWOJEGO wycinka; `napis` to fragment tekstu do wypisania
+   w tym kaflu (słupki nie piszą nic). Kegel 3 px wygląda na mikroskopijny,
+   ale scena renderuje się w RES=3, więc na ekranie to 9 px. */
+function bramaBaner(g,sx,sy,napis){
+  R(g,sx,sy-19,16,7,'#7a1f2e');                 // płótno
+  R(g,sx,sy-19,16,1.2,'#a8394a');               // światło od góry
+  R(g,sx,sy-13.4,16,1.2,'#4e1220');             // cień od dołu
+  if(!napis)return;
+  g.font='3px "Jersey 25"';g.fillStyle='#fff7d6';g.textAlign='center';
+  g.fillText(napis,sx+8,sy-14.4);
+  g.textAlign='left';
+}
 /* =====================================================================
    SKINY KAFLI — ta sama MECHANIKA, inny WYGLĄD w każdej domenie
    ---------------------------------------------------------------------
@@ -10453,7 +10547,7 @@ function drawWorld(){
       /* druga linijka: co tu leci i kiedy — żeby gracz wiedział, po co wracać */
       const px=dm.x*16+8-camX,py=dm.y*16+8-camY;
       if(px>-60&&px<W+60&&py>-60&&py<H+60){
-        cx.font='6px "Press Start 2P"';cx.textAlign='center';
+        cx.font='6px "Jersey 25"';cx.textAlign='center';
         const t2=(mk?DOM_MATS[mk].ic+' ':'')+(otw?domDayTxt(id):'za '+fmtLeft(domNextOpen(id)));
         cx.fillStyle='#000';cx.fillText(t2,px+1,py-8);
         cx.fillStyle=otw?alpha(UI.text,.8):UI.danger;cx.fillText(t2,px,py-9);
@@ -10466,15 +10560,15 @@ function drawWorld(){
       const sx=b.x*16+8-camX,sy=b.y*16+8-camY;
       if(sx<-40||sx>W+40||sy<-40||sy>H+40)continue;
       if(bossCdT[id]>0){
-        cx.font='6px "Press Start 2P"';cx.textAlign='center';cx.fillStyle='rgba(236,233,244,.4)';
+        cx.font='6px "Jersey 25"';cx.textAlign='center';cx.fillStyle='rgba(236,233,244,.4)';
         cx.fillText('⚔ wraca za '+Math.ceil(bossCdT[id])+'s',sx,sy);cx.textAlign='left';
       }else{
         const pulse=1+Math.sin(anim*4)*.12;
         cx.save();cx.translate(sx,sy);cx.scale(pulse,pulse);
-        cx.font='14px "Press Start 2P"';cx.textAlign='center';
+        cx.font='14px "Jersey 25"';cx.textAlign='center';
         cx.fillStyle='#000';cx.fillText('⚔',1,1);cx.fillStyle='#e04848';cx.fillText('⚔',0,0);
         cx.restore();
-        cx.font='6px "Press Start 2P"';cx.textAlign='center';cx.fillStyle='rgba(224,72,72,.95)';
+        cx.font='6px "Jersey 25"';cx.textAlign='center';cx.fillStyle='rgba(224,72,72,.95)';
         cx.fillText('BOSS: '+b.n,sx,sy-16);cx.textAlign='left';
       }
     }
@@ -10487,7 +10581,7 @@ function drawWorld(){
         if(sx>-60&&sx<W+60&&sy>-40&&sy<H+40){
           const p=1+Math.sin(anim*4)*.1,lab=AR.label||'⚔ ARENA →';
           cx.save();cx.translate(sx,sy-6);cx.scale(p,p);
-          cx.font='7px "Press Start 2P"';cx.textAlign='center';
+          cx.font='7px "Jersey 25"';cx.textAlign='center';
           cx.fillStyle='#000';cx.fillText(lab,1,1);
           cx.fillStyle='#f5c542';cx.fillText(lab,0,0);
           cx.restore();cx.textAlign='left';
@@ -10503,7 +10597,7 @@ function drawWorld(){
           cx.fillStyle='rgba(20,10,20,.5)';cx.beginPath();cx.arc(0,0,13,0,7);cx.fill();
           cx.save();cx.rotate(ang);cx.fillStyle='#e04848';
           cx.beginPath();cx.moveTo(9,0);cx.lineTo(-4,-6);cx.lineTo(-4,6);cx.closePath();cx.fill();cx.restore();
-          cx.font='6px "Press Start 2P"';cx.textAlign='center';
+          cx.font='6px "Jersey 25"';cx.textAlign='center';
           cx.fillStyle='#000';cx.fillText('⚔ ARENA',1,20);cx.fillStyle='#f5c542';cx.fillText('⚔ ARENA',0,19);
           cx.restore();cx.textAlign='left';
         }
@@ -10601,7 +10695,7 @@ function drawWorld(){
     cx.beginPath();cx.arc(bx,by,5.5,0,7);cx.fill();
     R(cx,bx-.7,by-9,1.4,4,'#3a2a12');
     cx.fillStyle=g>.5?'#fff7d6':'#f5a032';cx.fillRect(bx-1,by-11,2,2);
-    cx.font='6px "Press Start 2P"';cx.textAlign='center';
+    cx.font='6px "Jersey 25"';cx.textAlign='center';
     cx.fillStyle='#000';cx.fillText(t.toFixed(1),bx+1,by-15);
     cx.fillStyle=t<1.5?'#e04848':'#f5a032';cx.fillText(t.toFixed(1),bx,by-16);
     cx.textAlign='left';
@@ -10615,7 +10709,7 @@ function drawWorld(){
     f.boss?drawBoss(f,f.x-camX,f.y-camY):drawFoe(f,f.x-8-camX,f.y-20-camY);
     if(pk>0)cx.restore();
   }});
-  for(const n of NPCS){if(n.r!==REG||(n.id==='dych_npc'&&S.dych))continue;
+  for(const n of NPCS){if(n.r!==REG||(n.id==='dych_npc'&&S.dych)||(n.when&&!n.when()))continue;
     ents.push({y:n.y,d:()=>drawNPC(cx,n,n.x-8-camX,n.y-20-camY)});}
   for(const b of boars)ents.push({y:b.y,d:()=>drawBoarTop(cx,b,b.x-9-camX,b.y-10-camY)});
   for(const c of cars)ents.push({y:c.y+(c.h?11:24),d:()=>drawCarE(c,c.x-camX,c.y-camY)});
@@ -10772,7 +10866,7 @@ function drawWorld(){
     p.x+=p.vx*.016;p.y+=p.vy*.016;p.vy+=300*.016;p.life-=.016;}
   confetti=confetti.filter(p=>p.life>0);
   if(prompt){
-    cx.font='7px "Press Start 2P"';cx.textAlign='center';
+    cx.font='7px "Jersey 25"';cx.textAlign='center';
     const tx='[E] '+prompt.label;
     cx.fillStyle='#000';cx.fillText(tx,W/2+1,H-13);cx.fillStyle=UI.acc;cx.fillText(tx,W/2,H-14);
     cx.textAlign='left';
@@ -10782,7 +10876,7 @@ function drawWorld(){
     const k=1-h.life/.55;
     cx.save();cx.translate(h.x-camX,h.y-camY-k*14);
     cx.rotate((h.x%2?1:-1)*.08);
-    cx.font=Math.round(8+k*3)+'px "Press Start 2P"';cx.textAlign='center';
+    cx.font=Math.round(8+k*3)+'px "Jersey 25"';cx.textAlign='center';
     cx.globalAlpha=Math.min(1,h.life*4);
     cx.fillStyle='#000';cx.fillText(h.txt,1,1);
     cx.fillStyle=h.c;cx.fillText(h.txt,0,0);
@@ -10792,7 +10886,7 @@ function drawWorld(){
   for(const n of dmgNums){
     const k=1-n.life/.9;
     cx.save();cx.translate(n.x-camX,n.y-camY-k*24);
-    cx.font=(n.crit?11:8)+'px "Press Start 2P"';cx.textAlign='center';
+    cx.font=(n.crit?11:8)+'px "Jersey 25"';cx.textAlign='center';
     cx.globalAlpha=Math.min(1,n.life*3);
     cx.fillStyle='#000';cx.fillText(n.v+(n.crit?'!':''),1,1);
     cx.fillStyle=n.col;cx.fillText(n.v+(n.crit?'!':''),0,0);
@@ -10831,7 +10925,7 @@ function drawWorld(){
       cx.restore();
     }
     if(act){cx.strokeStyle=UI.text;cx.lineWidth=1;cx.strokeRect(23,y-9,46,7);}
-    cx.font='5px "Press Start 2P"';cx.fillStyle=v<=0?UI.danger:(hg>0?UI.healGlow:UI.text);
+    cx.font='5px "Jersey 25"';cx.fillStyle=v<=0?UI.danger:(hg>0?UI.healGlow:UI.text);
     cx.fillText(v<=0?'PADŁ':v+'/'+m,72,y-3);
     cx.globalAlpha=1;
   }
@@ -10864,12 +10958,12 @@ function drawWorld(){
    }else{
      drawSkillOrb(W-26,H-44,12.5,cdFill,c.col,c.el,ready,'E',Math.ceil(spcT)+'s');
    }
-   if(BUFF.t>0){cx.fillStyle=UI.ok;cx.font='6px "Press Start 2P"';
+   if(BUFF.t>0){cx.fillStyle=UI.ok;cx.font='6px "Jersey 25"';
      cx.fillText('🍴 BUFF '+Math.ceil(BUFF.t)+'s',8,H-10-S.party.length*17-4);}}
   // pasek HP bossa
   {const bf=foes.find(f=>f.boss);
    if(bf){
-     cx.font='7px "Press Start 2P"';cx.textAlign='center';
+     cx.font='7px "Jersey 25"';cx.textAlign='center';
      cx.fillStyle='#000';cx.fillText(bf.bn,W/2+1,23);
      cx.fillStyle=bf.ph2?UI.danger:UI.text;cx.fillText(bf.bn,W/2,22);cx.textAlign='left';
      R(cx,60,28,W-120,9,'rgba(0,0,0,.55)');
@@ -10879,7 +10973,7 @@ function drawWorld(){
   if(POL.on)drawPoliceHUD();
   // licznik fal w domenie
   if(REG==='arena'&&DOM.cur){
-    cx.font='7px "Press Start 2P"';cx.textAlign='center';
+    cx.font='7px "Jersey 25"';cx.textAlign='center';
     const ile=DOM.rooms.length,cl=DOM.rooms.filter(r=>r.cleared).length;
     const liv=foes.filter(f=>!f.dead).length,pie=domPietra(DOM.cur),fk=flKind();
     const txt=DOM.done?(DOM.stairs?'✔ SCHODY WYŻEJ [E]':'✔ ODBIERZ SKRZYNIĘ')
@@ -10890,7 +10984,7 @@ function drawWorld(){
     const nag='PIĘTRO '+(DOM.floor+1)+'/'+pie.length+' · '+fk.n;
     cx.fillStyle='#000';cx.fillText(nag,W/2+1,39);
     cx.fillStyle=DOMAINS[DOM.cur].col;cx.fillText(nag,W/2,38);
-    cx.font='6px "Press Start 2P"';
+    cx.font='6px "Jersey 25"';
     cx.fillStyle=alpha(UI.text,.75);cx.fillText(txt,W/2,49);
     cx.fillStyle=alpha(UI.text,.6);
     cx.fillText('🌀 '+DOMAINS[DOM.cur].n+' · poziom '+((S.domLvl[DOM.cur]||0)+1),W/2,59);
@@ -10918,14 +11012,14 @@ function drawWorld(){
     cx.textAlign='left';
   }
   drawQuestArrow();
-  cx.font='6px "Press Start 2P"';cx.fillStyle=alpha(UI.text,.85);
+  cx.font='6px "Jersey 25"';cx.fillStyle=alpha(UI.text,.85);
   for(const d of DOORS){
     if(d.r!==REG)continue;
     const sx=d.x*16-camX+8,sy=d.y*16-camY-4;
     if(sx>0&&sx<W&&sy>0&&sy<H){cx.textAlign='center';cx.fillText(d.n,sx,sy);cx.textAlign='left';}
   }
   // nazwa regionu (nad orbami umiejętności)
-  cx.font='6px "Press Start 2P"';cx.fillStyle=alpha(UI.text,.5);
+  cx.font='6px "Jersey 25"';cx.fillStyle=alpha(UI.text,.5);
   cx.textAlign='right';cx.fillText(REGIONS[REG].n,W-8,H-68);cx.textAlign='left';
   // ciepłe światło + winieta + flesz
   cx.fillStyle='rgba(255,180,80,.045)';cx.fillRect(0,0,W,H);
@@ -10971,10 +11065,10 @@ function drawWorld(){
       cx.restore();
       cx.restore();
       cx.globalAlpha=a;cx.textAlign='center';
-      cx.font='10px "Press Start 2P"';
+      cx.font='10px "Jersey 25"';
       cx.fillStyle='#000';cx.fillText('JESTEM DYCH!',W/2+2,H/2-62+2);
       cx.fillStyle='#7bc950';cx.fillText('JESTEM DYCH!',W/2,H/2-62);
-      cx.font='13px "Press Start 2P"';
+      cx.font='13px "Jersey 25"';
       cx.fillStyle='#000';cx.fillText('DZIKI DYCH, DZIKI!',W/2+2,H/2-42+2);
       cx.fillStyle='#e8f4d8';cx.fillText('DZIKI DYCH, DZIKI!',W/2,H/2-42);
     }else{
@@ -10986,10 +11080,10 @@ function drawWorld(){
       drawCharBody(cx,'edek',-8,-24,0,Math.floor(anim*8)%2);
       cx.restore();
       cx.globalAlpha=a;cx.textAlign='center';
-      cx.font='10px "Press Start 2P"';
+      cx.font='10px "Jersey 25"';
       cx.fillStyle='#000';cx.fillText('JESTEM WARCHOCKIM',W/2+2,H/2-62+2);
       cx.fillStyle='#f5c542';cx.fillText('JESTEM WARCHOCKIM',W/2,H/2-62);
-      cx.font='13px "Press Start 2P"';
+      cx.font='13px "Jersey 25"';
       cx.fillStyle='#000';cx.fillText('EDWARDEM BYKU!',W/2+2,H/2-42+2);
       cx.fillStyle='#fff7d6';cx.fillText('EDWARDEM BYKU!',W/2,H/2-42);
     }
@@ -11029,7 +11123,7 @@ function drawBuildings(){
   });
   bld(6,26,9,6,(x,y,w,h)=>{ // Dino
     R(cx,x,y+12,w*16,h-12,'#3f7a46');R(cx,x,y+6,w*16,10,'#ece9f4');
-    cx.font='7px "Press Start 2P"';cx.fillStyle='#c8384a';cx.textAlign='center';
+    cx.font='7px "Jersey 25"';cx.fillStyle='#c8384a';cx.textAlign='center';
     cx.fillText('DINO',x+w*8,y+14);cx.textAlign='left';
     R(cx,x+w*8-10,y+h-22,20,22,'#26542e');
     R(cx,x+10,y+20,18,12,'#a8d8f0');R(cx,x+w*16-28,y+20,18,12,'#a8d8f0');
@@ -11050,7 +11144,7 @@ function drawBuildings(){
   bld(30,23,3,2,(x,y,w,h)=>{ // Metro
     R(cx,x,y+6,w*16,h-6,'#31518f');R(cx,x+4,y+12,w*16-8,h-12,'#141127');
     rr(cx,x+w*8-8,y-6,16,14,3,'#c8384a');
-    cx.font='9px "Press Start 2P"';cx.fillStyle='#ece9f4';cx.textAlign='center';
+    cx.font='9px "Jersey 25"';cx.fillStyle='#ece9f4';cx.textAlign='center';
     cx.fillText('M',x+w*8,y+5);cx.textAlign='left';
     lbl('METRO',x+w*8,y+h+12);
   });
@@ -11060,7 +11154,7 @@ function drawBuildings(){
 function drawPKS(x,y,w,h){
   R(cx,x,y+8,w*16,h-8,'#5a5a6a');R(cx,x-2,y+2,w*16+4,8,'#f5c542');
   R(cx,x+4,y+14,w*16-8,10,'#a8d8f0');
-  cx.font='6px "Press Start 2P"';cx.fillStyle='#1a1a24';cx.textAlign='center';
+  cx.font='6px "Jersey 25"';cx.fillStyle='#1a1a24';cx.textAlign='center';
   cx.fillText('PKS',x+w*8,y+9);cx.textAlign='left';
   lbl('🚌 PODRÓŻ',x+w*8,y+h+10);
 }
@@ -11091,7 +11185,7 @@ function drawBuildingsTrasa(){
     /* migające światła sceny */
     for(let i=0;i<6;i++){const on=(Math.floor(anim*4)+i)%3===0;
       R(cx,x+10+i*((w*16-20)/5),y+10,5,4,on?'#f5c542':'#5a4a2a');}
-    cx.font='7px "Press Start 2P"';cx.textAlign='center';
+    cx.font='7px "Jersey 25"';cx.textAlign='center';
     cx.fillStyle='#e04848';cx.fillText('POLAND ROCK',x+w*8,y+2);cx.textAlign='left';
     lbl('🎸 SCENA',x+w*8,y+h+10);
   });
@@ -11134,7 +11228,7 @@ function drawBuildingsChodziez(){
   });
   bld(30,18,7,4,(x,y,w,h)=>{ // Dino Chodzież
     R(cx,x,y+10,w*16,h-10,'#3f7a46');R(cx,x,y+4,w*16,10,'#ece9f4');
-    cx.font='7px "Press Start 2P"';cx.fillStyle='#c8384a';cx.textAlign='center';
+    cx.font='7px "Jersey 25"';cx.fillStyle='#c8384a';cx.textAlign='center';
     cx.fillText('DINO',x+w*8,y+12);cx.textAlign='left';
   });
   bld(38,2,8,6,(x,y,w,h)=>{ // lasek
@@ -11148,13 +11242,13 @@ function drawBuildingsMorze(){
     R(cx,x,y+10,w*16,h-10,'#4a6a9a');R(cx,x-2,y+4,w*16+4,8,'#31518f');
     R(cx,x+10,y+22,16,12,'#a8d8f0');R(cx,x+w*16-26,y+22,16,12,'#a8d8f0');
     R(cx,x+w*8-8,y-6,16,12,'#ece9f4');
-    cx.font='6px "Press Start 2P"';cx.fillStyle='#e04848';cx.textAlign='center';
+    cx.font='6px "Jersey 25"';cx.fillStyle='#e04848';cx.textAlign='center';
     cx.fillText('🐟',x+w*8,y+3);cx.textAlign='left';
     lbl('SMAŻALNIA',x+w*8,y+h+10);
   });
   bld(38,18,8,5,(x,y,w,h)=>{ // Dino nadmorskie
     R(cx,x,y+10,w*16,h-10,'#3f7a46');R(cx,x,y+4,w*16,10,'#ece9f4');
-    cx.font='7px "Press Start 2P"';cx.fillStyle='#c8384a';cx.textAlign='center';
+    cx.font='7px "Jersey 25"';cx.fillStyle='#c8384a';cx.textAlign='center';
     cx.fillText('DINO',x+w*8,y+12);cx.textAlign='left';
   });
   bld(48,13,5,4,(x,y,w,h)=>{ // stragan
@@ -11246,7 +11340,7 @@ function bld(tx,ty,tw,th,fn){
   if(x>W+50||y>H+160||x+tw*16<-50||y+th*16<0)return;
   fn(x,y,tw,th*16);
 }
-function lbl(t,x,y){cx.font='6px "Press Start 2P"';cx.fillStyle='rgba(236,233,244,.9)';
+function lbl(t,x,y){cx.font='6px "Jersey 25"';cx.fillStyle='rgba(236,233,244,.9)';
   cx.textAlign='center';cx.fillText(t,x,y);cx.textAlign='left';}
 function drawQuestArrow(){
   if(REG==='arena')return;
@@ -11363,7 +11457,7 @@ function updateDino(dt){
 }
 function drawDinoMG(){
   R(cx,0,0,W,H,'#3f7a46');R(cx,0,0,W,26,'#ece9f4');
-  cx.font='8px "Press Start 2P"';cx.fillStyle='#c8384a';cx.textAlign='center';
+  cx.font='8px "Jersey 25"';cx.fillStyle='#c8384a';cx.textAlign='center';
   cx.fillText('DINO — DOSTAWA NAPOJÓW EDKA',W/2,17);cx.textAlign='left';
   for(let i=0;i<4;i++){R(cx,20,60+i*54,W-40,4,'#2a5230');R(cx,20,44+i*54,W-40,16,'#356540');}
   for(const it of MD.items){
@@ -11470,7 +11564,7 @@ function drawRhythmMG(){
     R(cx,0,196,W,10,'#31518f');
     for(let i=0;i<6;i++){const off=((anim*140)%100);
       R(cx,i*100-off,199,50,4,'#f5c542');}
-    cx.font='7px "Press Start 2P"';cx.fillStyle='#6fd8e8';cx.textAlign='center';
+    cx.font='7px "Jersey 25"';cx.fillStyle='#6fd8e8';cx.textAlign='center';
     cx.fillText('🚇 STACJA PO STACJI WCHODZI BAS',W/2,52);cx.textAlign='left';
   }else{
     R(cx,W/2-40,20,80,120,'#243358');R(cx,W/2-15,0,30,30,'#2c3f70');R(cx,W/2-3,-6,6,10,'#f5c542');
@@ -11487,7 +11581,7 @@ function drawRhythmMG(){
   for(let i=0;i<3;i++){
     R(cx,laneX[i]-22,30,44,H-60,MR.flash[i]>0?'rgba(245,197,66,.25)':'rgba(255,255,255,.06)');
     cx.strokeStyle='#f5c542';cx.lineWidth=2;cx.strokeRect(laneX[i]-20,hitY-12,40,24);
-    cx.font='9px "Press Start 2P"';cx.fillStyle=UI.textDim;cx.textAlign='center';
+    cx.font='9px "Jersey 25"';cx.fillStyle=UI.textDim;cx.textAlign='center';
     cx.fillText(laneKey[i],laneX[i],H-10);cx.textAlign='left';
   }
   for(const n of MR.notes){
@@ -11499,7 +11593,7 @@ function drawRhythmMG(){
   }
   R(cx,20,14,W-40,6,UI.line);R(cx,20,14,(W-40)*Math.min(1,t/MR.endT),6,UI.acc);
   mgHud('🎵 '+MR.score,'COMBO '+MR.combo);
-  if(MR.judgeT>0){cx.font='11px "Press Start 2P"';cx.textAlign='center';
+  if(MR.judgeT>0){cx.font='11px "Jersey 25"';cx.textAlign='center';
     cx.fillStyle=MR.judge==='PUDŁO'?UI.danger:UI.ok;
     cx.fillText(MR.judge,W/2+60,70);cx.textAlign='left';}
 }
@@ -11574,7 +11668,7 @@ function drawSimonMG(){
       cx.globalAlpha=1;
     }
     for(let i=0;i<8;i++)R(cx,20+i*56,150+((i*31)%30),8,14,['#4a5a8a','#6a4a6a'][i%2]);
-    cx.font='7px "Press Start 2P"';cx.fillStyle='#6fd8e8';cx.textAlign='center';
+    cx.font='7px "Jersey 25"';cx.fillStyle='#6fd8e8';cx.textAlign='center';
     cx.fillText('CENTRUM NAUKI KOPERNIK — TANIEC NA ZGODĘ',W/2,30);cx.textAlign='left';
   }else{
     for(let r=0;r<4;r++){const y=140+r*34;
@@ -11592,22 +11686,22 @@ function drawSimonMG(){
   cx.restore();
   R(cx,20,14,W-40,8,UI.line);
   R(cx,20,14,(W-40)*MS.applause/100,8,MS.applause>60?UI.ok:MS.applause>30?UI.warn:UI.danger);
-  cx.font='6px "Press Start 2P"';cx.fillStyle=UI.textDim;cx.fillText(dance?'VIBE':'APLAUZ',22,32);
+  cx.font='6px "Jersey 25"';cx.fillStyle=UI.textDim;cx.fillText(dance?'VIBE':'APLAUZ',22,32);
   cx.fillStyle=UI.acc;cx.fillText('RUNDA '+MS.round+'/3',W-80,32);
-  cx.font='16px "Press Start 2P"';cx.textAlign='center';
+  cx.font='16px "Jersey 25"';cx.textAlign='center';
   if(MS.stage==='show'&&MS.show<MS.seq.length){
     cx.fillStyle=UI.acc;cx.fillText(ARROWS[MS.seq[MS.show]],W/2,dance?200:124);
-    cx.font='7px "Press Start 2P"';cx.fillStyle=UI.textDim;
+    cx.font='7px "Jersey 25"';cx.fillStyle=UI.textDim;
     cx.fillText(dance?'ZAPAMIĘTAJ KROKI TANECZNE':'ZAPAMIĘTAJ GESTY MARSZAŁKA',W/2,H-16);
   }else if(MS.stage==='input'){
-    cx.font='7px "Press Start 2P"';cx.fillStyle=UI.ok;
+    cx.font='7px "Jersey 25"';cx.fillStyle=UI.ok;
     cx.fillText('POWTÓRZ! ('+MS.input.length+'/'+MS.seq.length+')  strzałki / dotknij kierunek',W/2,H-16);
-    cx.font='12px "Press Start 2P"';cx.fillStyle=UI.text;
+    cx.font='12px "Jersey 25"';cx.fillStyle=UI.text;
     cx.fillText(MS.input.map(a=>ARROWS[a]).join(' '),W/2,dance?200:124);
   }else if(MS.stage==='fail'){
-    cx.font='10px "Press Start 2P"';cx.fillStyle=UI.danger;cx.fillText(dance?'NIE TEN KROK! OD NOWA!':'BUUU! OD NOWA!',W/2,dance?200:124);
+    cx.font='10px "Jersey 25"';cx.fillStyle=UI.danger;cx.fillText(dance?'NIE TEN KROK! OD NOWA!':'BUUU! OD NOWA!',W/2,dance?200:124);
   }else if(MS.stage==='ok'){
-    cx.font='10px "Press Start 2P"';cx.fillStyle=UI.ok;cx.fillText(dance?'CZUJESZ TO! DALEJ!':'BRAWO! E-DEK! E-DEK!',W/2,dance?200:124);
+    cx.font='10px "Jersey 25"';cx.fillStyle=UI.ok;cx.fillText(dance?'CZUJESZ TO! DALEJ!':'BRAWO! E-DEK! E-DEK!',W/2,dance?200:124);
   }
   cx.textAlign='left';
   drawVignette();
@@ -11666,7 +11760,7 @@ function drawMeczMG(){
   R(cx,60,H-16,W-120,10,UI.line);
   R(cx,60,H-16,(W-120)*Math.min(1,MC.bar/100),10,MC.bar>70?UI.ok:MC.bar>35?UI.warn:UI.danger);
   cx.strokeStyle=UI.text;cx.strokeRect(60+(W-120)*.96,H-18,4,14);
-  cx.font='8px "Press Start 2P"';cx.textAlign='center';
+  cx.font='8px "Jersey 25"';cx.textAlign='center';
   cx.fillStyle=UI.acc;
   if(Math.floor(anim*3)%2===0)cx.fillText('TAP TAP TAP! (dotyk / SPACJA)',W/2,20);
   cx.fillText('RUNDA '+MC.round+'/3',W/2,H-24);
@@ -11807,9 +11901,9 @@ function drawStopMG(){
     if(c.t==='laweta'){R(cx,c.v>0?x:x+cd.w-12,y-4,12,4,'#8a8a98');R(cx,x+cd.w*.5,y+cd.h,4,3,'#c02020');}
     if(c.t==='kamper'){rr(cx,c.v>0?x-20:x+cd.w,y+1,20,cd.h-2,2,'#d8d4e8');
       R(cx,c.v>0?x-16:x+cd.w+4,y+3,12,4,'#6fd8e8');
-      cx.font='5px "Press Start 2P"';cx.fillStyle='#c8384a';cx.textAlign='center';
+      cx.font='5px "Jersey 25"';cx.fillStyle='#c8384a';cx.textAlign='center';
       cx.fillText('ROCK!',c.x,y-4);cx.textAlign='left';}
-    if(c.done&&!STOP_CARS[c.t].bad){cx.font='6px "Press Start 2P"';cx.fillStyle='#7bc950';
+    if(c.done&&!STOP_CARS[c.t].bad){cx.font='6px "Jersey 25"';cx.fillStyle='#7bc950';
       cx.textAlign='center';cx.fillText('STOP!',c.x,y-5);cx.textAlign='left';}
   }
   // strefa machania
@@ -11823,25 +11917,25 @@ function drawStopMG(){
   if(MST.wave>0){   // KCIUK w górę
     const hx=W/2-4,hy=H-56-bob;
     R(cx,hx,hy,5,8,'#e8c9a0');R(cx,hx+1,hy-5,3,6,'#e8c9a0');
-    cx.font='10px "Press Start 2P"';cx.fillStyle='#f5c542';cx.fillText('👍',hx+8,hy);
+    cx.font='10px "Jersey 25"';cx.fillStyle='#f5c542';cx.fillText('👍',hx+8,hy);
   }
   // HUD
   if(r===1){
     R(cx,W-96,H-24,74,12,'#2a2440');
     R(cx,W-94,H-22,70*MST.bat/100,8,MST.bat>50?'#7bc950':MST.bat>20?'#f5c542':'#e04848');
     R(cx,W-22,H-20,3,4,'#c9c4dd');
-    cx.font='6px "Press Start 2P"';cx.fillStyle='#ece9f4';cx.fillText('🔋 '+Math.ceil(MST.bat)+'%',W-96,H-28);
+    cx.font='6px "Jersey 25"';cx.fillStyle='#ece9f4';cx.fillText('🔋 '+Math.ceil(MST.bat)+'%',W-96,H-28);
   }
   R(cx,14,14,W-28,12,'#2a2440');
   R(cx,16,16,(W-32)*MST.meter/100,8,MST.meter>66?'#7bc950':MST.meter>33?'#f5c542':'#e04848');
-  cx.font='6px "Press Start 2P"';cx.fillStyle='#f5c542';
+  cx.font='6px "Jersey 25"';cx.fillStyle='#f5c542';
   cx.fillText('SZANSA NA STOPA '+Math.round(MST.meter)+'%',16,34);
   cx.textAlign='right';cx.fillStyle='#ece9f4';cx.fillText('⏱ '+Math.max(0,Math.ceil(MST.time)),W-16,34);
   cx.textAlign='center';
-  if(MST.judgeT>0){cx.font='8px "Press Start 2P"';
+  if(MST.judgeT>0){cx.font='8px "Jersey 25"';
     cx.fillStyle=MST.judge.indexOf('NIE')>=0||MST.judge.indexOf('POWIETRZA')>=0||MST.judge.indexOf('LAWETA')>=0?'#e04848':'#7bc950';
     cx.fillText(MST.judge,W/2,56);}
-  if(r===2&&MST.meter>=55){cx.font='6px "Press Start 2P"';cx.fillStyle='#6fd8e8';
+  if(r===2&&MST.meter>=55){cx.font='6px "Jersey 25"';cx.fillStyle='#6fd8e8';
     cx.fillText('KAMPER NA HORYZONCIE — ŁAP GO!',W/2,H-8);}
   cx.textAlign='left';
   drawVignette();
@@ -11910,7 +12004,7 @@ function drawChargeMG(){
   for(let i=0;i<8;i++)R(cx,i*60,H-70,30,3,'#4a4a5a');
   R(cx,0,40,W,10,'#c8384a');R(cx,0,50,W,4,'#8a2438');         // zadaszenie stacji
   for(let i=0;i<5;i++)R(cx,30+i*95,54,8,26,'#8a8a98');
-  cx.font='7px "Press Start 2P"';cx.fillStyle='#f5c542';cx.textAlign='center';
+  cx.font='7px "Jersey 25"';cx.fillStyle='#f5c542';cx.textAlign='center';
   cx.fillText('STACJA ŁADOWANIA — RUNDA '+MCH.round+'/2',W/2,32);
   // ładowarka
   const bx=W/2-70,by=H-58;
@@ -11938,10 +12032,10 @@ function drawChargeMG(){
   // pasek naładowania
   R(cx,px,py-26,pw,10,'#2a2440');
   R(cx,px+2,py-24,(pw-4)*Math.min(1,MCH.pct/100),6,MCH.pct>66?'#7bc950':MCH.pct>33?'#f5c542':'#e04848');
-  cx.font='6px "Press Start 2P"';cx.fillStyle='#ece9f4';cx.textAlign='left';
+  cx.font='6px "Jersey 25"';cx.fillStyle='#ece9f4';cx.textAlign='left';
   cx.fillText((MCH.round===1?'🤖 EDEK ':'🦾 DYCH ')+Math.round(MCH.pct)+'%',px,py-30);
   cx.textAlign='right';cx.fillText('⏱ '+Math.max(0,Math.ceil(MCH.time)),px+pw,py-30);
-  if(MCH.judgeT>0){cx.textAlign='center';cx.font='8px "Press Start 2P"';
+  if(MCH.judgeT>0){cx.textAlign='center';cx.font='8px "Jersey 25"';
     cx.fillStyle=MCH.judge.indexOf('PUDŁO')>=0?'#e04848':'#7bc950';
     cx.fillText(MCH.judge,W/2,py-44);}
   cx.textAlign='left';
@@ -12050,14 +12144,14 @@ function drawRideMG(){
   rr(cx,bx-44,py-6,88,44,5,MRI.hurt>0?'#f0b0b0':'#ece9f4');
   R(cx,bx-40,py-2,80,8,'#6fd8e8');R(cx,bx-40,py+22,80,4,'#c9c4dd');
   R(cx,bx-46,py+30,10,8,'#1a1a24');R(cx,bx+36,py+30,10,8,'#1a1a24');
-  cx.font='5px "Press Start 2P"';cx.fillStyle='#c8384a';cx.textAlign='center';
+  cx.font='5px "Jersey 25"';cx.fillStyle='#c8384a';cx.textAlign='center';
   cx.fillText('POLAND ROCK →',bx,py+18);cx.textAlign='left';
   drawEdekBody(cx,bx-26,py-32,3,Math.floor(anim*8)%2,1.4,S.equip);
   cx.save();cx.translate(bx+10,py-34);cx.scale(1.3,1.3);drawDychBody(cx,0,0,3,Math.floor(anim*8+1)%2);cx.restore();
   // HUD
   R(cx,20,16,W-40,10,'#2a2440');
   R(cx,22,18,(W-44)*MRI.dist/MRI.need,6,'#7bc950');
-  cx.font='6px "Press Start 2P"';cx.fillStyle='#f5c542';cx.fillText('🎸 DO POLA: '+Math.round(MRI.dist)+'%',22,36);
+  cx.font='6px "Jersey 25"';cx.fillStyle='#f5c542';cx.fillText('🎸 DO POLA: '+Math.round(MRI.dist)+'%',22,36);
   cx.textAlign='right';cx.fillStyle='#ece9f4';
   cx.fillText('🤝 UCHWYTY '+MRI.grip+'/3   💎 '+MRI.gems,W-22,36);cx.textAlign='left';
   drawVignette();
@@ -12349,7 +12443,7 @@ function drawTorpedaMG(){
       cx.fillStyle='rgba(191,240,255,.35)';cx.beginPath();cx.arc(0,0,13,0,7);cx.fill();
       cx.strokeStyle='#dff7ff';cx.lineWidth=2;cx.beginPath();cx.arc(0,0,13,0,7);cx.stroke();
       cx.fillStyle='rgba(255,255,255,.6)';cx.beginPath();cx.arc(-4,-5,3.4,0,7);cx.fill();
-      cx.fillStyle='#fff';cx.font='8px "Press Start 2P"';cx.textAlign='center';
+      cx.fillStyle='#fff';cx.font='8px "Jersey 25"';cx.textAlign='center';
       cx.fillText('↑',0,3);cx.textAlign='left';cx.restore();
     }else if(t==='prad'){                                          // PRĄD WODNY = boost
       cx.save();cx.globalAlpha=.75;
@@ -12359,7 +12453,7 @@ function drawTorpedaMG(){
         cx.moveTo(ax,oy-12);cx.lineTo(ax+11,oy);cx.lineTo(ax,oy+12);cx.lineTo(ax+4,oy);cx.fill();
       }
       cx.restore();
-      cx.font='6px "Press Start 2P"';cx.fillStyle='#f5c542';cx.fillText('PRĄD',sx-4,oy-20);
+      cx.font='6px "Jersey 25"';cx.fillStyle='#f5c542';cx.fillText('PRĄD',sx-4,oy-20);
     }else if(t==='ryba'){
       const fy=oy+Math.sin(anim*2+ox)*4;
       cx.save();cx.translate(sx,fy);
@@ -12379,7 +12473,7 @@ function drawTorpedaMG(){
       const b=Math.sin(anim*4+ox)*2;
       rr(cx,sx-4,oy-8+b,8,14,2,'#f5a032');R(cx,sx-4,oy-8+b,8,3,'#ffc46a');
       R(cx,sx-1.6,oy-12+b,3.2,4,'#c8781a');
-      cx.fillStyle='#fff7d6';cx.font='4px "Press Start 2P"';cx.textAlign='center';
+      cx.fillStyle='#fff7d6';cx.font='4px "Jersey 25"';cx.textAlign='center';
       cx.fillText('M',sx,oy+1+b);cx.textAlign='left';
     }
   }
@@ -12413,7 +12507,7 @@ function drawTorpedaMG(){
     const tx2=t.x-px+TOR_EX,ty2=t.y;
     if(tx2<-60||tx2>W+60)continue;
     cx.globalAlpha=Math.max(0,Math.min(1,t.life*2.4));
-    cx.font='7px "Press Start 2P"';cx.textAlign='center';
+    cx.font='7px "Jersey 25"';cx.textAlign='center';
     cx.fillStyle='#000';cx.fillText(t.t,tx2+1,ty2+1);
     cx.fillStyle=t.c;cx.fillText(t.t,tx2,ty2);
     cx.textAlign='left';
@@ -12431,7 +12525,7 @@ function drawTorpedaMG(){
   R(cx,bx,by,bw*Math.min(1,TOR.run/TOR_LEN),6,TOR.boost>0?'#f5c542':'#6fd8e8');
   for(let i=1;i<TOR_CP.length;i++){const cxp=bx+bw*(TOR_CP[i]/TOR_LEN);
     R(cx,cxp-1,by-3,2,12,TOR.cp>=i?'#7bc950':'#dff7ff');}
-  cx.font='6px "Press Start 2P"';cx.fillStyle='#fff7f2';cx.textAlign='center';
+  cx.font='6px "Jersey 25"';cx.fillStyle='#fff7f2';cx.textAlign='center';
   cx.fillText(Math.floor(TOR.run/TOR_LEN*100)+'%',W/2,by+18);cx.textAlign='left';
   for(let i=0;i<3;i++){
     const hx=12+i*13,hy=18,on=i<TOR.hearts;
@@ -12451,14 +12545,14 @@ function drawTorpedaMG(){
     for(let i=0;i<7;i++){const ly=24+i*38,lw=40+Math.random()*60;
       R(cx,W-lw-((anim*700+i*90)%(W+120)),ly,lw,2,'#f5c542');}
     cx.restore();
-    cx.font='7px "Press Start 2P"';cx.textAlign='center';
+    cx.font='7px "Jersey 25"';cx.textAlign='center';
     cx.fillStyle='#000';cx.fillText('PRĄD ×1,7',W/2+1,H-30+1);
     cx.fillStyle='#f5c542';cx.fillText('PRĄD ×1,7',W/2,H-30);cx.textAlign='left';
   }
   mgHud('🌀 SZALONY TORPEDA','💎 '+TOR.gems+'  🥤 '+TOR.soki+'   SPACJA = skok');
 }
 function mgHud(a,b){
-  cx.font='8px "Press Start 2P"';
+  cx.font='8px "Jersey 25"';
   cx.fillStyle='#000';cx.fillText(a,11,H-9);cx.fillStyle=UI.acc;cx.fillText(a,10,H-10);
   if(b){cx.textAlign='right';cx.fillStyle='#000';cx.fillText(b,W-9,H-9);cx.fillStyle=UI.text;cx.fillText(b,W-10,H-10);cx.textAlign='left';}
 }
@@ -12580,7 +12674,7 @@ $('btnCont').addEventListener('click',()=>{
   applyChar();initPartyHP(true);resetFollowers();
   if(SOLID(at(Math.floor(P.x/16),Math.floor(P.y/16)))){const sp=REGIONS[REG].spawn;P.x=sp[0];P.y=sp[1];}
   /* stary zapis mógł zostawić gracza NA POLU, zanim postawiliśmy bramę — wypuść go na trasę */
-  if(REG==='trasa'&&qs('policja')!==2&&insideFest(Math.floor(P.x/16),Math.floor(P.y/16))){
+  if(REG==='trasa'&&qs('policja')!==2&&naPolu(Math.floor(P.x/16),Math.floor(P.y/16))){
     const sp=REGIONS.trasa.spawn;P.x=sp[0];P.y=sp[1];resetFollowers();
     toast('🎫 Brama pola jest zamknięta — najpierw złap stopa i wjedź tu z ekipą!',4200);
   }
@@ -12665,4 +12759,4 @@ function frame(ts){
   requestAnimationFrame(loop);
 }
 dmatsBonus();   // dopiero tu, bo potrzebuje rejestrów DOM_MATS i ASC_MAT
-document.fonts.load('8px "Press Start 2P"').finally(()=>requestAnimationFrame(loop));
+document.fonts.load('8px "Jersey 25"').finally(()=>requestAnimationFrame(loop));

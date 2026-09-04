@@ -1,3 +1,8 @@
 *.bak
 .DS_Store
 Thumbs.db
+
+# pliki robocze narzędzi z testy/ — Chrome z Flatpaka nie zapisze do /tmp,
+# więc zrzuty i doklejone kopie index.html lądują w katalogu gry
+_*.png
+_*.html
