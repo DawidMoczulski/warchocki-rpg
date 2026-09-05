@@ -77,6 +77,46 @@ T('budzenie dzwieku wlacza muzyke menu, a nie tylko tworzy AudioContext',()=>{
      'budzenie dzwieku MUSI odpalac muzyke menu, inaczej suwak muzyki jest martwy');
 });
 
+/* --- STEROWANIE GRY NIE MOZE ZJADAC ZDARZEN INTERFEJSU ---
+   Usterka zgloszona po v24.1: przy CIOSIE przypisanym do lewego przycisku myszy
+   suwaki glosnosci w menu nie reagowaly na przeciaganie. Menu jest dzieckiem
+   #stage, a handler `pointerdown` na #stage wolal preventDefault() dla akcji
+   przypisanej do myszy — a to zabija natywne przeciaganie suwaka. Przyciski
+   dzialaly, bo mialy w tym handlerze swoj wyjatek; suwaki nie mialy.
+   Test odtwarza dokladnie ten uklad: mysz przypisana do akcji + wcisniecie
+   na kontrolce menu. `defaultPrevented` musi zostac na false.               */
+T('mysz przypisana do CIOSU nie blokuje kontrolek menu',()=>{
+  const stare=KEYMAP.attack;
+  KEYMAP.attack='Mouse0';
+  try{
+    for(const id of ['menuVolMusic','menuVolVoice']){
+      const el=$(id);
+      const ev=new PointerEvent('pointerdown',
+        {bubbles:true,cancelable:true,pointerType:'mouse',button:0,buttons:1});
+      el.dispatchEvent(ev);
+      ok(!ev.defaultPrevented,
+         'wcisniecie na "'+id+'" zostalo anulowane — przeciaganie suwaka bedzie martwe');
+    }
+  }finally{KEYMAP.attack=stare;}
+});
+
+T('zadna kontrolka menu nie jest anulowana przez akcje myszy',()=>{
+  const stare=KEYMAP.attack;
+  KEYMAP.attack='Mouse0';
+  try{
+    const kontrolki=[...document.querySelectorAll(
+      '#title button, #title input, #title [role="tab"]')];
+    ok(kontrolki.length>=8,'za malo kontrolek do sprawdzenia: '+kontrolki.length);
+    for(const el of kontrolki){
+      const ev=new PointerEvent('pointerdown',
+        {bubbles:true,cancelable:true,pointerType:'mouse',button:0,buttons:1});
+      el.dispatchEvent(ev);
+      ok(!ev.defaultPrevented,
+         'anulowano wcisniecie na <'+el.tagName.toLowerCase()+' '+(el.id||el.className)+'>');
+    }
+  }finally{KEYMAP.attack=stare;}
+});
+
 T('suwak w trakcie ciagniecia nie jest nadpisywany',()=>{
   const sl=$('menuVolMusic');
   sl.value=17;

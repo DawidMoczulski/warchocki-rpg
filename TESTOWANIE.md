@@ -249,6 +249,16 @@ których już nie było. Cokolwiek ma przeżyć do jutra, ląduje w `testy/`.
 node testy/test_mapy.js               # ręczne plansze domen: format i zdrowy rozsądek
 ```
 
+**Prawdziwa mysz.** Syntetyczne zdarzenia nie ruszą natywnego suwaka — Chrome
+reaguje tylko na zdarzenia zaufane. Żeby odtworzyć przeciąganie, trzeba wstrzyknąć
+je przez CDP (`--remote-debugging-port` + `Input.dispatchMouseEvent`). Tak
+właśnie potwierdziłem usterkę suwaków: `value` zostawało na 100. W testach
+wystarcza jednak tańszy odpowiednik — wysłać `pointerdown` z `cancelable:true`
+i sprawdzić `defaultPrevented`; to łapie dokładnie tę klasę błędu bez CDP.
+
+```bash
+```
+
 `sprawdz.sh` uruchamia test **w prawdziwej grze** — wstrzykuje go do kopii
 `index.html`, odpala bezgłowego Chrome i wyciąga wynik z DOM-u. Nie ma atrapy
 canvasu ani audio, więc nie ma też ryzyka, że atrapa rozjedzie się z grą.
@@ -259,6 +269,16 @@ zaczynaj od `bootWorld()`.
 
 `test_mapy.js` idzie czystym Node, bo `js/mapy.js` to sam opis plansz —
 nie potrzebuje ani canvasu, ani reszty gry.
+
+**Pułapka: menu leży WEWNĄTRZ `#stage`.** `#title` jest `position:fixed`, więc
+wygląda na osobną warstwę, ale w drzewie DOM to dziecko sceny gry — zdarzenia
+z menu **bąbelkują do handlerów sterowania**. Handler `pointerdown` na `#stage`
+miał listę wyjątków („to nie jest gra: `button`, `.panel`, `#dlg`, `.ov`") i menu
+do niej nie trafiło: przy CIOSIE przypisanym do myszy wołał `preventDefault()`
+na wciśnięciu w suwak głośności i zabijał natywne przeciąganie. Przyciski
+działały, suwaki nie. Warunek jest teraz **odwrócony** — liczy się tylko to, co
+pada na płótno (`if(e.target!==cv)return;`) — więc nowy element interfejsu nie
+wymaga już dopisywania kolejnego wyjątku.
 
 **Czego testy w `sprawdz.sh` NIE złapią:** dźwięku. Idą przez `file://`, więc
 `fetch` klipów pada i nic nigdy nie gra — suwak głośności przechodzi każdy test

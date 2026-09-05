@@ -6629,7 +6629,17 @@ function refreshCursor(){
 }
 addEventListener('blur',()=>{keys.ControlLeft=keys.ControlRight=false;refreshCursor();});
 stage.addEventListener('pointerdown',e=>{
-  if(e.target.closest('button')||e.target.closest('.panel')||e.target.closest('#dlg')||e.target.closest('.ov:not(.hidden)'))return;
+  /* WEJŚCIE DO GRY IDZIE WYŁĄCZNIE PRZEZ PŁÓTNO.
+     Wcześniej stała tu lista wyjątków (`button`, `.panel`, `#dlg`, `.ov`) —
+     czyli wyliczanka wszystkiego, co interfejsem NIE jest grą. Każdy nowy
+     element UI trzeba było do niej dopisać, a przeoczenie kosztowało usterkę:
+     menu główne dostało klasę `.menuScreen`, do listy nie trafiło, więc przy
+     CIOSIE przypisanym do myszy ten handler wołał `preventDefault()` na
+     wciśnięciu w suwak głośności i zabijał natywne przeciąganie. Przyciski
+     działały (miały swój wyjątek), suwaki nie — i tak to wyglądało u gracza.
+     Odwracamy warunek: liczy się tylko to, co pada NA PŁÓTNO. HUD ma
+     `pointer-events:none`, więc kliknięcia w jego tło i tak trafiają w płótno. */
+  if(e.target!==cv)return;
   if(mapOpen){toggleMap();return;}  // tap na otwartej mapie = zamknij
   if(paused){togglePause();return;} // tap = wznów (mobile)
   initAudio();
