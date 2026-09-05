@@ -43,6 +43,49 @@ T('lista klawiszy w menu i w pauzie pokazuja to samo',()=>{
   KEYMAP.attack=stare; renderKeybind();
 });
 
+/* --- DŹWIĘK ---
+   Pierwsza wersja testowala tylko kierunek STAN -> SUWAK (syncAudioUI ustawia
+   wartosci) i przechodzila, mimo ze dla gracza suwaki byly martwe: nie grala
+   ZADNA muzyka, bo „pierwszy gest” budzacy dzwiek wisial na tle ekranu
+   tytulowego i pomijal przyciski, a nowe menu to same przyciski.
+   Dlatego testujemy teraz kierunek, ktorego uzywa CZLOWIEK.                */
+
+T('przesuniecie suwaka zmienia glosnosc i zapisuje ustawienie',()=>{
+  const przed=musicVol;
+  const sl=$('menuVolMusic');
+  sl.value=44; sl.dispatchEvent(new Event('input',{bubbles:true}));
+  ok(Math.abs(musicVol-0.44)<0.01,'musicVol ma isc za suwakiem, jest '+musicVol);
+  eq(String(store.get('wrpg_vol_music')),'0.44','ustawienie ma sie zapisac');
+  musicVol=przed; store.set('wrpg_vol_music',przed); syncAudioUI();
+});
+
+T('kontakt z ustawieniami dzwieku BUDZI dzwiek',()=>{
+  const org=window.initAudio; let n=0;
+  window.initAudio=function(){n++;return org.apply(this,arguments);};
+  try{
+    document.querySelector('.menuTab[data-tab="dzwiek"]').click();
+    $('menuVolMusic').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));
+    $('menuVolVoice').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));
+  }finally{window.initAudio=org;}
+  ok(n>=3,'zakladka i chwyt kazdego suwaka maja budzic dzwiek, bylo: '+n);
+});
+
+T('budzenie dzwieku wlacza muzyke menu, a nie tylko tworzy AudioContext',()=>{
+  /* to jest sedno usterki: bez startMenuMusic() suwak muzyki nie ma czego sciszac */
+  ok(typeof obudzDzwiek==='function','brak funkcji budzacej dzwiek');
+  ok((''+obudzDzwiek).indexOf('startMenuMusic')>=0,
+     'budzenie dzwieku MUSI odpalac muzyke menu, inaczej suwak muzyki jest martwy');
+});
+
+T('suwak w trakcie ciagniecia nie jest nadpisywany',()=>{
+  const sl=$('menuVolMusic');
+  sl.value=17;
+  syncAudioUI(sl);
+  eq(sl.value,'17','wartosc ciagnietego suwaka ma zostac nietknieta');
+  syncAudioUI();
+  eq(sl.value,String(Math.round(musicVol*100)),'bez pominiecia suwak wraca do stanu');
+});
+
 T('suwaki dzwieku w menu i w panelu gry sa zsynchronizowane',()=>{
   const stare=voiceVol;
   voiceVol=0.42; syncAudioUI();

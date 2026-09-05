@@ -243,6 +243,7 @@ których już nie było. Cokolwiek ma przeżyć do jutra, ląduje w `testy/`.
 
 ```bash
 ./testy/sprawdz.sh test_menu.js       # menu główne: zakładki, zapis, sterowanie, wejście do gry
+./testy/test_dzwiek.sh                # czy ustawienia dźwięku MAJĄ CO ściszać (własny serwer HTTP)
 ./testy/sprawdz.sh test_brama.js      # brama pola: widoczność, przejezdność, patrol
 ./testy/sprawdz.sh test_czcionki.js   # polskie znaki: ogonki, kreski, spójność wysokości
 node testy/test_mapy.js               # ręczne plansze domen: format i zdrowy rozsądek
@@ -259,7 +260,15 @@ zaczynaj od `bootWorld()`.
 `test_mapy.js` idzie czystym Node, bo `js/mapy.js` to sam opis plansz —
 nie potrzebuje ani canvasu, ani reszty gry.
 
-**Czego testy NIE złapią:** jakości obrazu. Czy brama wygląda jak brama, czy
+**Czego testy w `sprawdz.sh` NIE złapią:** dźwięku. Idą przez `file://`, więc
+`fetch` klipów pada i nic nigdy nie gra — suwak głośności przechodzi każdy test
+na DOM-ie, choć dla gracza jest martwy. Dokładnie tak przeszła usterka zgłoszona
+po v24: suwaki poprawnie ustawiały zmienne i zapisywały ustawienia, tylko muzyka
+menu w ogóle nie ruszała. Od tego jest `test_dzwiek.sh` — stawia serwer HTTP
+i odblokowuje autoplay, żeby sprawdzić, czy po wejściu na zakładkę „Dźwięk"
+cokolwiek naprawdę gra.
+
+**Czego nie złapią też:** jakości obrazu. Czy brama wygląda jak brama, czy
 plansza się nie sypie, czy tekst nie wychodzi za ramkę — to się sprawdza
 ZRZUTAMI (patrz niżej). Test powie tylko, że kafel 72 stoi w (38,32).
 

@@ -12832,37 +12832,71 @@ function menuTab(nazwa){
   if(nazwa==='dzwiek')syncAudioUI();
   const sc=document.querySelector('.menuScreenIn');if(sc)sc.scrollTop=0;
 }
+/* Muzyka menu MUSI ruszyć od kliknięcia w zakładkę.
+   Ogólny „pierwszy gest” wisi na #title i pomija przyciski (`closest('button')`),
+   żeby klik w „Nowa gra” nie odpalał muzyki tuż przed wejściem do gry. Stary ekran
+   tytułowy był w większości pustym tłem, więc gracz i tak trafiał obok przycisku
+   i dźwięk wstawał. Nowe menu to same przyciski — przez to na zakładce „Dźwięk”
+   nie grało NIC i suwaki wyglądały na zepsute, choć poprawnie ustawiały głośność. */
+function obudzDzwiek(){
+  const wszystko=initAudio();          // tworzy AudioContext OD RAZU, klipy lecą w tle
+  resumeAC();
+  /* Utwór menu ładujemy OSOBNO i z priorytetem. `initAudio()` rozwiązuje się
+     dopiero, gdy zejdzie komplet ~70 klipów głosowych (23 MB) — czekanie na to
+     z muzyką oznaczało kilkanaście sekund ciszy na zakładce „Dźwięk”, w których
+     suwak muzyki nie miał czego ściszać i wyglądał na zepsuty. */
+  if(AC&&!BUFS['song']){
+    loadClip('song').then(buf=>{BUFS['song']=buf;resumeAC();startMenuMusic();}).catch(()=>{});
+  }else{
+    startMenuMusic();
+  }
+  return wszystko;
+}
 document.querySelectorAll('.menuTab').forEach(b=>{
-  b.addEventListener('click',()=>{initAudio();SFX.ok();menuTab(b.dataset.tab);});
+  b.addEventListener('click',()=>{obudzDzwiek();SFX.ok();menuTab(b.dataset.tab);});
 });
 
 /* ---- USTAWIENIA DŹWIĘKU: dwa komplety suwaków, jeden stan ----
    Menu główne i panel w grze pokazują te same wartości. Gdyby każdy trzymał
    swoją kopię, po zmianie w jednym drugi kłamałby aż do przeładowania. */
-function syncAudioUI(){
+function syncAudioUI(pomin){
   const v=Math.round(voiceVol*100),m=Math.round(musicVol*100);
   [['volVoice','volVoiceVal',v],['menuVolVoice','menuVolVoiceVal',v],
    ['volMusic','volMusicVal',m],['menuVolMusic','menuVolMusicVal',m]].forEach(([sid,lid,val])=>{
     const sl=$(sid),lb=$(lid);
-    if(sl){sl.value=val;setSliderFill(sl);}
+    /* Suwaka, który gracz TRZYMA, nie dotykamy: wpisanie `value` w trakcie
+       ciągnięcia potrafi przerwać gest i gałka ucieka spod palca. */
+    if(sl&&sl!==pomin){sl.value=val;setSliderFill(sl);}
+    else if(sl)setSliderFill(sl);
     if(lb)lb.textContent=val+'%';
   });
   const txt=muted?'Włącz dźwięk':'Wycisz wszystko';
   const mm=$('menuAudioMute');if(mm)mm.textContent=txt;
   const mu=$('menuMute');if(mu)mu.textContent=muted?'🔇':'🔊';
 }
-if($('menuVolVoice'))$('menuVolVoice').addEventListener('input',e=>{
-  voiceVol=(+e.target.value)/100;store.set('wrpg_vol_voice',voiceVol);
-  syncAudioUI();resumeAC();applyVolumes();
+if($('menuVolVoice')){
+  $('menuVolVoice').addEventListener('pointerdown',obudzDzwiek);
+  $('menuVolVoice').addEventListener('input',e=>{
+    voiceVol=(+e.target.value)/100;store.set('wrpg_vol_voice',voiceVol);
+    syncAudioUI(e.target);resumeAC();applyVolumes();
+  });
+  /* puszczenie suwaka = próbka głosu, żeby było SŁYCHAĆ, co się ustawiło */
+  $('menuVolVoice').addEventListener('change',()=>obudzDzwiek().then(previewVoice));
+}
+if($('menuVolMusic')){
+  $('menuVolMusic').addEventListener('pointerdown',obudzDzwiek);
+  $('menuVolMusic').addEventListener('input',e=>{
+    musicVol=(+e.target.value)/100;store.set('wrpg_vol_music',musicVol);
+    syncAudioUI(e.target);resumeAC();applyVolumes();
+  });
+  $('menuVolMusic').addEventListener('change',()=>obudzDzwiek().then(previewMusic));
+}
+if($('menuAudioMute'))$('menuAudioMute').addEventListener('click',()=>{
+  obudzDzwiek();$('btnMute').click();syncAudioUI();
 });
-if($('menuVolVoice'))$('menuVolVoice').addEventListener('change',()=>{resumeAC();previewVoice();});
-if($('menuVolMusic'))$('menuVolMusic').addEventListener('input',e=>{
-  musicVol=(+e.target.value)/100;store.set('wrpg_vol_music',musicVol);
-  syncAudioUI();resumeAC();applyVolumes();
+if($('menuMute'))$('menuMute').addEventListener('click',()=>{
+  obudzDzwiek();$('btnMute').click();syncAudioUI();
 });
-if($('menuVolMusic'))$('menuVolMusic').addEventListener('change',()=>{resumeAC();previewMusic();});
-if($('menuAudioMute'))$('menuAudioMute').addEventListener('click',()=>{$('btnMute').click();syncAudioUI();});
-if($('menuMute'))$('menuMute').addEventListener('click',()=>{initAudio();$('btnMute').click();syncAudioUI();});
 if($('menuFS'))$('menuFS').addEventListener('click',()=>toggleFS());
 if($('menuKeysReset'))$('menuKeysReset').addEventListener('click',()=>{
   KEYMAP=Object.assign({},DEFAULT_KEYS);saveKeys();rebindAction=null;renderKeybind();SFX.ok();
