@@ -242,6 +242,7 @@ katalogiem, a `TESTOWANIE.md` przez jakiś czas wymieniało komendy do plików,
 których już nie było. Cokolwiek ma przeżyć do jutra, ląduje w `testy/`.
 
 ```bash
+./testy/sprawdz.sh test_menu.js       # menu główne: zakładki, zapis, sterowanie, wejście do gry
 ./testy/sprawdz.sh test_brama.js      # brama pola: widoczność, przejezdność, patrol
 ./testy/sprawdz.sh test_czcionki.js   # polskie znaki: ogonki, kreski, spójność wysokości
 node testy/test_mapy.js               # ręczne plansze domen: format i zdrowy rozsądek
@@ -338,6 +339,13 @@ dzięki temu `--screenshot` łapie gotowy obraz i nie trzeba walczyć z `rAF`:
 
 Flatpakowy Chrome **nie zapisze do `/tmp`** — zrzut leci do katalogu gry
 i dopiero potem jest przenoszony.
+
+**Pułapka, która kosztowała jeden fałszywy alarm:** pod `--virtual-time-budget`
+animacje CSS **nie dobiegają końca**. Element z `animation: … both` zastyga
+w klatce startowej — menu główne wyszło na zrzucie przezroczyste, a monitor
+po prawej w ogóle się nie pojawił, choć w przeglądarce działał bez zarzutu.
+Dlatego `scena.sh` podaje `--force-prefers-reduced-motion`; gra honoruje to
+ustawienie i rysuje stan końcowy. Robiąc zrzut ręcznie, dodaj tę flagę.
 
 ## Wypchnięcie zmian na żywo
 

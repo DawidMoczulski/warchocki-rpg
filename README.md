@@ -25,6 +25,9 @@ Fanowska parodia z prawdziwymi klipami głosowymi i autorską mechaniką w stylu
   i każda daje **jeden unikalny surowiec**, bez którego nie ma wzniesienia przypisanej postaci
 - **6 bossów regionalnych** z arenami i fazami szału (z PANEM LAWETĄ 3000 włącznie)
 - **Życzenia** — dwa banery naraz (postać + jej sygnaturowa broń 5★), waluta: Złote Rolexy (150💎), gwarancja na 90. życzeniu
+- **Menu główne na cały ekran** — Edek stoi na planie zdjęciowym, a obok wisi monitor
+  z czterema kanałami: gra, instrukcja „jak grać”, sterowanie (klawisze zmieniasz od razu,
+  bez wchodzenia do gry) i dźwięk
 - **Kanał Edka** — nagrywaj filmiki, zbieraj wyświetlenia i subskrypcje
 - **Seria „SIEMA ODJAZD"** — 5 questów pod rząd: pakujemy graty, łapiemy stopa, ładujemy baterie na stacji,
   łapiemy kampera z przyczepą i jedziemy na pole Poland Rocka (3 nowe minigry)

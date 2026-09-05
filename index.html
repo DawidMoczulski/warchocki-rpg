@@ -39,16 +39,116 @@
   <button id="spcBtn" class="px" aria-label="Umiejętność">⚡</button>
   <button id="burstBtn" class="px" aria-label="Super-hit">💥</button>
 
-  <div id="title" class="ov">
-    <h1 class="px">WARCHOCKI&nbsp;RPG</h1>
-    <p class="sub px" style="color:var(--acc)">⭐ WARCHOCKI IMPACT ⭐</p>
-    <p class="sub px mut">7 postaci · żywioły i reakcje · bronie i artefakty · 6 regionów · domeny · bossowie · SIEMA ODJAZD 🎸</p>
-    <p id="testNote" class="sub px hidden" style="color:var(--ok)"></p>
-    <div class="btnrow">
-      <button id="btnNew" class="bigbtn px">▶ NOWA GRA</button>
-      <button id="btnCont" class="ghostbtn px hidden">↻ KONTYNUUJ</button>
-    </div>
-    <p class="hint px">ruch: WASD / dotyk · SPRINT: trzymaj SHIFT 🏃 · akcja/umiejętność: E ⚡ · CIOS: spacja/X/👊 · SUPER-HIT: Q 💥<br>postać: 1-2-3 / C · jedzenie: R · MAPA: M · zbieranie/gotowanie 🌿🍳 · pauza: P<br>🏖️ NOWE: Jezioro Miejskie w Chodzieży — plaża, dzieciaki i SZALONY TORPEDA pod wodą!<br><br>🎧 graj z dźwiękiem — Edek gada swoim głosem!</p>
+  <!-- ================================================================
+       MENU GŁÓWNE — „plan zdjęciowy Edka”.
+       Leży POZA #stage (position:fixed), bo ma zajmować cały ekran,
+       a scena gry jest przycięta do 16:10 i 1180 px szerokości.
+       Lewa połowa to SCENA (sygnet + Edek w świetle), prawa to MONITOR:
+       jeden ekran, który zmienia treść — zamiast siatki kafelków.
+       ================================================================ -->
+  <div id="title" class="menuScreen">
+    <div class="menuGlow" aria-hidden="true"></div>
+
+    <header class="menuBar">
+      <div class="menuBarBtns">
+        <button id="menuFS" class="iconBtn" type="button" title="Pełny ekran">⛶</button>
+        <button id="menuMute" class="iconBtn" type="button" title="Wycisz">🔊</button>
+      </div>
+    </header>
+
+    <main class="menuBody">
+
+      <section class="menuSet">
+        <h1 class="menuMark px">Warchocki<span>RPG</span></h1>
+        <canvas id="menuHero" width="520" height="560" aria-hidden="true"></canvas>
+        <p class="menuQuote px">„No i elegancko”</p>
+      </section>
+
+      <section class="menuMonitor">
+        <div class="menuTabs" role="tablist" aria-label="Menu główne">
+          <button class="menuTab px" role="tab" data-tab="graj"  aria-selected="true">Zagraj</button>
+          <button class="menuTab px" role="tab" data-tab="jak"   aria-selected="false">Jak grać</button>
+          <button class="menuTab px" role="tab" data-tab="ster"  aria-selected="false">Sterowanie</button>
+          <button class="menuTab px" role="tab" data-tab="dzwiek" aria-selected="false">Dźwięk</button>
+        </div>
+
+        <div class="menuScreenIn">
+
+          <div class="menuPane" data-pane="graj">
+            <p class="menuLead">Grasz Edkiem — robotem, który jeździ po Polsce, nagrywa filmiki
+              i zbiera zasięgi. Po drodze trzeba komuś przyłożyć.</p>
+            <div class="menuActions">
+              <button id="btnNew" class="playBtn px" type="button">Nowa gra</button>
+              <button id="btnCont" class="contBtn px hidden" type="button">Wróć do zapisu</button>
+            </div>
+            <p id="saveInfo" class="menuMeta hidden"></p>
+            <p id="testNote" class="menuMeta hidden"></p>
+            <p class="menuFoot">Graj z dźwiękiem — Edek mówi swoim głosem, z prawdziwych filmików.</p>
+          </div>
+
+          <div class="menuPane hidden" data-pane="jak">
+            <div class="howGrid">
+              <article class="how">
+                <h3 class="px">Chodzisz i gadasz</h3>
+                <p>Sześć regionów Polski: Warszawa, Chodzież, morze, Kraków, Tatry i krajowa na
+                  Poland Rocka. Ludzi zagadujesz, a oni dają zadania.</p>
+              </article>
+              <article class="how">
+                <h3 class="px">Bijesz się</h3>
+                <p>Hejterzy, dresy, drony i bossowie. Każda postać ma zwykły cios, umiejętność
+                  i super-hit, który ładuje się od zadawanych obrażeń.</p>
+              </article>
+              <article class="how">
+                <h3 class="px">Zbierasz ekipę</h3>
+                <p>Do drużyny wchodzą trzy postacie naraz i przełączasz je w locie. Nowych
+                  ziomali ściągasz życzeniami — za Złote Rolexy.</p>
+              </article>
+              <article class="how">
+                <h3 class="px">Rozwijasz postacie</h3>
+                <p>Poziomy, wzniesienia, talenty i artefakty. Materiały na to lecą z domen
+                  i z bossów — każda domena daje jeden surowiec, którego nie ma nigdzie indziej.</p>
+              </article>
+              <article class="how">
+                <h3 class="px">Wchodzisz do domen</h3>
+                <p>Pięć pięter pod rząd: rozwalasz skrzynie, beton bierzesz bombą, a podłoga
+                  potrafi się zawalić. Każda domena jest czynna w dwa dni tygodnia.</p>
+              </article>
+              <article class="how">
+                <h3 class="px">Kręcisz kanał</h3>
+                <p>Za zrobione zadania lecą filmiki, wyświetlenia i subskrypcje. To licznik
+                  tego, jak daleko zaszedłeś.</p>
+              </article>
+            </div>
+          </div>
+
+          <div class="menuPane hidden" data-pane="ster">
+            <p class="menuLead">Kliknij akcję i naciśnij nowy klawisz. Możesz przypisać też
+              przyciski myszy. Esc anuluje.</p>
+            <div id="menuKeys" class="keyList"></div>
+            <div class="menuActions">
+              <button id="menuKeysReset" class="contBtn px" type="button">Przywróć domyślne</button>
+            </div>
+          </div>
+
+          <div class="menuPane hidden" data-pane="dzwiek">
+            <div class="volrow">
+              <label for="menuVolVoice">Głos Edka i Dycha <span id="menuVolVoiceVal">100%</span></label>
+              <input id="menuVolVoice" type="range" min="0" max="100" step="1" value="100">
+            </div>
+            <div class="volrow">
+              <label for="menuVolMusic">Muzyka <span id="menuVolMusicVal">100%</span></label>
+              <input id="menuVolMusic" type="range" min="0" max="100" step="1" value="100">
+            </div>
+            <div class="menuActions">
+              <button id="menuAudioMute" class="contBtn px" type="button">Wycisz wszystko</button>
+            </div>
+            <p class="menuFoot">Głosy to prawdziwe fragmenty z filmików Edka i Dycha.
+              Muzyka bitewna ścisza się, kiedy któryś z nich mówi.</p>
+          </div>
+
+        </div>
+      </section>
+    </main>
   </div>
 
   <div id="dlg" class="px hidden">

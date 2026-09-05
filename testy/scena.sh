@@ -25,15 +25,19 @@ window.addEventListener('load',function(){
   try{
     scene='world';
     %s
-    if(typeof draw==='function')draw(0.016);
-    window.requestAnimationFrame=function(){};   // zamroź pętlę
+    if(typeof frame==='function')frame(performance.now());  // wymuś jedną klatkę
+    window.requestAnimationFrame=function(){};              // i zamroź pętlę
   }catch(e){document.title='BLAD: '+e.message;console.log('BLAD',e);}
 });
 </script>''' % sys.argv[1]
 open('_scena.html','w',encoding='utf-8').write(src.replace('</body>',inject+'</body>'))
 PY
+# --force-prefers-reduced-motion jest KONIECZNE: pod wirtualnym czasem animacje
+# CSS nie dobiegają końca i elementy z `animation: ... both` zastygają w klatce
+# startowej (u nas: całe menu główne wychodziło przezroczyste albo puste).
+# Gra i tak honoruje to ustawienie, więc zrzut pokazuje prawidłowy stan końcowy.
 timeout 180 flatpak run --filesystem="$G" com.google.Chrome --headless=new --disable-gpu --no-sandbox \
-  --virtual-time-budget=9000 --window-size=1000,700 --hide-scrollbars \
+  --force-prefers-reduced-motion --virtual-time-budget=9000 --window-size=1000,700 --hide-scrollbars \
   --screenshot="$G/_$NAZWA.png" "file://$G/_scena.html" 2>/dev/null || true
 rm -f "$G/_scena.html"
 ls -la "$G/_$NAZWA.png"

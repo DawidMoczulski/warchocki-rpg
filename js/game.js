@@ -5,9 +5,24 @@
    domeny (fale + skrzynie) • bossowie regionalni • ulepszanie postaci
    13 questów • 3 regiony • kanał Edka • prawdziwy głos z YT • Edward FM
    ===================================================================== */
-const W=480,H=300,TILE=16,RES=3; /* RES: render 3× ostrzejszy (1440×900), logika zostaje w 480×300 */
+const W=480,H=300,TILE=16;
+/* RES — ile pikseli urządzenia przypada na jeden piksel logiki gry. Logika
+   zawsze chodzi w 480×300; RES decyduje tylko o OSTROŚCI obrazu.
+   Na pełnym ekranie 1920 px szerokości canvas w RES=3 (1440 px) był
+   rozciągany w górę i tracił ostrość, dlatego na dużych i gęstych ekranach
+   wchodzimy w RES=4 (1920×1200 = 1:1 na Full HD).
+   USTALANE RAZ, PRZY STARCIE: pieczony teren trzyma kawałki w tej samej
+   skali i blituje je 1:1, więc zmiana RES w locie unieważniłaby cały cache.
+   Sufit to 4 — wyżej rośnie tylko rachunek za piksele, a różnicy nie widać. */
+let RES=3;
+try{
+  const gesty=(window.devicePixelRatio||1)>=1.5;
+  const duzy=Math.max(screen.width||0,screen.height||0)>=1600;
+  if(gesty||duzy)RES=4;
+}catch(e){}
 let MW=64,MH=44;
 const cv=document.getElementById('game'),cx=cv.getContext('2d');
+cv.width=W*RES;cv.height=H*RES;   /* atrybuty w HTML to tylko wartość startowa */
 const $=id=>document.getElementById(id);
 const stage=$('stage');
 const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -6008,8 +6023,13 @@ function renderMenu(){
   }
 }
 function showKeybind(){$('menuTiles').classList.add('hidden');$('keybindWrap').classList.remove('hidden');renderKeybind();}
-function renderKeybind(){
-  const el=$('keybindList');el.innerHTML='';
+/* Cel rysowania jest parametrem, bo listę klawiszy pokazujemy w DWÓCH
+   miejscach: w menu pauzy (#keybindList) i w menu głównym (#menuKeys).
+   Obie korzystają z tego samego KEYMAP, więc przepisanie jednej odświeża
+   też drugą — stąd renderKeybind() bez argumentu odświeża wszystkie. */
+function renderKeybind(cel){
+  if(!cel){['keybindList','menuKeys'].forEach(id=>{const e=$(id);if(e)renderKeybind(e);});return;}
+  const el=cel;el.innerHTML='';
   for(const a of Object.keys(DEFAULT_KEYS)){
     const row=document.createElement('div');row.className='kbrow';
     row.innerHTML='<span class="kbn">'+KEY_LABELS[a]+'</span>';
@@ -6027,10 +6047,12 @@ function renderKeybind(){
     btn.addEventListener('contextmenu',e=>e.preventDefault());
     row.appendChild(btn);el.appendChild(row);
   }
-  const hint=document.createElement('p');hint.className='hint px';
-  hint.innerHTML='🖱 Możesz przypisać też przyciski myszy — kliknij kafelek, a potem naciśnij LPM/PPM.<br>'+
-    'Gdy CIOS jest na myszy, kursor w grze znika — przytrzymaj <b>CTRL</b>, żeby go pokazać i kliknąć ikony.';
-  el.appendChild(hint);
+  if(el.id==='keybindList'){
+    const hint=document.createElement('p');hint.className='hint px';
+    hint.innerHTML='🖱 Możesz przypisać też przyciski myszy — kliknij kafelek, a potem naciśnij LPM/PPM.<br>'+
+      'Gdy CIOS jest na myszy, kursor w grze znika — przytrzymaj <b>CTRL</b>, żeby go pokazać i kliknąć ikony.';
+    el.appendChild(hint);
+  }
 }
 function captureRebind(code){
   if(code==='Escape'){rebindAction=null;renderKeybind();return;}
@@ -12642,6 +12664,7 @@ function openQuests(){
 /* ---------------- START ---------------- */
 function bootWorld(){
   $('title').classList.add('hidden');
+  document.body.classList.remove('menuOpen');   // menu zwalnia przewijanie strony
   $('hud').classList.remove('hidden');
   scene='world';
   refreshHUD();startMapMusic();stopSong();
@@ -12685,20 +12708,6 @@ if(!S)S=JSON.parse(JSON.stringify(DEFAULT_SAVE));
 setInterval(()=>{if(scene==='world'&&S&&REG!=='arena'){S.px=P.x;S.py=P.y;save();}},4000);
 
 /* ---------------- PĘTLA ---------------- */
-function drawTitleScene(){
-  R(cx,0,0,W,H,UI.bg1);
-  cx.fillStyle=alpha(UI.text,.6);
-  for(let i=0;i<50;i++){const x=(i*127.3)%W,y=(i*61.7)%160;if(i%3)cx.fillRect(x|0,y|0,1,1);}
-  R(cx,W/2-30,H-170,60,90,'#243358');R(cx,W/2-12,H-196,24,28,'#2c3f70');R(cx,W/2-2,H-208,5,14,'#f5c542');
-  R(cx,0,H-80,W,80,'#16203a');
-  const bx=140+Math.sin(anim)*10;
-  drawBoarTop(cx,{dx:1,t:anim},bx,H-60);
-  drawBoarTop(cx,{dx:1,t:anim+.5},bx-40,H-48);
-  drawEdekBody(cx,bx+70,H-100,1,Math.floor(anim*6)%2,2,S?S.equip:DEFAULT_SAVE.equip);
-  if(S&&S.dych){cx.save();cx.translate(bx+130,H-92);cx.scale(2,2);
-    drawDychBody(cx,0,0,1,Math.floor(anim*6+1)%2);cx.restore();}
-  drawVignette();
-}
 function typewriter(dt){
   if(scene!=='dialog'||!dlgLine)return;
   dlgChars=Math.min(dlgLine.t.length,dlgChars+dt*40);
@@ -12723,7 +12732,7 @@ function frame(ts){
   cx.setTransform(RES,0,0,RES,0,0);
   if(paused){
     switch(scene){
-      case 'title':drawTitleScene();break;
+      case 'title':drawMenuHero();break;
       case 'world':case 'dialog':drawWorld();break;
       case 'mgBoar':drawBoarMG();break;
       case 'mgDino':drawDinoMG();break;
@@ -12743,7 +12752,7 @@ function frame(ts){
     drawWorld();drawMapOverlay();requestAnimationFrame(loop);return; // mapa zamraża świat
   }
   switch(scene){
-    case 'title':drawTitleScene();break;
+    case 'title':drawMenuHero();break;
     case 'world':updateWorld(dt);drawWorld();break;
     case 'dialog':drawWorld();typewriter(dt);break;
     case 'mgBoar':updateBoar(dt);if(scene==='mgBoar')drawBoarMG();break;
@@ -12760,3 +12769,125 @@ function frame(ts){
 }
 dmatsBonus();   // dopiero tu, bo potrzebuje rejestrów DOM_MATS i ASC_MAT
 document.fonts.load('8px "Jersey 25"').finally(()=>requestAnimationFrame(loop));
+
+/* =====================================================================
+   MENU GŁÓWNE — „PLAN ZDJĘCIOWY EDKA”
+   ---------------------------------------------------------------------
+   Menu zajmuje CAŁY ekran i leży poza sceną gry (patrz .menuScreen w CSS).
+   Prawa strona to jeden monitor przełączany zakładkami, więc ustawienia
+   i sterowanie są pod ręką od pierwszej sekundy — bez wchodzenia do gry.
+   ===================================================================== */
+
+/* ---- EDEK NA SCENIE: własne płótno, ostre co do piksela ----
+   Sprite Edka to pikselart w siatce ok. 16×28. Żeby nie rozmyło go
+   skalowanie, liczymy CAŁKOWITĄ krotność powiększenia i dobieramy backing
+   store do gęstości ekranu (DPR). Przy ułamkowej skali piksele robią się
+   nierówne — jeden ma 3 punkty szerokości, sąsiad 4 — i cała sylwetka
+   wygląda na brudną. */
+let heroBox={w:0,h:0,sc:0};
+function measureMenuHero(){
+  const cvh=$('menuHero');if(!cvh)return;
+  const r=cvh.getBoundingClientRect();if(!r.width)return;
+  const dpr=Math.min(3,Math.max(1,window.devicePixelRatio||1));
+  const w=Math.round(r.width*dpr),h=Math.round(r.height*dpr);
+  if(w===heroBox.w&&h===heroBox.h)return;
+  cvh.width=w;cvh.height=h;heroBox={w,h,sc:Math.max(1,Math.floor(h/40))};
+}
+function drawMenuHero(){
+  const cvh=$('menuHero');if(!cvh||!cvh.getContext)return;
+  measureMenuHero();
+  if(!heroBox.w)return;
+  const g=cvh.getContext('2d');
+  g.setTransform(1,0,0,1,0,0);
+  g.clearRect(0,0,heroBox.w,heroBox.h);
+  g.imageSmoothingEnabled=false;                    // pikselart skalujemy twardo
+  const sc=heroBox.sc, duet=!!(S&&S.dych);
+  const podloga=heroBox.h-sc*6;
+  /* Plama światła pod nogami — to ona „stawia” Edka na scenie.
+     ZIMNA, nie złota: w palecie SERWEROWNIA złoto należy wyłącznie do waluty,
+     a chłodny błękit czyta się jak poświata monitorów, czyli światło, w którym
+     robot-influencer faktycznie stoi. */
+  const grd=g.createRadialGradient(heroBox.w/2,podloga,0,heroBox.w/2,podloga,sc*13);
+  grd.addColorStop(0,'rgba(111,201,255,.26)');grd.addColorStop(1,'rgba(111,201,255,0)');
+  g.fillStyle=grd;g.beginPath();g.ellipse(heroBox.w/2,podloga,sc*13,sc*4.4,0,0,7);g.fill();
+  const bob=reduceMotion?0:Math.round(Math.sin(anim*1.7)*sc*.5);
+  const klatka=reduceMotion?0:Math.floor(anim*3)%2;
+  const eq=(S&&S.equip)||DEFAULT_SAVE.equip;
+  const ex=heroBox.w/2-(duet?sc*11:sc*8);
+  drawEdekBody(g,ex,podloga-sc*26+bob,0,klatka,sc,eq);
+  if(duet){
+    const bob2=reduceMotion?0:Math.round(Math.sin(anim*1.7+1.1)*sc*.5);
+    g.save();g.translate(heroBox.w/2+sc*3,podloga-sc*26+bob2);g.scale(sc,sc);
+    drawDychBody(g,0,0,0,reduceMotion?0:Math.floor(anim*3+1)%2);g.restore();
+  }
+}
+
+/* ---- ZAKŁADKI MONITORA ---- */
+function menuTab(nazwa){
+  document.querySelectorAll('.menuTab').forEach(b=>
+    b.setAttribute('aria-selected',b.dataset.tab===nazwa?'true':'false'));
+  document.querySelectorAll('.menuPane').forEach(p=>
+    p.classList.toggle('hidden',p.dataset.pane!==nazwa));
+  if(nazwa==='ster')renderKeybind($('menuKeys'));
+  if(nazwa==='dzwiek')syncAudioUI();
+  const sc=document.querySelector('.menuScreenIn');if(sc)sc.scrollTop=0;
+}
+document.querySelectorAll('.menuTab').forEach(b=>{
+  b.addEventListener('click',()=>{initAudio();SFX.ok();menuTab(b.dataset.tab);});
+});
+
+/* ---- USTAWIENIA DŹWIĘKU: dwa komplety suwaków, jeden stan ----
+   Menu główne i panel w grze pokazują te same wartości. Gdyby każdy trzymał
+   swoją kopię, po zmianie w jednym drugi kłamałby aż do przeładowania. */
+function syncAudioUI(){
+  const v=Math.round(voiceVol*100),m=Math.round(musicVol*100);
+  [['volVoice','volVoiceVal',v],['menuVolVoice','menuVolVoiceVal',v],
+   ['volMusic','volMusicVal',m],['menuVolMusic','menuVolMusicVal',m]].forEach(([sid,lid,val])=>{
+    const sl=$(sid),lb=$(lid);
+    if(sl){sl.value=val;setSliderFill(sl);}
+    if(lb)lb.textContent=val+'%';
+  });
+  const txt=muted?'Włącz dźwięk':'Wycisz wszystko';
+  const mm=$('menuAudioMute');if(mm)mm.textContent=txt;
+  const mu=$('menuMute');if(mu)mu.textContent=muted?'🔇':'🔊';
+}
+if($('menuVolVoice'))$('menuVolVoice').addEventListener('input',e=>{
+  voiceVol=(+e.target.value)/100;store.set('wrpg_vol_voice',voiceVol);
+  syncAudioUI();resumeAC();applyVolumes();
+});
+if($('menuVolVoice'))$('menuVolVoice').addEventListener('change',()=>{resumeAC();previewVoice();});
+if($('menuVolMusic'))$('menuVolMusic').addEventListener('input',e=>{
+  musicVol=(+e.target.value)/100;store.set('wrpg_vol_music',musicVol);
+  syncAudioUI();resumeAC();applyVolumes();
+});
+if($('menuVolMusic'))$('menuVolMusic').addEventListener('change',()=>{resumeAC();previewMusic();});
+if($('menuAudioMute'))$('menuAudioMute').addEventListener('click',()=>{$('btnMute').click();syncAudioUI();});
+if($('menuMute'))$('menuMute').addEventListener('click',()=>{initAudio();$('btnMute').click();syncAudioUI();});
+if($('menuFS'))$('menuFS').addEventListener('click',()=>toggleFS());
+if($('menuKeysReset'))$('menuKeysReset').addEventListener('click',()=>{
+  KEYMAP=Object.assign({},DEFAULT_KEYS);saveKeys();rebindAction=null;renderKeybind();SFX.ok();
+});
+
+/* ---- CO JEST W ZAPISIE ----
+   „Wróć do zapisu” bez informacji, DOKĄD się wraca, to ślepy przycisk.
+   Pokazujemy region i poziom ekipy — tyle, żeby gracz poznał swój stan gry. */
+function opiszZapis(){
+  const el=$('saveInfo');if(!el)return;
+  /* pokazujemy TYLKO wtedy, gdy zapis naprawdę istnieje — ten sam warunek,
+     który odsłania przycisk powrotu. Inaczej świeży gracz czytał o swoim
+     „ostatnim” stanie gry, zanim w ogóle zagrał. */
+  const jest=!!store.get('wrpg');
+  if(!jest||!S||!S.quests){el.classList.add('hidden');return;}
+  const reg=((REGIONS[S.region]&&REGIONS[S.region].n)||'Warszawa')
+    .toLowerCase().replace(/(^|[\s-])(\p{L})/gu,(m,a,b)=>a+b.toUpperCase());
+  const poz=Math.max(...(S.party||['edek']).map(id=>(S.chars&&S.chars[id]&&S.chars[id].lvl)||1));
+  const zrobione=Object.keys(S.quests).filter(q=>S.quests[q]===2).length;
+  el.textContent='W zapisie: '+reg+', poziom '+poz+', '+zrobione+
+    (zrobione===1?' zrobione zadanie.':(zrobione>=2&&zrobione<=4?' zrobione zadania.':' zrobionych zadań.'));
+  el.classList.remove('hidden');
+}
+opiszZapis();
+syncAudioUI();
+menuTab('graj');
+if(!$('title').classList.contains('hidden'))document.body.classList.add('menuOpen');
+addEventListener('resize',()=>{heroBox={w:0,h:0,sc:0};});   // przeliczy skalę Edka przy zmianie okna
