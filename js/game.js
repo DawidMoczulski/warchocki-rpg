@@ -2671,6 +2671,7 @@ const ELEMENTS={
   spaw:{ic:'🔥',n:'SPAW',col:'#e04848'},
   serca:{ic:'💘',n:'SERCA',col:'#e88ac8'},
   baltyk:{ic:'🌊',n:'BAŁTYK',col:'#3a72c8'},
+  ostrze:{ic:'⚔️',n:'OSTRZE',col:'#dd1111'},
 };
 /* reakcja = aura żywiołu A na wrogu + trafienie żywiołem B (wszystkie pary mają sens!) */
 const REACT={
@@ -2695,6 +2696,13 @@ const REACT={
   'serca|swojskosc':{n:'PRZEZ ŻOŁĄDEK DO SERCA!',col:'#e88ac8',mul:1.2,charm:3},
   'piwo|swojskosc':{n:'SCHABOWY!',col:'#c9944a',mul:1.4,food:'schabowy'},
   'czas|elegancja':{n:'ZABYTEK!',col:'#f5c542',mul:1.45},
+  'baltyk|ostrze':{n:'LODOWY OSTRZ!',col:'#66ccff',mul:1.45,stun:1},
+  'elegancja|ostrze':{n:'OSTRE BŁYSKI!',col:'#ff6655',mul:1.4},
+  'czas|ostrze':{n:'PRECYZJA!',col:'#ffb366',mul:1.6},
+  'ostrze|piwo':{n:'DZIKA ZGRAJA!',col:'#ff6655',mul:1.4},
+  'ostrze|serca':{n:'SŁODKIE SZALEŃSTWO!',col:'#ff99bb',mul:1.3},
+  'ostrze|spaw':{n:'ŻAR KOSA!',col:'#ff4d33',mul:1.7,burn:3},
+  'ostrze|swojskosc':{n:'NASIEKANIE!',col:'#bb5533',mul:1.25},
 };
 const reactKey=(a,b)=>[a,b].sort().join('|');
 /* Klucze REACT MUSZĄ być posortowane alfabetycznie, bo tak je składa `reactKey`.
@@ -2872,6 +2880,37 @@ const CHARS={
     spcN:'FALA BAŁTYCKA',spcCd:12,spcD:'fala zmiata i odrzuca wszystkich wrogów',
     hitTxt:['DORSZ!','PLASK!'],
     desc:'Rzuca dorszem celniej niż niejeden bramkarz.',how:'Życzenia — własny baner'},
+  liri:{
+    burst:{jingle:'',col:'#dd1111',bar:'#dd1111',
+      ready:'[Q] 💥 KOSA MROKU!',
+      full:'💥 SUPER-HIT GOTOWY! Wciśnij [Q], wieśniaku!',cut:1.2},
+    c6:{n:'KOSIARNIA',d:'LATAJĄCE KOSY podwajają się na C6 (10 zamiast 5)'},
+    sig:'kosamCiekla',
+    /* [E] — UMIEJĘTNOŚĆ. `skM` to mnożnik obrażeń z talentu i konstelacji. */
+    skill(skM){// KOSIARA — trzy fale rozchodzą się
+      let skillMul=skM*(S.gear[S.ch]?.w==='kosamCiekla'?1.05:1);
+      const directions=[P.dir];
+      for(let i=1;i<=2;i++){
+        const dist=i*50;
+        const delayT=i*0.08;
+        setTimeout(()=>{
+          if(scene!=='world')return;
+          fxRing(P.x+DV[P.dir][0]*dist,P.y+DV[P.dir][1]*dist,60,'#dd1111',{life:0.6,w:3});
+          fxSparks(P.x+DV[P.dir][0]*dist,P.y+DV[P.dir][1]*dist,'#dd1111',8,35,{ang:P.dir*1.57,spread:0.8,g:0,sz:1.2});
+          for(const f of foes){
+            const d=Math.hypot(f.x-(P.x+DV[P.dir][0]*dist),f.y-(P.y+DV[P.dir][1]*dist));
+            if(d<80)dealDmg(f,'liri',1.4*skillMul);
+          }
+        },delayT*1000);
+      }
+      addShake(2.4,0.35);
+      toast('⚔️ KOSIARA! Trzy fale przechodzą!');
+      SFX.hit();
+    },n:'Karmazynowa Liri',elId:'ostrze',star:5,
+    spd:83,batk:26,rng:24,atk:'melee',
+    spcN:'KOSIARA',spcCd:10,spcD:'trzy fale kosy przechodzą przez pole walki',
+    hitTxt:['CYCH!','SKOWYT!','CIĘCIE!'],
+    desc:'Robotka z przeszłości. Czerwona, ostrzejsza niż słowa, kosztowniejsza niż życie.',how:'Życzenia — własny baner'},
 };
 for(const c of Object.values(CHARS)){const e=ELEMENTS[c.elId];c.el=e.ic;c.elN=e.n;c.col=e.col;c.hitCol=e.col;}
 
@@ -2897,6 +2936,7 @@ const WEAPONS={
   lukA:{n:'Łuk Amora z Tindera',star:5,atk:37,sub:{cd:48},ic:'💘',desc:'Strzela serduszkami. Boli jak match z byłą.'},
   dorszM:{n:'Legendarny Dorsz-Miecz',star:5,atk:44,sub:{cd:40},ic:'🐟',desc:'Wykuty w smażalni, hartowany w Bałtyku.'},
   wasP:{n:'Wąs Przeznaczenia',star:5,atk:38,sub:{hp:120},ic:'〰️',desc:'Widać go z kosmosu. Czuć jego moc. Nie promuje go żaden baner.'},
+  kosamCiekla:{n:'Ciekła Kosa',star:5,atk:45,sub:{atk:5,cd:25},ic:'🌀',desc:'Płynna jak krew. Ostrze, które zawsze trafia. +5% do umiejętności użytkownika.'},
 };
 /* BROŃ SYGNATUROWA — baner broni zawsze pokazuje sygnaturę postaci z banera postaci */
 /* --- ARTEFAKTY: 3 sloty (0=TALIZMAN, 1=BIŻUTERIA, 2=GADŻET) --- */
@@ -5382,7 +5422,7 @@ const BANNER_LEN=14*24*3600;                 // 14 dni (2 tygodnie) na jeden ban
    przez 14 dni stoi DYCH DZIKI, potem kolejka leci dalej po liście. */
 const BANNER_T0=Date.UTC(2026,7,10,22,0,0)/1000;
 /* Na banerze staje zawsze postać 5⭐ — 4⭐ (Jarek, Bogdan) chodzą z gwarancji */
-const BANNER_ORDER=['dych','edek','grazynka','zenek','julka'];
+const BANNER_ORDER=['dych','edek','liri','grazynka','zenek','julka'];
 const CHAR4=['jarek','bogdan'];
 /* STAWKI JAK W GENSHINIE, tylko z gwarancją ściągniętą z 90. na 80. życzenie.
    Baza jest niska (0,6%), całą robotę robi miękka gwarancja: od 65. życzenia
@@ -8012,6 +8052,55 @@ function drawGrazynkaBody(c,x,y,dir,f){
   c.fillStyle='#fff';c.beginPath();c.arc(5,-3.4,2,0,7);c.arc(8,-4.2,2.3,0,7);c.arc(11,-3.4,2,0,7);c.fill();
   c.restore();
 }
+/* --- LIRI: Karmazynowa Robotka z Kosą --- */
+const LIRI_COL={
+  body:'#8b1a1a',limb:'#a82828',joint:'#3a0a0a',boot:'#1a0a0a',
+  armor:'#2d0a0a',eye1:'#f21111',eye2:'#d62222',glow:'#ff4444',
+};
+function drawLiriBody(c,x,y,dir,f){
+  c.save();c.translate(x,y);
+  const L=LIRI_COL;
+  const legL=f?1:0,legR=f?0:1;
+  // cień
+  c.fillStyle='rgba(0,0,0,.32)';c.beginPath();c.ellipse(8,24.6,6.5,2.2,0,0,7);c.fill();
+  // nogi
+  R(c,4.4,15.6+legL,3,8.4-legL,L.limb);R(c,8.6,15.6+legR,3,8.4-legR,L.limb);
+  rr(c,4.4,15+legL,3,1.8,.9,L.joint);rr(c,8.6,15+legR,3,1.8,.9,L.joint);
+  rr(c,3.8,23+legL,4.2,1.8,.8,L.boot);rr(c,8.2,23+legR,4.2,1.8,.8,L.boot);
+  // korpus - ciemnoczerwony
+  rr(c,3.2,2.6,9.6,12,2,L.body);
+  rr(c,3.8,3.2,8.4,8.4,1.6,L.armor);
+  // ramiona zależnie od kierunku
+  if(dir===1){R(c,1.8,10,2.8,8.8,L.limb);}
+  else if(dir===2){R(c,11.4,10,2.8,8.8,L.limb);}
+  else{R(c,1.2,10,2.6,8.8,L.limb);R(c,11.2,10,2.6,8.8,L.limb);}
+  // KOSA w ręce (nie pokazywana po bokach, tylko z przodu)
+  if(dir!==1&&dir!==2){
+    R(c,13.4,9,1,9,L.joint);  // trzonek kosy
+    // ostrze - sierpowate
+    c.fillStyle=L.body;c.beginPath();
+    c.moveTo(14.4,9);c.quadraticCurveTo(16,8,16.2,11);c.quadraticCurveTo(14.8,13,14.4,13);
+    c.fill();
+  }
+  // głowa
+  if(dir===3){
+    rr(c,3.4,-7,9.2,8.4,2.6,L.body);
+  }else if(dir===0){
+    rr(c,3.4,-7,9.2,8.4,2.6,L.body);
+    // oczy - czerwone kocie
+    rr(c,5,-3.4,1.9,2.3,.9,L.eye1);rr(c,9.1,-3.4,1.9,2.3,.9,L.eye2);
+    c.fillStyle='#fff';c.fillRect(5.4,-3,.55,.55);c.fillRect(9.5,-3,.55,.55);
+    R(c,6.2,-.2,3.6,.7,L.armor);
+    // grzywka zawinięta na bok - białe pasemka
+    rr(c,2.6,-8.6,3.2,2.4,1,'#ffffff');
+    rr(c,10.2,-8.2,2.8,2.2,1,'#ffffff');
+  }else{
+    const fl=dir===1;
+    rr(c,3.4,-7,9.2,8.4,2.6,L.body);
+    rr(c,fl?3:7.8,-3.4,1.9,2.3,.9,fl?L.eye1:L.eye2);
+  }
+  c.restore();
+}
 /* ludzie z drużyny: Jarek / Zenek / Julka / Bogdan */
 const HUMAN_CFG={
   jarek:{body:'#8a6fc8',pants:'#33304a',hair:'#c0c0c0',skin:'#e8c9a0',prop:'watch'},
@@ -8056,6 +8145,7 @@ function drawHumanChar(c,id,x,y,dir,f){
    „ludzkie" (HUMAN_CFG) dostają wspólną rysowalkę i nie muszą nic deklarować. */
 CHARS.dych.draw=(c,x,y,dir,f)=>drawDychBody(c,x,y,dir,f);
 CHARS.grazynka.draw=(c,x,y,dir,f)=>drawGrazynkaBody(c,x,y,dir,f);
+CHARS.liri.draw=(c,x,y,dir,f)=>drawLiriBody(c,x,y,dir,f);
 CHARS.edek.draw=(c,x,y,dir,f)=>drawEdekBody(c,x,y,dir,f,1,S?S.equip:DEFAULT_SAVE.equip);
 function drawCharBody(c,id,x,y,dir,f){
   const C=CHARS[id];
