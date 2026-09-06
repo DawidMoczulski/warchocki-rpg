@@ -219,7 +219,8 @@ const TEST_SETUPS={
   domenaboss:{q:{dych:2},reg:'wawa',at:[39,42],zawsze:1,lvl:70,dom:10}, // pełna obsada mini-bossów
   /* KARMAZYNOWA LIRI — pełny build do testów: poz. 90, C6, talenty 10, Ciekła Kosa */
   liri:{q:{dych:2},reg:'wawa',at:[39,44],lvl:90,zawsze:1,
-    ekipa:['liri'],gra:'liri',con:6,tal:10,bron:{liri:'kosamCiekla'}},
+    ekipa:['liri'],gra:'liri',con:6,tal:10,bron:{liri:'kosamCiekla'},
+    baner:'liri',rolex:40},
 };
 (function applyTestSetup(){
   let m=null;
@@ -263,12 +264,14 @@ const TEST_SETUPS={
   /* Domeny: otwarte bez czekania na właściwy dzień + ustawiony poziom.
      Przez setTimeout, bo `DOMAINS` i `domAlways` są deklarowane DUŻO niżej
      w pliku — sięgnięcie do nich stąd wprost poleciałoby na TDZ. */
+  if(t.baner)setTimeout(()=>{banerNa(t.baner);},0);
   if(t.zawsze||t.dom)setTimeout(()=>{
     if(t.zawsze)domAlways=1;
     if(t.dom){for(const k in DOMAINS)S.domLvl[k]=t.dom;save();}
   },0);
   S.region=t.reg;S.px=t.at[0]*16+8;S.py=t.at[1]*16+8;
   S.dia=Math.max(S.dia||0,500);
+  if(t.rolex)S.rolex=Math.max(S.rolex||0,t.rolex);   // czym kręcić życzenia w teście
   save();
   setTimeout(()=>{const el=$('testNote');
     if(el){el.textContent='🧪 TRYB TESTOWY: '+key.toUpperCase()+' — kliknij KONTYNUUJ';
@@ -278,7 +281,7 @@ const TEST_SETUPS={
 /* ---------------- AUDIO: klipy z YT + piosenki ---------------- */
 /* audio jako pliki w assets/audio/ (fetch przy initAudio; muzyka bitewna leniwie) */
 const AUDIO_BASE='assets/audio/';
-const AUDIO_KEYS=["song", "burst_byku", "metro_rhythm", "s_dziki", "s_elegancko", "s_metro", "s_67", "v_piszczel", "v_spawanie", "v_los", "v_spontan", "v_zycie", "v_elegancko", "v_cochcecie", "v_kladesie", "v_napoje", "v_paleta", "v_czesc", "c_etam", "c_kopytem", "c_elegancko2", "c_ziomali", "c_strach", "c_zaspiewam", "c_uciekajcie", "c_maliny", "c_problemy", "c_kamera", "c_rolextiktok", "c_wolnyptak", "c_ziomal_dumnie", "c_rozchwytywany", "c_jarek_sprawdz", "c_diamenty", "c_krolbalu", "c_buty", "c_randka", "c_kosz", "c_serduszka", "c_dwabramki", "c_niepoddajemy", "c_spaceruje", "c_pestka", "c_koniecswiata", "c_truskawka", "c_kawa", "c_tygrysy", "c_rdzewieje", "c_prokop", "c_ryba", "c_rolexlewa", "c_ktoby", "c_odganiam", "c_pszczolki", "c_spokoj", "c_morzejazda", "c_zyciemorze", "c_mielno", "c_wywalilem", "c_typy", "c_czapka", "c_gofry", "d_mops", "d_megaweekend", "d_razem", "m_roboty", "m_wiatr", "m_puszki", "m_ministerstwo", "m_kopernik", "m_magia", "m_rolexlong", "m_meczlong", "d_siemanko", "d_mordeczko", "d_wariacie", "d_lecimy", "d_chodz", "d_song",
+const AUDIO_KEYS=["song", "burst_byku", "liri_voice", "metro_rhythm", "s_dziki", "s_elegancko", "s_metro", "s_67", "v_piszczel", "v_spawanie", "v_los", "v_spontan", "v_zycie", "v_elegancko", "v_cochcecie", "v_kladesie", "v_napoje", "v_paleta", "v_czesc", "c_etam", "c_kopytem", "c_elegancko2", "c_ziomali", "c_strach", "c_zaspiewam", "c_uciekajcie", "c_maliny", "c_problemy", "c_kamera", "c_rolextiktok", "c_wolnyptak", "c_ziomal_dumnie", "c_rozchwytywany", "c_jarek_sprawdz", "c_diamenty", "c_krolbalu", "c_buty", "c_randka", "c_kosz", "c_serduszka", "c_dwabramki", "c_niepoddajemy", "c_spaceruje", "c_pestka", "c_koniecswiata", "c_truskawka", "c_kawa", "c_tygrysy", "c_rdzewieje", "c_prokop", "c_ryba", "c_rolexlewa", "c_ktoby", "c_odganiam", "c_pszczolki", "c_spokoj", "c_morzejazda", "c_zyciemorze", "c_mielno", "c_wywalilem", "c_typy", "c_czapka", "c_gofry", "d_mops", "d_megaweekend", "d_razem", "m_roboty", "m_wiatr", "m_puszki", "m_ministerstwo", "m_kopernik", "m_magia", "m_rolexlong", "m_meczlong", "d_siemanko", "d_mordeczko", "d_wariacie", "d_lecimy", "d_chodz", "d_song",
 /* --- SIEMA ODJAZD: stop na Poland Rocka (short z Dychem) --- */
 "c_polandrock", "c_festiwalowicze", "c_kojarze", "c_zerknijcie", "c_podwiezcie", "c_zmieszcze",
 "c_bratniduch", "c_namiot", "c_planprosty", "c_trzymajtempo", "d_przeklenstwa", "c_wypatrzycie",
@@ -1836,6 +1839,38 @@ let FXP=[];       // cząsteczki (iskry/płomienie/serca/gwiazdy)
 let FXR=[];       // pierścienie uderzeniowe (shockwave)
 let FXG=[];       // kurz przy ziemi (pod postaciami)
 let AFTER=[];     // powidoki postaci (szarża Dycha)
+/* LATAJĄCE KOSY LIRI — [Q] wypuszcza je na orbitę wokół niej; po czasie znikają.
+   Każda tnie danego wroga nie częściej niż raz na `KOSA_CD`, żeby przelot przez
+   grupę nie kasował jej w jednej klatce. */
+let KOSY=[];
+const KOSA_ZYCIE=4.2,KOSA_CD=.45;
+function spawnKosy(n){
+  KOSY=[];
+  for(let i=0;i<n;i++)KOSY.push({ang:i*(6.283/n),r:22,spin:Math.random()*6.28,
+    life:KOSA_ZYCIE,life0:KOSA_ZYCIE,hit:{}});
+}
+function updateKosy(dt){
+  if(!KOSY.length)return;
+  const mul=chBurstMul('liri')*(S.gear.liri&&S.gear.liri.w==='kosamCiekla'?1.05:1);
+  for(const k of KOSY){
+    k.life-=dt;k.ang+=dt*3.4;k.spin+=dt*13;
+    k.r=34+Math.sin((1-k.life/k.life0)*3.14)*32;    // wychodzą w pole i wracają
+    for(const t in k.hit)if((k.hit[t]-=dt)<=0)delete k.hit[t];
+    const kx=P.x+Math.cos(k.ang)*k.r,ky=P.y-8+Math.sin(k.ang)*k.r*.62;
+    k.x=kx;k.y=ky;
+    for(let i=0;i<foes.length;i++){
+      const f=foes[i];
+      if(f.dead||k.hit[i])continue;
+      if(Math.hypot(f.x-kx,f.y-(ky+8))<15){
+        dealDmg(f,'liri',1.15*mul,{ox:kx,oy:ky,noEnergy:true});
+        k.hit[i]=KOSA_CD;
+        fxSparks(f.x,f.y-14,'#f21111',5,90,{life:.3});
+      }
+    }
+  }
+  KOSY=KOSY.filter(k=>k.life>0);
+}
+
 let shakeT=0,shakeMag=0,hitStop=0,hurtFlash=0,swingSide=1,flameT=0,flameDir=0;
 const FXCAP=420;
 const easeOutQ=t=>1-(1-t)*(1-t)*(1-t);
@@ -2176,21 +2211,15 @@ function tryBurst(){
   playBurstJingle(B.jingle);
   worldFlash=Math.max(worldFlash,.25);
 }
+/* Choreografia SUPER-HITU siedzi w rejestrze postaci (`burst.plan`), nie tutaj.
+   Wcześniej była tu drabinka if(dych)/else — i każda nowa postać dostawała
+   po cichu wybuchy Edka razem z jego obrażeniami. */
 function startBurstBlasts(){
-  if(burstChar==='dych'){
-    /* Dych się wywrócił — jeden wielki ciemnozielony wybuch + fale wtórne */
-    burstBlasts=[
-      {t:0,x:P.x,y:P.y,kind:'butla'},
-      {t:.35,x:P.x,y:P.y,kind:'fala'},
-      {t:.7,x:P.x,y:P.y,kind:'fala'},
-    ];
-    burstDance=2.4;   // leży, potem się zbiera
-    return;
-  }
-  /* Edek — choreografia: lewo, prawo, przód, tył, skosy, finał na środku */
-  const steps=[[26,0],[-26,0],[0,-30],[0,30],[34,-24],[-34,24],[-34,-24],[34,24],[0,-4]];
-  burstBlasts=steps.map((s,i)=>({t:i*BURST_BEAT,x:P.x+s[0],y:P.y+s[1],big:i===steps.length-1}));
-  burstDance=4.5;   // tańczy do końca 6-sekundowego hooku (1,35 s zjada przerywnik)
+  const B=(CHARS[burstChar]&&CHARS[burstChar].burst)||{};
+  const r=B.plan?B.plan():null;
+  if(!r){burstBlasts=[];burstDance=0;return;}
+  burstBlasts=r.blasts||[];
+  burstDance=r.dance||0;
 }
 function burstBlast(b){
   if(b.kind==='butla'){ // CIEMNOZIELONY WYBUCH Dycha: szkło, piana, mega odrzut
@@ -2221,6 +2250,25 @@ function burstBlast(b){
     fxRing(b.x,b.y+6,74,'#7bc950',{life:.4,w:2,ground:true});
     addShake(2.5,.2);
     beep(90,.2,'sawtooth',.07,45);
+    return;
+  }
+  if(b.kind==='kosy'){   // LIRI: wirujące kosy wychodzą w pole (patrz spawnKosy)
+    spawnKosy(b.n||5);
+    fxRing(b.x,b.y-6,54,'#f21111',{life:.4,w:4});
+    fxRing(b.x,b.y+4,44,'#ff6b6b',{life:.35,w:2,ground:true});
+    fxStarFlash(b.x,b.y-8,'#f21111',18,{life:.3,spin:7});
+    addShake(5,.32);addHitStop(.05);
+    beep(150,.35,'sawtooth',.1,60);
+    return;
+  }
+  if(b.kind==='ciecie'){  // LIRI: pojedyncze cięcie kosą w przerywniku
+    fxStarFlash(b.x,b.y-8,'#ece2e6',13,{life:.22,spin:-6});
+    fxRing(b.x,b.y-6,30,'#f21111',{life:.28,w:3});
+    fxSparks(b.x,b.y-8,'#ff6b6b',10,150,{life:.4});
+    addShake(3,.2);
+    beep(220,.16,'sawtooth',.08,90);
+    for(const f of foes)if(!f.dead&&Math.hypot(f.x-b.x,f.y-b.y)<40)
+      dealDmg(f,'liri',1.5*chBurstMul('liri'),{ox:b.x,oy:b.y,noEnergy:true});
     return;
   }
   const col='#f5c542',r=b.big?46:30;
@@ -2739,7 +2787,19 @@ const CHARS={
   edek:{
     burst:{jingle:'burst_byku',col:'#f5c542',bar:'#f5c542',
     ready:'[Q] 💥 EDWARDEM BYKU!',
-    full:'💥 SUPER-HIT GOTOWY! Wciśnij [Q], byku!',cut:1.35},
+    full:'💥 SUPER-HIT GOTOWY! Wciśnij [Q], byku!',cut:1.35,
+    /* choreografia: lewo, prawo, przód, tył, skosy, finał na środku */
+    plan(){const steps=[[26,0],[-26,0],[0,-30],[0,30],[34,-24],[-34,24],[-34,-24],[34,24],[0,-4]];
+      return{blasts:steps.map((s,i)=>({t:i*BURST_BEAT,x:P.x+s[0],y:P.y+s[1],
+        big:i===steps.length-1})),dance:4.5};},   // tańczy do końca hooku
+    txt:['JESTEM WARCHOCKIM','EDWARDEM BYKU!'],
+    /* poza w przerywniku: kołysze się i podskakuje */
+    pose(cx,k,a,anim){cx.save();cx.translate(W/2,H/2+40);
+      cx.rotate(Math.sin(anim*9)*.14);
+      cx.translate(0,-Math.abs(Math.sin(anim*9))*9);
+      cx.scale(4,4);cx.globalAlpha=a;
+      drawCharBody(cx,'edek',-8,-24,0,Math.floor(anim*8)%2);
+      cx.restore();}},
     c6:{n:'ROLEX Z DIAMENTAMI',d:'BŁYSK ROLEXA nie tylko oślepia — teraz też przypiera hejterów obrażeniami'},
     sig:'rolexM',
     /* [E] — UMIEJĘTNOŚĆ. `skM` to mnożnik obrażeń z talentu i konstelacji. */
@@ -2769,7 +2829,24 @@ const CHARS={
   dych:{
     burst:{jingle:'d_song',col:'#2f6b33',bar:'#7bc950',
     ready:'[Q] 💥 DZIKI DYCH!',
-    full:'💥 SUPER-HIT GOTOWY! Wciśnij [Q], mordeczko!',cut:1.5},
+    full:'💥 SUPER-HIT GOTOWY! Wciśnij [Q], mordeczko!',cut:1.5,
+    /* jeden wielki ciemnozielony wybuch + dwie fale wtórne */
+    plan(){return{blasts:[{t:0,x:P.x,y:P.y,kind:'butla'},
+      {t:.35,x:P.x,y:P.y,kind:'fala'},{t:.7,x:P.x,y:P.y,kind:'fala'}],
+      dance:2.4};},                                // leży, potem się zbiera
+    txt:['JESTEM DYCH!','DZIKI DYCH, DZIKI!'],
+    /* poza: buja się coraz mocniej, wywraca i drga po glebie */
+    pose(cx,k,a,anim){let rot,drop=0;
+      if(k<.5)rot=Math.sin(anim*11)*.16*(k/.5+.3);
+      else{const kk=Math.min(1,(k-.5)/.38);rot=kk*kk*1.5;drop=kk*22;}
+      if(k>=.88)rot=1.5+Math.sin((k-.88)*60)*.05;
+      cx.save();cx.translate(W/2,H/2+40+drop);
+      cx.rotate(rot);cx.scale(4,4);cx.globalAlpha=a;
+      drawCharBody(cx,'dych',-8,-24,0,0);
+      cx.save();cx.translate(5.6,-11);cx.rotate(.45+rot*.4);
+      R(cx,-1.5,-6.5,3,8,'#1e4a26');R(cx,-.7,-10,1.4,4,'#1e4a26');
+      R(cx,-.9,-3.2,1.8,2.4,'#d8cf9a');R(cx,-1.1,-6,.7,3.4,'#3d7a44');
+      cx.restore();cx.restore();}},
     c6:{n:'DZIKO, MORDECZKO',  d:'DZIKA SZARŻA leci dwa razy pod rząd'},
     sig:'butelkaD',
     /* [E] — UMIEJĘTNOŚĆ. `skM` to mnożnik obrażeń z talentu i konstelacji. */
@@ -2902,9 +2979,38 @@ const CHARS={
     hitTxt:['DORSZ!','PLASK!'],
     desc:'Rzuca dorszem celniej niż niejeden bramkarz.',how:'Życzenia — własny baner'},
   liri:{
-    burst:{jingle:'',col:'#dd1111',bar:'#dd1111',
-      ready:'[Q] 💥 KOSA MROKU!',
-      full:'💥 SUPER-HIT GOTOWY! Wciśnij [Q], wieśniaku!',cut:1.2},
+    burst:{jingle:'liri_voice',col:'#8e1620',bar:'#f21111',
+      ready:'[Q] 💥 JUŻ PO TOBIE!',
+      full:'💥 SUPER-HIT GOTOWY! Wciśnij [Q] — już po nich!',cut:2.6,
+      /* zamach tnie trzy razy przed nią, a na koniec w pole wychodzą KOSY.
+         C6 KOSIARNIA podwaja ich liczbę. */
+      plan(){const dv=DV[P.dir];
+        return{blasts:[
+          {t:0,   x:P.x+dv[0]*26,y:P.y+dv[1]*26,kind:'ciecie'},
+          {t:.16, x:P.x+dv[0]*46,y:P.y+dv[1]*46,kind:'ciecie'},
+          {t:.32, x:P.x+dv[0]*66,y:P.y+dv[1]*66,kind:'ciecie'},
+          {t:.5,  x:P.x,y:P.y,kind:'kosy',n:hasCon('liri',6)?10:5},
+        ],dance:0};},
+      txt:['JUŻ PO TOBIE','WIEŚNIAKU!'],txtY:-26,
+      /* poza: bierze zamach zza pleców i tnie — kosa jedzie za ruchem */
+      pose(cx,k,a,anim){
+        const zam=k<.55?-1.15+(k/.55)*.5:Math.min(1.5,-.65+((k-.55)/.45)*2.2);
+        cx.save();cx.translate(W/2,H/2+40);
+        cx.rotate(zam*.16);
+        cx.scale(4,4);cx.globalAlpha=a;
+        drawCharBody(cx,'liri',-8,-24,0,0);
+        cx.save();cx.translate(6,-12);cx.rotate(zam);   // sama kosa w zamachu
+        cx.translate(-13,-2);drawLiriKosa(cx,false);
+        cx.restore();cx.restore();
+        if(k>.55&&!reduceMotion){                       // smuga cięcia
+          cx.save();cx.translate(W/2,H/2+18);
+          cx.globalAlpha=a*Math.max(0,1-(k-.55)/.45)*.8;
+          cx.strokeStyle='#ece2e6';cx.lineWidth=3;
+          cx.beginPath();cx.arc(0,0,74,-1.1+zam,.5+zam);cx.stroke();
+          cx.strokeStyle='#f21111';cx.lineWidth=1.4;
+          cx.beginPath();cx.arc(0,0,68,-1.1+zam,.5+zam);cx.stroke();
+          cx.restore();
+        }}},
     c6:{n:'KOSIARNIA',d:'LATAJĄCE KOSY podwajają się na C6 (10 zamiast 5)'},
     sig:'kosamCiekla',
     /* [E] — UMIEJĘTNOŚĆ. `skM` to mnożnik obrażeń z talentu i konstelacji. */
@@ -2957,8 +3063,10 @@ const WEAPONS={
   lukA:{n:'Łuk Amora z Tindera',star:5,atk:37,sub:{cd:48},ic:'💘',desc:'Strzela serduszkami. Boli jak match z byłą.'},
   dorszM:{n:'Legendarny Dorsz-Miecz',star:5,atk:44,sub:{cd:40},ic:'🐟',desc:'Wykuty w smażalni, hartowany w Bałtyku.'},
   wasP:{n:'Wąs Przeznaczenia',star:5,atk:38,sub:{hp:120},ic:'〰️',desc:'Widać go z kosmosu. Czuć jego moc. Nie promuje go żaden baner.'},
-  kosamCiekla:{n:'Ciekła Kosa',star:5,atk:45,sub:{atk:5,cd:25},ic:'🌀',desc:'Płynna jak krew. Ostrze, które zawsze trafia. +5% do umiejętności użytkownika.'},
+  kosamCiekla:{n:'Ciekła Kosa',star:5,atk:45,sub:{atk:5,cd:25},ic:'⚔️',glow:'#f21111',
+    desc:'Płynna jak krew. W rękach Liri dokłada +5% do obrażeń [E] i [Q].'},
 };
+WEAPONS.kosamCiekla.draw=g=>drawLiriKosa(g,false);
 /* BROŃ SYGNATUROWA — baner broni zawsze pokazuje sygnaturę postaci z banera postaci */
 /* --- ARTEFAKTY: 3 sloty (0=TALIZMAN, 1=BIŻUTERIA, 2=GADŻET) --- */
 const ART_SLOTS=['🧿 TALIZMAN','💍 BIŻUTERIA','🎽 GADŻET'];
@@ -5474,6 +5582,16 @@ const bannerAt=k=>BANNER_ORDER[modP(k,BANNER_ORDER.length)];
 const bannerChar=()=>bannerAt(bannerSlot());
 const bannerNext=()=>bannerAt(bannerSlot()+1);
 const bannerWeap=()=>CHARS[bannerChar()].sig;
+/* Przewija rotację banerów tak, żeby na afiszu stanęła wskazana postać.
+   Zegar zostaje nietknięty — ruszamy tylko `banOffset`, tak jak podgląd w konsoli. */
+function banerNa(id){
+  const i=BANNER_ORDER.indexOf(id);
+  if(i<0)return false;
+  const teraz=bannerSlot();
+  const krok=modP(i-modP(teraz,BANNER_ORDER.length),BANNER_ORDER.length);
+  banOffset+=krok*BANNER_LEN;
+  return true;
+}
 const bannerLeft=()=>BANNER_LEN-modP(banNow()-BANNER_T0,BANNER_LEN);
 /* szansa na 5★: płasko do progu, potem stromo w górę, na twardej gwarancji 100% */
 const charChance=p=>p>=PITY_HARD?1:p>=PITY_SOFT?Math.min(1,CHAR_BASE+CHAR_RAMP*(p-PITY_SOFT+1)):CHAR_BASE;
@@ -5655,11 +5773,15 @@ function drawBannerArt(id,wep){
     g.save();g.translate(W2*.5+120,H2-34);g.scale(6.6,6.6);g.translate(-8,-26);
     g.globalAlpha=.75;drawCharBody(g,id,0,0,0,0);g.restore();
     const w=WEAPONS[bannerWeap()];
-    g.save();g.globalAlpha=.22;g.fillStyle='#f5c542';
+    g.save();g.globalAlpha=.22;g.fillStyle=w.glow||'#f5c542';
     g.beginPath();g.arc(W2*.34,H2*.5,112,0,7);g.fill();g.restore();
-    g.font='140px serif';g.textAlign='center';g.textBaseline='middle';
-    g.fillText(w.ic,W2*.34,H2*.5);
-    g.textAlign='left';g.textBaseline='alphabetic';
+    /* broń z własnym rysunkiem (`draw`) rysuje się sama — emoji zostaje dla
+       reszty. Ciekła Kosa jako 🌀 świeciła na banerze na NIEBIESKO. */
+    if(w.draw){g.save();g.translate(W2*.34,H2*.5);g.scale(11,11);
+      g.rotate(Math.sin(anim*.9)*.06);g.translate(-16,-9);w.draw(g);g.restore();}
+    else{g.font='140px serif';g.textAlign='center';g.textBaseline='middle';
+      g.fillText(w.ic,W2*.34,H2*.5);
+      g.textAlign='left';g.textBaseline='alphabetic';}
   }else{
     g.save();g.translate(W2*.5,H2-34);g.scale(9,9);g.translate(-8,-26);
     drawCharBody(g,id,0,0,0,Math.floor(anim*1.6)%2);g.restore();
@@ -9386,7 +9508,7 @@ function doSelfie(){
   selfie.st='leave';selfie.t=Math.min(selfie.t,3);
 }
 function updateWorld(dt){
-  updateFX(dt);
+  updateFX(dt);updateKosy(dt);
   if(hitStop>0){hitStop-=dt;return;}   // hit-stop: świat zamiera na ułamek sekundy
   /* SUPER-HIT: przerywnik zatrzymuje świat, potem lecą wybuchy w rytmie */
   if(burstCut>0){
@@ -10926,6 +11048,15 @@ function drawWorld(){
     drawCharBody(cx,a.ch,a.x-8-camX,a.y-20-camY,a.dir,a.fr);
     cx.globalAlpha=1;}});
   ents.push({y:P.y,d:()=>drawHero(S.ch,P.x+DV[atkDir][0]*lunge,P.y+DV[atkDir][1]*lunge,P.dir,Math.floor(P.frame)%2,hurtT>0&&hurtT<1.2)});
+  /* KOSY LIRI krążą wokół niej — każda osobnym bytem, żeby te za plecami
+     chowały się za sylwetką, a te z przodu przelatywały przed nią */
+  for(const k of KOSY)ents.push({y:k.y+8,d:()=>{
+    const zanik=Math.min(1,k.life/.5);
+    cx.save();cx.translate(k.x-camX,k.y-camY);
+    /* mniejsza skala i obrót wokół OSTRZA (nie trzonka) — w locie czyta się
+       jako wirujące ostrze, a nie jak przeniesiona w powietrze cała kosa */
+    cx.globalAlpha=zanik;cx.rotate(k.spin);cx.scale(.58,.58);cx.translate(-16,-4);
+    drawLiriKosa(cx,false);cx.restore();cx.globalAlpha=1;}});
   /* BOMBA NIESIONA NAD GŁOWĄ — pulsuje coraz szybciej i pokazuje sekundy,
      żeby nie dało się o niej zapomnieć w środku walki */
   if(DOM.cur&&DOM.carry)ents.push({y:P.y+.02,d:()=>{
@@ -11272,7 +11403,6 @@ function drawWorld(){
   if(worldFlash>0){cx.fillStyle='rgba(255,255,255,'+Math.min(.9,worldFlash)+')';cx.fillRect(0,0,W,H);}
   /* PRZERYWNIK SUPER-HITU: pełnoekranowa scenka jak burst w Genshinie */
   if(burstCut>0){
-    const dych=burstChar==='dych';
     /* kolory scenki bierzemy z rejestru postaci — jedno źródło prawdy */
     const bcf=(CHARS[burstChar]&&CHARS[burstChar].burst)||{};
     const mainCol=bcf.col||'#f5c542',glowCol=bcf.bar||'#f5c542';
@@ -11289,46 +11419,20 @@ function drawWorld(){
     gg.addColorStop(0,glowCol);gg.addColorStop(1,glowCol+'00');
     cx.fillStyle=gg;cx.beginPath();cx.arc(0,0,64,0,7);cx.fill();
     cx.restore();
-    if(dych){
-      /* DYCH: chwieje się z butelką i się WYWRACA */
-      let rot,drop=0;
-      if(k<.5)rot=Math.sin(anim*11)*.16*(k/.5+.3);        // buja się coraz mocniej
-      else{const kk=Math.min(1,(k-.5)/.38);rot=kk*kk*1.5;drop=kk*22;} // grawitacja robi swoje
-      if(k>=.88)rot=1.5+Math.sin((k-.88)*60)*.05;          // drgnięcie po glebie
-      cx.save();cx.translate(W/2,H/2+40+drop);
-      cx.rotate(rot);cx.scale(4,4);cx.globalAlpha=a;
-      drawCharBody(cx,'dych',-8,-24,0,0);
-      /* ciemnozielona butelka po piwie w łapie (łapa siedzi niżej, bo Dych ma
-         dłuższe ramiona — patrz drawDychBody) */
-      cx.save();cx.translate(5.6,-11);cx.rotate(.45+rot*.4);
-      R(cx,-1.5,-6.5,3,8,'#1e4a26');       // korpus
-      R(cx,-.7,-10,1.4,4,'#1e4a26');       // szyjka
-      R(cx,-.9,-3.2,1.8,2.4,'#d8cf9a');    // etykieta
-      R(cx,-1.1,-6,.7,3.4,'#3d7a44');      // odblask szkła
-      cx.restore();
-      cx.restore();
+    /* Poza i teksty scenki idą z rejestru postaci (`burst.pose` / `burst.txt`).
+       Wcześniej stała tu drabinka if(dych)/else i KAŻDA nowa postać dostawała
+       sylwetkę Edka razem z jego okrzykiem. */
+    if(bcf.pose)bcf.pose(cx,k,a,anim);
+    const txt=bcf.txt||[];
+    if(txt.length){
       cx.globalAlpha=a;cx.textAlign='center';
       cx.font='10px "Jersey 25"';
-      cx.fillStyle='#000';cx.fillText('JESTEM DYCH!',W/2+2,H/2-62+2);
-      cx.fillStyle='#7bc950';cx.fillText('JESTEM DYCH!',W/2,H/2-62);
+      const ty=bcf.txtY||0;
+      cx.fillStyle='#000';cx.fillText(txt[0],W/2+2,H/2-62+ty+2);
+      cx.fillStyle=mainCol;cx.fillText(txt[0],W/2,H/2-62+ty);
       cx.font='13px "Jersey 25"';
-      cx.fillStyle='#000';cx.fillText('DZIKI DYCH, DZIKI!',W/2+2,H/2-42+2);
-      cx.fillStyle='#e8f4d8';cx.fillText('DZIKI DYCH, DZIKI!',W/2,H/2-42);
-    }else{
-      /* EDEK: wielki tańczący — kołysze się i podskakuje */
-      cx.save();cx.translate(W/2,H/2+40);
-      cx.rotate(Math.sin(anim*9)*.14);
-      cx.translate(0,-Math.abs(Math.sin(anim*9))*9);
-      cx.scale(4,4);cx.globalAlpha=a;
-      drawCharBody(cx,'edek',-8,-24,0,Math.floor(anim*8)%2);
-      cx.restore();
-      cx.globalAlpha=a;cx.textAlign='center';
-      cx.font='10px "Jersey 25"';
-      cx.fillStyle='#000';cx.fillText('JESTEM WARCHOCKIM',W/2+2,H/2-62+2);
-      cx.fillStyle='#f5c542';cx.fillText('JESTEM WARCHOCKIM',W/2,H/2-62);
-      cx.font='13px "Jersey 25"';
-      cx.fillStyle='#000';cx.fillText('EDWARDEM BYKU!',W/2+2,H/2-42+2);
-      cx.fillStyle='#fff7d6';cx.fillText('EDWARDEM BYKU!',W/2,H/2-42);
+      cx.fillStyle='#000';cx.fillText(txt[1],W/2+2,H/2-42+ty+2);
+      cx.fillStyle=glowCol;cx.fillText(txt[1],W/2,H/2-42+ty);
     }
     /* iskrzące gwiazdki wokół sceny */
     if(!reduceMotion&&Math.random()<.5)
