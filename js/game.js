@@ -3218,33 +3218,37 @@ function ikonaEdekE(g,r){
   g.fillRect(-.2,-.42,2.2,.84);
   g.restore();
 }
-/* EDEK [Q] EDWARDEM BYKU — ROGI BYKA. Wąs przegrał dwa podejścia: w tej skali
-   czytał się raz jak brwi, raz jak okulary. Rogi są jednym prostym kształtem
-   i siedzą wprost w okrzyku. */
+/* EDEK [Q] EDWARDEM BYKU — JEGO TWARZ: kanciasty łeb, wizjer z POZIOMYM
+   PASKIEM zamiast oczu i wąs. Głowa jest OBRYSEM, nie plamą — wersja
+   z wypełnioną głową i wyciętym wizjerem zjadała cały orb i robiła w nim
+   dziurę. Teraz czerń rysuje kształt, a jasna zostaje szczelina skanera. */
 function ikonaEdekQ(g,r){
-  const u=r/10;g.save();g.scale(u,u);g.fillStyle=IKO;
-  for(let i=0;i<6;i++){                        // promienie super-hitu
-    g.save();g.rotate(i*1.047+.52);
-    g.beginPath();g.moveTo(-.5,-9.3);g.lineTo(.5,-9.3);g.lineTo(0,-7.4);
+  const u=r/10;g.save();g.scale(u,u);
+  g.fillStyle=IKO;g.strokeStyle=IKO;g.lineJoin='round';
+  for(let i=0;i<8;i++){                          // promienie super-hitu
+    g.save();g.rotate(i*.785+.39);
+    g.beginPath();g.moveTo(-.55,-9.5);g.lineTo(.55,-9.5);g.lineTo(0,-8.1);
     g.closePath();g.fill();g.restore();
   }
-  for(const zn of [-1,1]){                     // dwa rogi wygięte w górę
-    g.save();g.scale(zn,1);
-    g.beginPath();
-    g.moveTo(1.4,-1.2);
-    g.bezierCurveTo(4.2,-1.6,6.6,-2.6,7.4,-5.6);
-    g.bezierCurveTo(8.3,-2.2,6.6,.9,3.4,1.9);
-    g.lineTo(1.4,1.9);
-    g.closePath();g.fill();g.restore();
-  }
-  g.beginPath();                               // czoło byka między rogami
-  g.moveTo(-2.2,-1.4);g.lineTo(2.2,-1.4);
-  g.bezierCurveTo(2.6,3.2,1.4,5.9,0,5.9);
-  g.bezierCurveTo(-1.4,5.9,-2.6,3.2,-2.2,-1.4);
-  g.closePath();g.fill();
+  g.fillRect(-4.6,-8.5,1.3,1.7);                 // anteny
+  g.fillRect(3.3,-8.5,1.3,1.7);
+  g.lineWidth=1.3;                               // obrys głowy
+  g.beginPath();
+  const x=-5.7,y=-6.4,w=11.4,h=11.9,rad=2.7;
+  g.moveTo(x+rad,y);
+  g.arcTo(x+w,y,x+w,y+h,rad);g.arcTo(x+w,y+h,x,y+h,rad);
+  g.arcTo(x,y+h,x,y,rad);g.arcTo(x,y,x+w,y,rad);
+  g.closePath();g.stroke();
+  rr(g,-4,-4.6,8,5,1.4,IKO);                     // wizjer
   g.globalCompositeOperation='destination-out';
-  g.beginPath();g.arc(-1.05,1.1,.62,0,7);g.fill();   // ślepia
-  g.beginPath();g.arc(1.05,1.1,.62,0,7);g.fill();
+  rr(g,-3.05,-2.85,6.1,1.4,.6,'#000');           // PASEK SKANERA — jasna szczelina
+  g.globalCompositeOperation='source-over';
+  g.beginPath();                                 // wąs — odsunięty od wizjera
+  g.moveTo(-4.1,2.5);
+  g.bezierCurveTo(-2.1,1.6,2.1,1.6,4.1,2.5);
+  g.bezierCurveTo(3.6,4.3,1.8,3.6,0,3.6);
+  g.bezierCurveTo(-1.8,3.6,-3.6,4.3,-4.1,2.5);
+  g.closePath();g.fill();
   g.restore();
 }
 /* DYCH [E] DZIKA SZARŻA — grot pędu z liniami rozpędu */
