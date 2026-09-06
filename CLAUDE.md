@@ -75,6 +75,13 @@ do handlerów sterowania. Handler `pointerdown` na `#stage` przyjmuje **tylko to
 co pada na płótno** (`if(e.target!==cv)return;`). Nie wracać do listy wyjątków
 „to nie jest gra" — właśnie na niej przejechało menu i suwaki głośności umarły.
 
+**Umiejętności i super-hity.** Wszystko, co odróżnia postacie w walce, siedzi
+w JEJ wpisie w `CHARS`: `skill()`, `burst.plan` (co wybucha), `burst.pose`
+(sylwetka w przerywniku), `burst.txt` (okrzyk) i `ico` (rysowane ikony orbów
+[E]/[Q]). Wcześniej stała tu drabinka `if(dych)…else`, gdzie „else" znaczyło
+EDEK — każda nowa postać po cichu dziedziczyła jego choreografię, jego okrzyk
+i jego obrażenia. Pilnuje tego `test_liri.js`.
+
 **Zapis.** `DEFAULT_SAVE` dokłada brakujące pola przy KAŻDYM wczytaniu, więc
 migracje sprawdzaj na obiekcie **wczytanym**, nie na scalonym — inaczej warunek
 nigdy się nie odpali.
@@ -82,6 +89,15 @@ nigdy się nie odpali.
 ## Pułapki, które już kosztowały czas
 
 - **`pkill -f` w Bashu zabija własny shell.** Zabijaj po PID.
+- **`node --check` NIE wykryje brakującej stałej ani literówki w nazwie
+  funkcji** — to poprawna składnia, wyjątek leci dopiero przy użyciu.
+  Zmieniałeś umiejętność? Odpal `test_liri.js`, on je faktycznie uruchamia.
+- Zrzuty przez własny skrypt: `--virtual-time-budget` **nie napędza pętli
+  `requestAnimationFrame` tak jak `setTimeout`**. Jeśli sterujesz grą ręcznie,
+  najpierw zamroź RAF, potem wołaj `updateWorld` w pętli, a `frame()` na końcu
+  raz — inaczej klatki nakładają się i zrzut kłamie. Dolny HUD (paski HP, orby)
+  i tak potrafi się w takim zrzucie nie pojawić: to ograniczenie harnessu,
+  nie usterka gry.
 - Zrzuty: pod `--virtual-time-budget` **animacje CSS nie dobiegają końca** —
   element z `animation: … both` zastyga w klatce startowej i zrzut kłamie.
   Dawać `--force-prefers-reduced-motion` (`testy/scena.sh` już ma).
@@ -105,6 +121,7 @@ Pełny opis w `TESTOWANIE.md` (tam też skróty `?test=…` i komendy konsoli).
 ./testy/sprawdz.sh test_menu.js       # menu: zakładki, sterowanie, zapis, zdarzenia
 ./testy/sprawdz.sh test_brama.js      # brama Poland Rocka: widoczność i przejezdność
 ./testy/sprawdz.sh test_czcionki.js   # polskie znaki: ogonki, kreski, spójność
+./testy/sprawdz.sh test_liri.js       # umiejętności KAŻDEJ postaci: [E], [Q], ikony orbów
 ./testy/test_dzwiek.sh                # czy dźwięk MA CO ściszać (własny serwer HTTP)
 node testy/test_mapy.js               # ręczne plansze: format i zdrowy rozsądek
 ./testy/scena.sh <nazwa> '<js>'       # zrzut jednej klatki gry
