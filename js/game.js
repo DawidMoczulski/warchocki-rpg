@@ -3192,6 +3192,217 @@ function ikonaLiriQ(g,r){
   g.restore();
 }
 CHARS.liri.ico={e:ikonaLiriE,q:ikonaLiriQ};
+
+/* --- IKONY UMIEJĘTNOŚCI RESZTY EKIPY -------------------------------------
+   Ta sama zasada co u Liri: czarna sylwetka + wycięcia (destination-out),
+   przez które prześwieca ciecz orba. Rysowane pod ~21-29 px, więc każdy
+   kształt musi się bronić SYLWETKĄ — detale w tej skali i tak znikają.
+   Każda ikona mówi, co robi umiejętność, nie kim jest postać.             */
+const IKO='#07050a';
+/* EDEK [E] BŁYSK ROLEXA — koperta zegarka sypiąca błyskiem */
+function ikonaEdekE(g,r){
+  const u=r/10;g.save();g.scale(u,u);g.fillStyle=IKO;
+  for(let i=0;i<8;i++){                       // promienie błysku
+    g.save();g.rotate(i*.785);
+    g.beginPath();g.moveTo(-.62,-9.1);g.lineTo(.62,-9.1);g.lineTo(0,-6.2);
+    g.closePath();g.fill();g.restore();
+  }
+  g.fillRect(-1.9,-6.1,3.8,1.5);              // pasek góra
+  g.fillRect(-1.9,4.6,3.8,1.5);               // pasek dół
+  g.beginPath();g.arc(0,-.2,4.5,0,7);g.fill();// koperta
+  g.globalCompositeOperation='destination-out';
+  g.beginPath();g.arc(0,-.2,2.85,0,7);g.fill();   // tarcza
+  g.restore();
+  g.save();g.scale(u,u);g.fillStyle=IKO;      // wskazówki na wyciętej tarczy
+  g.fillRect(-.42,-2.5,.84,2.5);
+  g.fillRect(-.2,-.42,2.2,.84);
+  g.restore();
+}
+/* EDEK [Q] EDWARDEM BYKU — ROGI BYKA. Wąs przegrał dwa podejścia: w tej skali
+   czytał się raz jak brwi, raz jak okulary. Rogi są jednym prostym kształtem
+   i siedzą wprost w okrzyku. */
+function ikonaEdekQ(g,r){
+  const u=r/10;g.save();g.scale(u,u);g.fillStyle=IKO;
+  for(let i=0;i<6;i++){                        // promienie super-hitu
+    g.save();g.rotate(i*1.047+.52);
+    g.beginPath();g.moveTo(-.5,-9.3);g.lineTo(.5,-9.3);g.lineTo(0,-7.4);
+    g.closePath();g.fill();g.restore();
+  }
+  for(const zn of [-1,1]){                     // dwa rogi wygięte w górę
+    g.save();g.scale(zn,1);
+    g.beginPath();
+    g.moveTo(1.4,-1.2);
+    g.bezierCurveTo(4.2,-1.6,6.6,-2.6,7.4,-5.6);
+    g.bezierCurveTo(8.3,-2.2,6.6,.9,3.4,1.9);
+    g.lineTo(1.4,1.9);
+    g.closePath();g.fill();g.restore();
+  }
+  g.beginPath();                               // czoło byka między rogami
+  g.moveTo(-2.2,-1.4);g.lineTo(2.2,-1.4);
+  g.bezierCurveTo(2.6,3.2,1.4,5.9,0,5.9);
+  g.bezierCurveTo(-1.4,5.9,-2.6,3.2,-2.2,-1.4);
+  g.closePath();g.fill();
+  g.globalCompositeOperation='destination-out';
+  g.beginPath();g.arc(-1.05,1.1,.62,0,7);g.fill();   // ślepia
+  g.beginPath();g.arc(1.05,1.1,.62,0,7);g.fill();
+  g.restore();
+}
+/* DYCH [E] DZIKA SZARŻA — grot pędu z liniami rozpędu */
+function ikonaDychE(g,r){
+  const u=r/10;g.save();g.scale(u,u);g.fillStyle=IKO;
+  g.beginPath();                              // grot
+  g.moveTo(7.6,0);g.lineTo(.4,5.6);g.lineTo(.4,2);g.lineTo(-1.4,2);
+  g.lineTo(-1.4,-2);g.lineTo(.4,-2);g.lineTo(.4,-5.6);
+  g.closePath();g.fill();
+  for(const y of [-3.7,0,3.7]){               // linie pędu z tyłu
+    g.beginPath();
+    g.moveTo(-7.9,y-.72);g.lineTo(-3.5,y-.72);g.lineTo(-3.5,y+.72);g.lineTo(-7.9,y+.72);
+    g.closePath();g.fill();
+  }
+  g.restore();
+}
+/* DYCH [Q] DZIKI DYCH — butelka z korkiem w powietrzu */
+function ikonaDychQ(g,r){
+  const u=r/10;g.save();g.scale(u,u);g.fillStyle=IKO;
+  g.beginPath();                              // butelka: szyjka, barki, korpus
+  g.moveTo(-1.5,-6.4);g.lineTo(1.5,-6.4);g.lineTo(1.5,-3.4);
+  g.bezierCurveTo(3.9,-2.2,4.4,-.4,4.4,2.2);
+  g.lineTo(4.4,6.2);
+  g.bezierCurveTo(4.4,7.1,3.7,7.4,2.8,7.4);
+  g.lineTo(-2.8,7.4);
+  g.bezierCurveTo(-3.7,7.4,-4.4,7.1,-4.4,6.2);
+  g.lineTo(-4.4,2.2);
+  g.bezierCurveTo(-4.4,-.4,-3.9,-2.2,-1.5,-3.4);
+  g.closePath();g.fill();
+  g.save();g.translate(3.9,-7.2);g.rotate(.5); // korek wystrzelony
+  g.fillRect(-1.15,-1.5,2.3,3);g.restore();
+  g.globalCompositeOperation='destination-out';
+  g.fillRect(-2.9,1.3,5.8,3.1);               // etykieta
+  g.restore();
+}
+/* GRAŻYNKA [E] GORĄCY ROSÓŁ — MISKA z parą. Chochla nie przeszła trzech
+   podejść: raz czytała się jak rękawica, raz jak dłoń, raz (z parą po bokach)
+   jak widelec. Miska mówi „rosół" wprost, a umiejętność leczy, nie miesza. */
+function ikonaGrazynkaE(g,r){
+  const u=r/10;g.save();g.scale(u,u);g.fillStyle=IKO;
+  g.beginPath();                                // czasza miski
+  g.moveTo(-7.4,.9);
+  g.bezierCurveTo(-7.4,6.9,7.4,6.9,7.4,.9);
+  g.closePath();g.fill();
+  g.beginPath();                                // kołnierz miski
+  g.moveTo(-8.6,-.6);g.lineTo(8.6,-.6);g.lineTo(8.6,1.1);
+  g.bezierCurveTo(8.6,1.9,-8.6,1.9,-8.6,1.1);
+  g.closePath();g.fill();
+  g.fillRect(-3.4,6.2,6.8,1.5);                 // stopka
+  for(const zn of [-1,0,1]){                    // trzy pasma pary — faliste, nie proste
+    g.save();g.translate(zn*3.5,0);
+    g.beginPath();
+    g.moveTo(-.72,-2.4);
+    g.bezierCurveTo(1.4,-4.1,-1.4,-5.4,.6,-7.6);
+    g.lineTo(1.7,-7);
+    g.bezierCurveTo(0,-5.1,2.7,-3.8,.72,-1.9);
+    g.closePath();g.fill();g.restore();
+  }
+  g.restore();
+}
+/* JAREK [E] STOP-KLATKA — tarcza zegara z wyciętą pauzą */
+function ikonaJarekE(g,r){
+  const u=r/10;g.save();g.scale(u,u);g.fillStyle=IKO;
+  g.fillRect(-2.5,-9,5,1.6);                   // koronka
+  g.fillRect(-.75,-8.1,1.5,1.5);
+  g.beginPath();g.arc(0,.4,6.6,0,7);g.fill();  // koperta
+  g.globalCompositeOperation='destination-out';
+  g.beginPath();g.arc(0,.4,5.15,0,7);g.fill(); // tarcza
+  g.restore();
+  g.save();g.scale(u,u);g.fillStyle=IKO;
+  g.fillRect(-2.3,-2.1,1.6,5);                 // znak PAUZY — „czas stoi"
+  g.fillRect(.7,-2.1,1.6,5);
+  g.restore();
+}
+/* ZENEK [E] PALNIK 3000°C — mała dysza z boku i DUŻY język ognia z wyciętym
+   rdzeniem. Wcześniej korpus był większy od płomienia i wychodziła suszarka. */
+function ikonaZenekE(g,r){
+  const u=r/10;g.save();g.scale(u,u);g.fillStyle=IKO;
+  g.beginPath();                                   // dysza
+  g.moveTo(-9,-2.1);g.lineTo(-5.4,-2.1);g.lineTo(-4.6,-1.2);
+  g.lineTo(-4.6,1.2);g.lineTo(-5.4,2.1);g.lineTo(-9,2.1);
+  g.closePath();g.fill();
+  g.fillRect(-7.9,2.1,1.9,3.4);                    // rączka
+  g.beginPath();                                   // PŁOMIEŃ — język ognia w górę
+  g.moveTo(-4.4,1.4);
+  g.bezierCurveTo(-1.4,2.6,1.1,1.4,1.6,-1.1);
+  g.bezierCurveTo(3.9,.9,4.4,3.4,3.1,5.2);
+  g.bezierCurveTo(6.4,4.4,8.1,.6,6.6,-2.9);
+  g.bezierCurveTo(5.4,-5.6,2.4,-7.1,2.9,-9.1);
+  g.bezierCurveTo(.4,-7.6,-.6,-4.4,.4,-2.4);
+  g.bezierCurveTo(-.9,-2.9,-1.9,-4.1,-2.1,-5.4);
+  g.bezierCurveTo(-3.9,-3.4,-4.9,-.9,-4.4,1.4);
+  g.closePath();g.fill();
+  g.globalCompositeOperation='destination-out';
+  g.beginPath();                                   // gorący rdzeń
+  g.moveTo(-1.1,.4);
+  g.bezierCurveTo(.4,1.1,1.9,.4,2.1,-1.1);
+  g.bezierCurveTo(3.1,.1,3.4,1.9,2.4,3.1);
+  g.bezierCurveTo(4.1,2.1,4.6,-.4,3.4,-2.4);
+  g.bezierCurveTo(2.4,-4.1,.9,-4.9,1.1,-6.1);
+  g.bezierCurveTo(-.4,-5.1,-1.1,-2.9,-.4,-1.4);
+  g.bezierCurveTo(-1.4,-2.1,-1.6,-2.9,-1.9,-3.4);
+  g.bezierCurveTo(-2.4,-2.1,-2.1,-.6,-1.1,.4);
+  g.closePath();g.fill();
+  g.restore();
+}
+/* JULKA [E] ZAUROCZENIE — serce przeszyte strzałą */
+function ikonaJulkaE(g,r){
+  const u=r/10;g.save();g.scale(u,u);g.fillStyle=IKO;
+  g.beginPath();                               // serce
+  g.moveTo(0,6.4);
+  g.bezierCurveTo(-7.4,1.4,-6.2,-4.4,-3.1,-4.4);
+  g.bezierCurveTo(-1.3,-4.4,0,-2.9,0,-2);
+  g.bezierCurveTo(0,-2.9,1.3,-4.4,3.1,-4.4);
+  g.bezierCurveTo(6.2,-4.4,7.4,1.4,0,6.4);
+  g.closePath();g.fill();
+  g.save();g.rotate(-.62);                     // strzała na wylot
+  g.fillRect(-8.6,-.6,5.2,1.2);
+  g.fillRect(3.4,-.6,3.4,1.2);
+  g.beginPath();g.moveTo(9.4,0);g.lineTo(6.4,-2.1);g.lineTo(6.4,2.1);
+  g.closePath();g.fill();
+  g.beginPath();g.moveTo(-8.6,0);g.lineTo(-6.2,-2.1);   // lotki
+  g.lineTo(-5.1,-2.1);g.lineTo(-7.5,0);g.lineTo(-5.1,2.1);
+  g.lineTo(-6.2,2.1);g.closePath();g.fill();
+  g.restore();
+  g.restore();
+}
+/* BOGDAN [E] FALA BAŁTYCKA — grzbiet fali z zawijanym barankiem */
+function ikonaBogdanE(g,r){
+  const u=r/10;g.save();g.scale(u,u);g.fillStyle=IKO;
+  g.beginPath();                               // grzbiet i zawinięcie
+  g.moveTo(-8.6,3.6);
+  g.bezierCurveTo(-8,-3.4,-2.4,-6.9,2.4,-5.1);
+  g.bezierCurveTo(6.8,-3.5,7.5,.6,5.1,2.3);
+  g.bezierCurveTo(3.1,3.7,.6,2.6,.5,.4);
+  g.bezierCurveTo(1.9,2.1,3.9,2.1,4.3,.6);
+  g.bezierCurveTo(4.8,-1.3,3.1,-3.3,.3,-3.6);
+  g.bezierCurveTo(-3.6,-4,-6,-.7,-5.9,3.6);
+  g.closePath();g.fill();
+  for(const y of [5.4,7.6]){                   // spokojna woda pod falą
+    g.beginPath();
+    g.moveTo(-8.6,y);
+    g.bezierCurveTo(-5.6,y-1.5,-3.4,y+1.5,-.4,y);
+    g.bezierCurveTo(2.6,y-1.5,4.8,y+1.5,7.8,y);
+    g.lineTo(7.8,y+1.2);
+    g.bezierCurveTo(4.8,y+2.7,2.6,y-.3,-.4,y+1.2);
+    g.bezierCurveTo(-3.4,y+2.7,-5.6,y-.3,-8.6,y+1.2);
+    g.closePath();g.fill();
+  }
+  g.restore();
+}
+CHARS.edek.ico    ={e:ikonaEdekE,    q:ikonaEdekQ};
+CHARS.dych.ico    ={e:ikonaDychE,    q:ikonaDychQ};
+CHARS.grazynka.ico={e:ikonaGrazynkaE};
+CHARS.jarek.ico   ={e:ikonaJarekE};
+CHARS.zenek.ico   ={e:ikonaZenekE};
+CHARS.julka.ico   ={e:ikonaJulkaE};
+CHARS.bogdan.ico  ={e:ikonaBogdanE};
 /* BROŃ SYGNATUROWA — baner broni zawsze pokazuje sygnaturę postaci z banera postaci */
 /* --- ARTEFAKTY: 3 sloty (0=TALIZMAN, 1=BIŻUTERIA, 2=GADŻET) --- */
 const ART_SLOTS=['🧿 TALIZMAN','💍 BIŻUTERIA','🎽 GADŻET'];

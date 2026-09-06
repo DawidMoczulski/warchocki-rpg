@@ -93,3 +93,21 @@ T('Ciekla Kosa dokłada obrazenia tylko Liri',()=>{
   ok(zKosa>bezKosy,'bron musi podnosic ATK');
   S.gear.liri.w='kosamCiekla';
 });
+
+T('kazda postac ma rysowane ikony [E]/[Q] i zadna nie rzuca wyjatkiem',()=>{
+  const pom=document.createElement('canvas');pom.width=pom.height=64;
+  const g=pom.getContext('2d');
+  for(const id of Object.keys(CHARS)){
+    const C=CHARS[id];
+    ok(C.ico&&typeof C.ico.e==='function',id+': brak rysowanej ikony [E]');
+    g.save();g.translate(32,32);C.ico.e(g,14);g.restore();   // wyjatek wywali test
+    if(C.burst){
+      ok(typeof C.ico.q==='function',id+': ma [Q], wiec musi miec ikone [Q]');
+      g.save();g.translate(32,32);C.ico.q(g,14);g.restore();
+    }
+    /* ikona nie ma prawa zostawic po sobie zmienionego stanu plotna —
+       inaczej kolejny element HUD rysuje sie w trybie „lighter" albo poloprzezroczysty */
+    eq(g.globalCompositeOperation,'source-over',id+': ikona zostawila zmieniony tryb rysowania');
+    eq(g.globalAlpha,1,id+': ikona zostawila zmienione globalAlpha');
+  }
+});
