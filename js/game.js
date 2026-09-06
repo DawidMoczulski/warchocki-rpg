@@ -1843,21 +1843,51 @@ let AFTER=[];     // powidoki postaci (szarża Dycha)
    Każda tnie danego wroga nie częściej niż raz na `KOSA_CD`, żeby przelot przez
    grupę nie kasował jej w jednej klatce. */
 let KOSY=[];
+const KOSA_ZYCIE=4.2,KOSA_CD=.45;
 /* CIĘCIA LIRI — łuk fali uderzeniowej WYGIĘTY WOKÓŁ NIEJ: środek krzywizny
    siedzi na Liri, a promień to odległość, na jaką doleciało szarpnięcie.
    Pierwsza wersja rysowała łuk wokół punktu PRZED nią i wychodziły z tego
    okręgi — czyli dokładnie te „wybuchające kółka", o które poszła reklamacja. */
 let CIECIA=[];
-function addCiecie(x,y,dir,promien,zawija){
-  CIECIA.push({x,y,dir,r:promien,zawija:!!zawija,life:.3,life0:.3});
+/* Fala czeka na swoją kolej W PĘTLI GRY (`op` = opóźnienie), nie na setTimeout.
+   setTimeout leciał obok gry: nie wiedział o pauzie, o zmianie sceny ani
+   o spowolnieniu czasu, i nie dało się go sprawdzić testem. */
+function addCiecie(x,y,dir,promien,zawija,op,dmg,mul){
+  CIECIA.push({x,y,dir,r:promien,zawija:!!zawija,op:op||0,dmg:dmg||0,mul:mul||1,
+    life:.3,life0:.3});
+}
+/* moment błysku: iskry wzdłuż cięcia, wstrząs i obrażenia w pierścieniu fali */
+function ciecieUderza(c){
+  const dv=DV[c.dir],baza=Math.atan2(dv[1],dv[0]);
+  const bx=c.x+dv[0]*c.r,by=c.y+dv[1]*c.r;
+  fxSparks(bx,by,'#ffe9e9',c.zawija?9:6,120,
+    {ang:baza,spread:1.15,g:0,sz:1.3,life:.3,add:true});
+  addShake(c.zawija?3.4:1.9,c.zawija?.26:.16);
+  if(c.zawija)addHitStop(.045);
+  beep(c.zawija?170:250,.13,'sawtooth',.075,c.zawija?70:110);
+  if(!c.dmg)return;
+  for(const f of foes){
+    if(f.dead)continue;
+    const rx=f.x-c.x,ry=f.y-c.y,dl=Math.hypot(rx,ry);
+    if(dl<c.r+18&&dl>c.r-26&&(rx*dv[0]+ry*dv[1])>dl*.25)
+      dealDmg(f,'liri',c.dmg*c.mul,{ox:bx,oy:by});
+  }
 }
 function updateCiecia(dt){
   if(!CIECIA.length)return;
-  for(const c of CIECIA)c.life-=dt;
-  CIECIA=CIECIA.filter(c=>c.life>0);
+  for(const c of CIECIA){
+    if(c.op>0){                      // jeszcze nie jej kolej
+      c.op-=dt;
+      if(c.op<=0)ciecieUderza(c);
+      continue;
+    }
+    c.life-=dt;
+  }
+  CIECIA=CIECIA.filter(c=>c.op>0||c.life>0);
 }
 function drawCiecia(cx,camX,camY){
   for(const c of CIECIA){
+    if(c.op>0)continue;                        // ta fala jeszcze nie wyszła
     const k=1-c.life/c.life0;                  // 0 = błysk, 1 = zgasło
     const zanik=Math.min(1,c.life/c.life0*1.5);
     const r=c.r*(1+k*.1);                      // szarpnięcie jeszcze lekko odjeżdża
@@ -1899,7 +1929,7 @@ function updateKosy(dt){
   const mul=chBurstMul('liri')*(S.gear.liri&&S.gear.liri.w==='kosamCiekla'?1.05:1);
   for(const k of KOSY){
     k.life-=dt;k.ang+=dt*3.4;k.spin+=dt*13;
-    k.r=34+Math.sin((1-k.life/k.life0)*3.14)*32;    // wychodzą w pole i wracają
+    k.r=42+Math.sin((1-k.life/k.life0)*3.14)*30;    // wychodzą w pole i wracają
     for(const t in k.hit)if((k.hit[t]-=dt)<=0)delete k.hit[t];
     const kx=P.x+Math.cos(k.ang)*k.r,ky=P.y-8+Math.sin(k.ang)*k.r*.62;
     k.x=kx;k.y=ky;
@@ -3060,34 +3090,11 @@ const CHARS={
     sig:'kosamCiekla',
     /* [E] — UMIEJĘTNOŚĆ. `skM` to mnożnik obrażeń z talentu i konstelacji. */
     skill(skM){// KOSIARA — trzy błyski cięcia lecące coraz dalej
-      const skillMul=skM*(S.gear.liri&&S.gear.liri.w==='kosamCiekla'?1.05:1);
-      const dv=DV[P.dir];
-      /* trzy szarpnięcia: przy niej, dalej, najdalej. Ostatnie się zawija
-         i bije najmocniej — to ono kończy serię. */
-      const fale=[
-        {d:30,dmg:1.1,zawija:false,t:0},
-        {d:58,dmg:1.3,zawija:false,t:110},
-        {d:88,dmg:1.7,zawija:true, t:230},
-      ];
-      for(const f of fale)setTimeout(()=>{
-        if(scene!=='world')return;
-        const cx0=P.x+dv[0]*f.d,cy0=P.y-6+dv[1]*f.d;
-        addCiecie(P.x,P.y-6,P.dir,f.d,f.zawija);   // łuk wygięty WOKÓŁ Liri
-        /* iskry lecą WZDŁUŻ cięcia, nie na wszystkie strony */
-        const baza=Math.atan2(dv[1],dv[0]);
-        fxSparks(cx0,cy0,'#ffe9e9',f.zawija?9:6,120,
-          {ang:baza,spread:1.15,g:0,sz:1.3,life:.3,add:true});
-        addShake(f.zawija?3.4:1.9,f.zawija?.26:.16);
-        if(f.zawija)addHitStop(.045);
-        beep(f.zawija?170:250,.13,'sawtooth',.075,f.zawija?70:110);
-        for(const foe of foes){
-          if(foe.dead)continue;
-          const rx=foe.x-P.x,ry=foe.y-P.y,dl=Math.hypot(rx,ry);
-          /* trafia to, co leży w stożku przed nią i w zasięgu tej fali */
-          if(dl<f.d+18&&dl>f.d-26&&(rx*dv[0]+ry*dv[1])>dl*.25)
-            dealDmg(foe,'liri',f.dmg*skillMul,{ox:cx0,oy:cy0});
-        }
-      },f.t);
+      const mul=skM*(S.gear.liri&&S.gear.liri.w==='kosamCiekla'?1.05:1);
+      /* przy niej, dalej, najdalej; ostatnie zawija i bije najmocniej */
+      addCiecie(P.x,P.y-6,P.dir,30,false,0,   1.1,mul);
+      addCiecie(P.x,P.y-6,P.dir,58,false,.11, 1.3,mul);
+      addCiecie(P.x,P.y-6,P.dir,88,true, .23, 1.7,mul);
       toast('⚔️ KOSIARA! Trzy cięcia — ostatnie zawija!');
       SFX.hit();
     },n:'Karmazynowa Liri',elId:'ostrze',star:5,
@@ -8336,12 +8343,16 @@ const LIRI_COL={
 /* KOSA — rysowana osobno, bo wchodzi i do sylwetki, i do baneru.
    `fl` odbija ją w lewo. Ostrze jest ŁUKIEM, nie prostokątem — inaczej
    z daleka czyta się jak kij, a nie kosa. */
-function drawLiriKosa(c,fl){
-  const L=LIRI_COL;
+/* Paleta LATAJĄCEJ kosy: jasne ostrze niesie kształt, ciemny trzonek daje mu
+   kontur. Sama czerwień #f21111 zlewała się z poświatą w burą chmurę. */
+const KOSA_WIDMO={blade:'#ff3b3b',bladeD:'#a3121c',haft:'#1a0509',
+  haftHi:'#4a1018',trim:'#ffc4c4',rdzen:'#fff0f0'};
+function drawLiriKosa(c,fl,pal){
+  const L=pal?Object.assign({},LIRI_COL,pal):LIRI_COL;
   c.save();
   if(fl){c.translate(16,0);c.scale(-1,1);}
   R(c,13.2,1.4,1.1,16,L.haft);                     // trzonek przez całą sylwetkę
-  R(c,13.2,1.4,.4,16,'#3a1a22');                   // rozjaśniona krawędź trzonka
+  R(c,13.2,1.4,.4,16,L.haftHi||'#3a1a22');         // rozjaśniona krawędź trzonka
   c.fillStyle=L.blade;                             // ostrze — sierp odchylony w przód
   c.beginPath();
   c.moveTo(13.6,1.8);
@@ -8354,6 +8365,12 @@ function drawLiriKosa(c,fl){
   c.quadraticCurveTo(17.3,3.5,18.1,6.6);
   c.quadraticCurveTo(17.2,4.4,13.6,4.1);
   c.fill();
+  if(L.rdzen){                                     // rozświetlona krawędź tnąca
+    c.strokeStyle=L.rdzen;c.lineWidth=.5;
+    c.beginPath();
+    c.moveTo(13.7,2);c.quadraticCurveTo(18.9,1.5,18,6.8);
+    c.stroke();
+  }
   R(c,13,1.2,1.6,1,L.trim);                        // okucie pod ostrzem
   c.restore();
 }
@@ -11180,8 +11197,13 @@ function drawWorld(){
     cx.save();cx.translate(k.x-camX,k.y-camY);
     /* mniejsza skala i obrót wokół OSTRZA (nie trzonka) — w locie czyta się
        jako wirujące ostrze, a nie jak przeniesiona w powietrze cała kosa */
-    cx.globalAlpha=zanik;cx.rotate(k.spin);cx.scale(.58,.58);cx.translate(-16,-4);
-    drawLiriKosa(cx,false);cx.restore();cx.globalAlpha=1;}});
+    /* CZERWONA paleta i większa skala — w wersji perłowej (tej z ręki)
+       wyglądały w locie jak drobne ikonki, a mają być kosami. */
+    cx.globalAlpha=zanik*.2;
+    cx.save();cx.globalCompositeOperation='lighter';
+    cx.fillStyle='#7d1018';cx.beginPath();cx.arc(0,0,4.5,0,7);cx.fill();cx.restore();
+    cx.globalAlpha=zanik;cx.rotate(k.spin);cx.scale(.8,.8);cx.translate(-16,-4);
+    drawLiriKosa(cx,false,KOSA_WIDMO);cx.restore();cx.globalAlpha=1;}});
   /* BOMBA NIESIONA NAD GŁOWĄ — pulsuje coraz szybciej i pokazuje sekundy,
      żeby nie dało się o niej zapomnieć w środku walki */
   if(DOM.cur&&DOM.carry)ents.push({y:P.y+.02,d:()=>{
