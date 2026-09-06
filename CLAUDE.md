@@ -124,11 +124,12 @@ których nie było.
 
 ## Aktualny stan treści
 
-7 postaci · 7 żywiołów · 24 zadania · 6 regionów + arena · 7 domen · 8 bossów ·
-45 typów wrogów · 73 kafle · 37 NPC · 18 broni · 51 ubrań · 158 klipów audio.
+8 postaci · 8 żywiołów · 24 zadania · 6 regionów + arena · 7 domen · 8 bossów ·
+45 typów wrogów · 73 kafle · 37 NPC · 19 broni · 51 ubrań · 158 klipów audio.
 
 - **Regiony:** Warszawa, Chodzież, Polskie Morze, Kraków, Tatry, Trasa na Poland Rock
-- **Postacie:** Edek, Dych Dziki, Grażynka 3000, Jarek Zegarek, Zenek Spawacz, Julka z Tindera, Rybak Bogdan
+- **Postacie:** Edek, Dych Dziki, Grażynka 3000, Jarek Zegarek, Zenek Spawacz, Julka z Tindera,
+  Rybak Bogdan, Karmazynowa Liri (żywioł OSTRZE, kosa; baner po Edku)
 - **Domeny:** Piwnica Hejterów, Dziki Las (obie z RĘCZNIE rysowanymi planszami po 5 pięter),
   Zatopione Molo, Smocza Jama, Lodowa Grota, Wesele w Remizie, Pole Namiotowe.
   Pozostałe pięć wciąż losuje piętra — do czasu, aż dostaną swoje mapy.

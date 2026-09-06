@@ -217,6 +217,9 @@ const TEST_SETUPS={
   wesele:{q:{dych:2},reg:'chodziez',at:[85,32],zawsze:1,lvl:50},    // pod WESELEM W REMIZIE
   las:{q:{dych:2},reg:'chodziez',at:[42,12],zawsze:1,lvl:50},       // pod DZIKIM LASEM
   domenaboss:{q:{dych:2},reg:'wawa',at:[39,42],zawsze:1,lvl:70,dom:10}, // pełna obsada mini-bossów
+  /* KARMAZYNOWA LIRI — pełny build do testów: poz. 90, C6, talenty 10, Ciekła Kosa */
+  liri:{q:{dych:2},reg:'wawa',at:[39,44],lvl:90,zawsze:1,
+    ekipa:['liri'],gra:'liri',con:6,tal:10,bron:{liri:'kosamCiekla'}},
 };
 (function applyTestSetup(){
   let m=null;
@@ -231,6 +234,12 @@ const TEST_SETUPS={
   S.dych=1;
   if(!S.chars.dych)S.chars.dych=newChar();
   if(!S.party.includes('dych'))S.party.push('dych');
+  /* `ekipa` dokłada postacie do drużyny — MUSI być przed pętlą poziomów niżej,
+     inaczej dosypana postać zostaje na 1. poziomie i test nic nie mówi. */
+  for(const id of (t.ekipa||[])){
+    if(!S.chars[id])S.chars[id]=newChar();
+    if(!S.party.includes(id)&&S.party.length<3)S.party.push(id);
+  }
   /* uczciwa walka: poziom 25 + wzniesienie, które ten poziom w ogóle dopuszcza */
   for(const id of S.party){const c=S.chars[id];
     if(!c)continue;
@@ -239,6 +248,18 @@ const TEST_SETUPS={
     if(!c.tal)c.tal={n:1,e:1,q:1};if(c.con===undefined)c.con=0;}
   S.quests=Object.assign({},S.quests,t.q);
   S.visited[t.reg]=1;S.introDone=true;
+  /* `bron` wkłada broń do ręki, `con`/`tal` podkręcają konstelacje i talenty,
+     `gra` wybiera aktywną postać. Pola są generyczne — kolejny skrót testowy
+     korzysta z nich bez zmian w kodzie. */
+  for(const id of Object.keys(t.bron||{})){
+    const w=t.bron[id];S.gearOwn[w]=(S.gearOwn[w]||0)+1;
+    if(!S.gear[id])S.gear[id]={w:null,a:[null,null,null]};
+    S.gear[id].w=w;
+  }
+  if(t.con||t.tal)for(const id of S.party){const c=S.chars[id];if(!c)continue;
+    if(t.con)c.con=Math.max(c.con||0,t.con);
+    if(t.tal)c.tal={n:t.tal,e:t.tal,q:t.tal};}
+  if(t.gra&&S.party.includes(t.gra))S.ch=t.gra;
   /* Domeny: otwarte bez czekania na właściwy dzień + ustawiony poziom.
      Przez setTimeout, bo `DOMAINS` i `domAlways` są deklarowane DUŻO niżej
      w pliku — sięgnięcie do nich stąd wprost poleciałoby na TDZ. */
@@ -8052,52 +8073,136 @@ function drawGrazynkaBody(c,x,y,dir,f){
   c.fillStyle='#fff';c.beginPath();c.arc(5,-3.4,2,0,7);c.arc(8,-4.2,2.3,0,7);c.arc(11,-3.4,2,0,7);c.fill();
   c.restore();
 }
-/* --- LIRI: Karmazynowa Robotka z Kosą --- */
+/* --- KARMAZYNOWA LIRI — czerwona robotka z kosą -------------------------
+   Trzy rzeczy niosą tę sylwetkę i żadnej nie wolno zgubić przy poprawkach:
+   CZARNY EKRAN twarzy z kocimi ślepiami, grzywka zawinięta na JEDEN bok
+   z bladymi pasemkami, i ciemna zbroja ze zdobieniem na torsie.
+   Złota tu nie ma świadomie — należy do waluty (patrz CLAUDE.md). */
 const LIRI_COL={
-  body:'#8b1a1a',limb:'#a82828',joint:'#3a0a0a',boot:'#1a0a0a',
-  armor:'#2d0a0a',eye1:'#f21111',eye2:'#d62222',glow:'#ff4444',
+  body:'#c1272d',      // karmazynowa obudowa
+  bodyD:'#8e1620',     // cień obudowy / wnętrze kończyn
+  limb:'#a81f27',      // ramiona i uda
+  armor:'#1f0a0f',     // ciemna zbroja: napierśnik, nagolenniki, naramienniki
+  armorHi:'#3a141c',   // krawędź zbroi, żeby czerń nie była płaską dziurą
+  trim:'#d9c2c8',      // zdobienia — perłowe srebro, NIE złoto
+  visor:'#0d0509',     // czarny ekran twarzy
+  eye1:'#f21111',      // ślepie bliższe / lewe
+  eye2:'#d62222',      // ślepie dalsze / prawe
+  hair:'#7d121c',      // grzywka
+  hairHi:'#ece2e6',    // blade pasemka
+  joint:'#2a0c12',boot:'#160609',
+  blade:'#e8dde2',bladeD:'#9aa0a8',haft:'#241016',   // kosa: ostrze + trzonek
 };
-function drawLiriBody(c,x,y,dir,f){
-  c.save();c.translate(x,y);
+/* KOSA — rysowana osobno, bo wchodzi i do sylwetki, i do baneru.
+   `fl` odbija ją w lewo. Ostrze jest ŁUKIEM, nie prostokątem — inaczej
+   z daleka czyta się jak kij, a nie kosa. */
+function drawLiriKosa(c,fl){
   const L=LIRI_COL;
+  c.save();
+  if(fl){c.translate(16,0);c.scale(-1,1);}
+  R(c,13.2,1.4,1.1,16,L.haft);                     // trzonek przez całą sylwetkę
+  R(c,13.2,1.4,.4,16,'#3a1a22');                   // rozjaśniona krawędź trzonka
+  c.fillStyle=L.blade;                             // ostrze — sierp odchylony w przód
+  c.beginPath();
+  c.moveTo(13.6,1.8);
+  c.quadraticCurveTo(19.4,1.2,18.2,7.4);
+  c.quadraticCurveTo(17.4,3.6,13.6,3.4);
+  c.fill();
+  c.fillStyle=L.bladeD;                            // grzbiet ostrza (cień pod krawędzią)
+  c.beginPath();
+  c.moveTo(13.6,3.1);
+  c.quadraticCurveTo(17.3,3.5,18.1,6.6);
+  c.quadraticCurveTo(17.2,4.4,13.6,4.1);
+  c.fill();
+  R(c,13,1.2,1.6,1,L.trim);                        // okucie pod ostrzem
+  c.restore();
+}
+function drawLiriBody(c,x,y,dir,f){
+  const L=LIRI_COL;
+  c.save();c.translate(x,y);
   const legL=f?1:0,legR=f?0:1;
-  // cień
   c.fillStyle='rgba(0,0,0,.32)';c.beginPath();c.ellipse(8,24.6,6.5,2.2,0,0,7);c.fill();
-  // nogi
+  // --- NOGI: karmazynowe uda, ciemne nagolenniki, buty
   R(c,4.4,15.6+legL,3,8.4-legL,L.limb);R(c,8.6,15.6+legR,3,8.4-legR,L.limb);
+  rr(c,4.2,19+legL,3.4,3.4,.8,L.armor);rr(c,8.4,19+legR,3.4,3.4,.8,L.armor);
   rr(c,4.4,15+legL,3,1.8,.9,L.joint);rr(c,8.6,15+legR,3,1.8,.9,L.joint);
   rr(c,3.8,23+legL,4.2,1.8,.8,L.boot);rr(c,8.2,23+legR,4.2,1.8,.8,L.boot);
-  // korpus - ciemnoczerwony
+  // --- KORPUS: obudowa → napierśnik → ZDOBIENIA
   rr(c,3.2,2.6,9.6,12,2,L.body);
-  rr(c,3.8,3.2,8.4,8.4,1.6,L.armor);
-  // ramiona zależnie od kierunku
-  if(dir===1){R(c,1.8,10,2.8,8.8,L.limb);}
-  else if(dir===2){R(c,11.4,10,2.8,8.8,L.limb);}
-  else{R(c,1.2,10,2.6,8.8,L.limb);R(c,11.2,10,2.6,8.8,L.limb);}
-  // KOSA w ręce (nie pokazywana po bokach, tylko z przodu)
-  if(dir!==1&&dir!==2){
-    R(c,13.4,9,1,9,L.joint);  // trzonek kosy
-    // ostrze - sierpowate
-    c.fillStyle=L.body;c.beginPath();
-    c.moveTo(14.4,9);c.quadraticCurveTo(16,8,16.2,11);c.quadraticCurveTo(14.8,13,14.4,13);
-    c.fill();
-  }
-  // głowa
+  rr(c,3.8,3.2,8.4,9,1.6,L.armor);                 // ciemna płyta pancerza
+  R(c,3.8,3.2,8.4,.5,L.armorHi);                   // światło na górnej krawędzi
+  /* zdobienie: trzy SZEWRONY zbiegające się w dół + kamień na mostku.
+     Świadomie NIE krzyż i nie pionowa oś z żebrami — czytało się jak apteczka. */
+  c.fillStyle=L.trim;
+  for(let i=0;i<3;i++){const yy=6.4+i*1.9,w=3.4-i*.5;
+    c.beginPath();
+    c.moveTo(8-w,yy);c.lineTo(8,yy+1.1);c.lineTo(8+w,yy);
+    c.lineTo(8+w,yy+.6);c.lineTo(8,yy+1.7);c.lineTo(8-w,yy+.6);c.fill();}
+  c.fillStyle=L.eye1;                              // karmazynowy kamień (romb) na mostku
+  c.beginPath();c.moveTo(8,3.7);c.lineTo(9.1,4.9);c.lineTo(8,6.1);c.lineTo(6.9,4.9);c.fill();
+  c.fillStyle='#ff8f8f';c.fillRect(7.7,4.4,.5,.5);  // błysk na kamieniu
+  rr(c,5.6,12.4,4.8,1.9,.9,L.joint);               // biodro
+  R(c,6.8,1.2,2.4,1.8,L.joint);                    // szyja
+  // --- RAMIONA + NARAMIENNIKI (zbroja siedzi na barkach)
+  if(dir===1){rr(c,1.6,3.6,3.2,9.2,1.4,L.limb);rr(c,1.4,3.2,3.6,3,1,L.armor);
+    rr(c,1.9,8,2.6,1.3,.6,L.joint);}
+  else if(dir===2){rr(c,11.2,3.6,3.2,9.2,1.4,L.limb);rr(c,11,3.2,3.6,3,1,L.armor);
+    rr(c,11.5,8,2.6,1.3,.6,L.joint);}
+  else{rr(c,1.2,3.6,2.7,9.2,1.2,L.limb);rr(c,12.1,3.6,2.7,9.2,1.2,L.limb);
+    rr(c,1,3.2,3.1,3,1,L.armor);rr(c,11.9,3.2,3.1,3,1,L.armor);
+    rr(c,1.5,8,2.1,1.3,.5,L.joint);rr(c,12.4,8,2.1,1.3,.5,L.joint);}
+  // --- KOSA w prawej ręce (z tyłu chowa się za sylwetką)
+  if(dir!==3)drawLiriKosa(c,dir===1);
+  // --- GŁOWA
   if(dir===3){
     rr(c,3.4,-7,9.2,8.4,2.6,L.body);
+    rr(c,4.2,-6.2,7.6,6.4,2,L.hair);               // od tyłu widać samą grzywkę
+    c.fillStyle=L.hairHi;                          // pasemka skośne także od tyłu
+    c.beginPath();c.moveTo(5.2,-6.1);c.lineTo(6,-6.1);c.lineTo(7.1,-.6);c.lineTo(6.3,-.6);c.fill();
+    c.beginPath();c.moveTo(8.8,-6);c.lineTo(9.4,-6);c.lineTo(10.1,-1);c.lineTo(9.5,-1);c.fill();
+    rr(c,2.8,-3.4,2.6,4.6,1,L.hair);               // pukiel opadający na bok
   }else if(dir===0){
     rr(c,3.4,-7,9.2,8.4,2.6,L.body);
-    // oczy - czerwone kocie
-    rr(c,5,-3.4,1.9,2.3,.9,L.eye1);rr(c,9.1,-3.4,1.9,2.3,.9,L.eye2);
-    c.fillStyle='#fff';c.fillRect(5.4,-3,.55,.55);c.fillRect(9.5,-3,.55,.55);
-    R(c,6.2,-.2,3.6,.7,L.armor);
-    // grzywka zawinięta na bok - białe pasemka
-    rr(c,2.6,-8.6,3.2,2.4,1,'#ffffff');
-    rr(c,10.2,-8.2,2.8,2.2,1,'#ffffff');
+    rr(c,4.2,-5.2,7.6,5.4,1.6,L.visor);            // CZARNY EKRAN twarzy
+    // KOCIE ŚLEPIA — skośne, zwężone do środka (wrogi wyraz), nie kwadraty
+    c.fillStyle=L.eye1;
+    c.beginPath();c.moveTo(5,-3.9);c.lineTo(7.1,-3.2);c.lineTo(7.1,-2.1);c.lineTo(5,-2.4);c.fill();
+    c.fillStyle=L.eye2;
+    c.beginPath();c.moveTo(11,-3.9);c.lineTo(8.9,-3.2);c.lineTo(8.9,-2.1);c.lineTo(11,-2.4);c.fill();
+    c.fillStyle='#ffd9d9';c.fillRect(5.4,-3.5,.5,.5);c.fillRect(10.3,-3.5,.5,.5);  // błysk
+    R(c,6.4,-.9,3.2,.5,L.armorHi);                 // wąska kreska ust
+    // GRZYWKA zawinięta na JEDEN bok (prawy), z bladymi pasemkami
+    rr(c,2.9,-8.4,10.2,3.4,1.4,L.hair);            // czasza włosów
+    c.fillStyle=L.hair;                            // pukiel: zawija się w dół i w bok
+    c.beginPath();
+    c.moveTo(11.6,-8);c.quadraticCurveTo(14.6,-6.4,13.4,-2.2);
+    c.quadraticCurveTo(13,-4.6,10.9,-5.6);c.fill();
+    /* pasemka SKOŚNE, zbiegające z czubka w stronę zawinięcia — pionowe paski
+       czytały się jak zajęcze uszy. */
+    c.fillStyle=L.hairHi;
+    c.beginPath();c.moveTo(4.6,-8.3);c.lineTo(5.5,-8.3);c.lineTo(6.6,-5.2);c.lineTo(5.8,-5.2);c.fill();
+    c.beginPath();c.moveTo(7.4,-8.4);c.lineTo(8.1,-8.4);c.lineTo(8.9,-5.4);c.lineTo(8.3,-5.4);c.fill();
+    c.fillStyle=L.hairHi;                          // pasemko biegnące po zawiniętym puklu
+    c.beginPath();
+    c.moveTo(11.9,-7.6);c.quadraticCurveTo(13.9,-6.2,13.1,-3.2);
+    c.quadraticCurveTo(13,-5.2,11.3,-6.2);c.fill();
   }else{
     const fl=dir===1;
     rr(c,3.4,-7,9.2,8.4,2.6,L.body);
-    rr(c,fl?3:7.8,-3.4,1.9,2.3,.9,fl?L.eye1:L.eye2);
+    rr(c,fl?3.4:5,-5.2,7.6,5.4,1.6,L.visor);       // ekran przesunięty w stronę patrzenia
+    c.fillStyle=fl?L.eye1:L.eye2;                  // jedno ślepie w profilu
+    if(fl){c.beginPath();c.moveTo(4.1,-3.9);c.lineTo(6.2,-3.2);c.lineTo(6.2,-2.1);c.lineTo(4.1,-2.4);c.fill();}
+    else{c.beginPath();c.moveTo(11.5,-3.9);c.lineTo(9.4,-3.2);c.lineTo(9.4,-2.1);c.lineTo(11.5,-2.4);c.fill();}
+    c.fillStyle='#ffd9d9';c.fillRect(fl?4.5:10.8,-3.5,.5,.5);
+    rr(c,2.9,-8.4,10.2,3.4,1.4,L.hair);            // czasza
+    c.fillStyle=L.hair;                            // pukiel po stronie przeciwnej do patrzenia
+    c.beginPath();
+    if(fl){c.moveTo(4.4,-8);c.quadraticCurveTo(1.4,-6.4,2.6,-2.2);
+      c.quadraticCurveTo(3,-4.6,5.1,-5.6);}
+    else{c.moveTo(11.6,-8);c.quadraticCurveTo(14.6,-6.4,13.4,-2.2);
+      c.quadraticCurveTo(13,-4.6,10.9,-5.6);}
+    c.fill();
+    R(c,fl?8.6:6.4,-8.2,.8,3,L.hairHi);            // pasemko
   }
   c.restore();
 }
@@ -9351,6 +9456,22 @@ function updateWorld(dt){
     P.diag=naUkos?(dy<0?-1:1):0;
     let sp=P.speed*(S.ch==='edek'?(SHOE_SPD[S.equip.shoes]||1):1)*(P.slow?.55:1)*(honeyT>0?.6:1)*(BUFF.t>0?1+BUFF.spd:1)
            *(P.sprint?SPRINT_MULT:1)*((DOM.cur&&DOM.carry)?.85:1);
+    /* KARMAZYNOWA POŚWIATA — za Liri wlecze się czerwony ślad. Reużywamy
+       powidoków (AFTER) z własnym mnożnikiem alfy: jej sylwetka jest czerwona,
+       więc powidok sam w sobie jest poświatą. Do tego kilka additive iskier. */
+    if(S.ch==='liri'&&!reduceMotion){
+      P.glowT=(P.glowT||0)-dt;
+      if(P.glowT<=0){P.glowT=.05;
+        /* krótkie życie i niska alfa: ma być SMUGA, nie sznur klonów —
+           przy wolnym chodzie dłuższy ślad układał się w drugą sylwetkę */
+        AFTER.push({ch:'liri',x:P.x,y:P.y,dir:P.dir,fr:Math.floor(P.frame)%2,
+          life:.22,life0:.22,al:.2});
+        fxP({x:P.x+(Math.random()-.5)*9,y:P.y-9+(Math.random()-.5)*11,
+          vx:(Math.random()-.5)*10,vy:-6-Math.random()*12,g:-4,
+          life:.42,life0:.42,sz:1.5,col:Math.random()<.5?'#f21111':'#ff6b6b',
+          add:true,shrink:true});
+      }
+    }
     const nx=P.x+dx*sp*dt,ny=P.y+dy*sp*dt;
     const wolnoX=canWalk(nx,P.y),wolnoY=canWalk(P.x,ny);
     if(wolnoX)P.x=nx;
@@ -10801,7 +10922,7 @@ function drawWorld(){
   const lunge=atkAnim>0?(atkAnim/.22)*4:0;   // wypad w kierunku ciosu
   /* powidoki (szarża Dycha) — pod bohaterem */
   for(const a of AFTER)ents.push({y:a.y-.01,d:()=>{
-    cx.globalAlpha=(a.life/a.life0)*.4;
+    cx.globalAlpha=(a.life/a.life0)*(a.al||.4);
     drawCharBody(cx,a.ch,a.x-8-camX,a.y-20-camY,a.dir,a.fr);
     cx.globalAlpha=1;}});
   ents.push({y:P.y,d:()=>drawHero(S.ch,P.x+DV[atkDir][0]*lunge,P.y+DV[atkDir][1]*lunge,P.dir,Math.floor(P.frame)%2,hurtT>0&&hurtT<1.2)});

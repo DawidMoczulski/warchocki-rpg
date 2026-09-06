@@ -383,3 +383,11 @@ cd "/home/dawid/DYSK/Gry AI/GRA_EDWARD_WARCHOCKI/web"
 git add -A && git commit -m "opis zmiany" && git push
 # GitHub Pages odświeża się po ~1 minucie
 ```
+
+## `?test=liri` — Karmazynowa Liri
+
+Liri w drużynie na poz. 90 (C6, talenty 10) z Ciekłą Kosą w ręce, ustawiona jako
+aktywna postać, start w Warszawie pod PIWNICĄ HEJTERÓW. Do sprawdzania jej
+umiejętności [E]/[Q], poświaty w ruchu i sylwetki.
+
+    http://localhost:8000/?test=liri
