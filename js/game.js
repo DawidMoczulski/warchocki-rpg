@@ -1843,7 +1843,52 @@ let AFTER=[];     // powidoki postaci (szarża Dycha)
    Każda tnie danego wroga nie częściej niż raz na `KOSA_CD`, żeby przelot przez
    grupę nie kasował jej w jednej klatce. */
 let KOSY=[];
-const KOSA_ZYCIE=4.2,KOSA_CD=.45;
+/* CIĘCIA LIRI — łuk fali uderzeniowej WYGIĘTY WOKÓŁ NIEJ: środek krzywizny
+   siedzi na Liri, a promień to odległość, na jaką doleciało szarpnięcie.
+   Pierwsza wersja rysowała łuk wokół punktu PRZED nią i wychodziły z tego
+   okręgi — czyli dokładnie te „wybuchające kółka", o które poszła reklamacja. */
+let CIECIA=[];
+function addCiecie(x,y,dir,promien,zawija){
+  CIECIA.push({x,y,dir,r:promien,zawija:!!zawija,life:.3,life0:.3});
+}
+function updateCiecia(dt){
+  if(!CIECIA.length)return;
+  for(const c of CIECIA)c.life-=dt;
+  CIECIA=CIECIA.filter(c=>c.life>0);
+}
+function drawCiecia(cx,camX,camY){
+  for(const c of CIECIA){
+    const k=1-c.life/c.life0;                  // 0 = błysk, 1 = zgasło
+    const zanik=Math.min(1,c.life/c.life0*1.5);
+    const r=c.r*(1+k*.1);                      // szarpnięcie jeszcze lekko odjeżdża
+    const rozw=(c.zawija?.85:.62)*(1-k*.18);   // łuk zwęża się, gdy gaśnie
+    const baza=Math.atan2(DV[c.dir][1],DV[c.dir][0]);
+    cx.save();
+    cx.translate(c.x-camX,c.y-camY);
+    cx.rotate(baza);
+    cx.scale(1,.72);                           // spłaszczenie — widok z góry
+    cx.globalCompositeOperation='lighter';
+    cx.lineCap='round';
+    /* dwie warstwy: szeroka czerwona poświata i wąski biały rdzeń ostrza */
+    for(let w=0;w<2;w++){
+      cx.globalAlpha=(w?.95:.4)*zanik;
+      cx.strokeStyle=w?'#fff2f2':'#f21111';
+      cx.lineWidth=w?1.6:5;
+      cx.beginPath();cx.arc(0,0,r,-rozw,rozw);cx.stroke();
+      if(c.zawija){
+        /* HAK: oba końce zakręcają do środka — trzecie cięcie „podcina" */
+        for(const zn of [-1,1]){
+          const ex=Math.cos(rozw*zn)*r,ey=Math.sin(rozw*zn)*r;
+          cx.beginPath();
+          cx.arc(ex,ey,r*.3,zn>0?rozw:rozw+3.14,zn>0?rozw+2.2:rozw+5.34,zn<0);
+          cx.stroke();
+        }
+      }
+    }
+    cx.restore();
+  }
+  cx.globalAlpha=1;cx.globalCompositeOperation='source-over';
+}
 function spawnKosy(n){
   KOSY=[];
   for(let i=0;i<n;i++)KOSY.push({ang:i*(6.283/n),r:22,spin:Math.random()*6.28,
@@ -3014,24 +3059,36 @@ const CHARS={
     c6:{n:'KOSIARNIA',d:'LATAJĄCE KOSY podwajają się na C6 (10 zamiast 5)'},
     sig:'kosamCiekla',
     /* [E] — UMIEJĘTNOŚĆ. `skM` to mnożnik obrażeń z talentu i konstelacji. */
-    skill(skM){// KOSIARA — trzy fale rozchodzą się
-      let skillMul=skM*(S.gear[S.ch]?.w==='kosamCiekla'?1.05:1);
-      const directions=[P.dir];
-      for(let i=1;i<=2;i++){
-        const dist=i*50;
-        const delayT=i*0.08;
-        setTimeout(()=>{
-          if(scene!=='world')return;
-          fxRing(P.x+DV[P.dir][0]*dist,P.y+DV[P.dir][1]*dist,60,'#dd1111',{life:0.6,w:3});
-          fxSparks(P.x+DV[P.dir][0]*dist,P.y+DV[P.dir][1]*dist,'#dd1111',8,35,{ang:P.dir*1.57,spread:0.8,g:0,sz:1.2});
-          for(const f of foes){
-            const d=Math.hypot(f.x-(P.x+DV[P.dir][0]*dist),f.y-(P.y+DV[P.dir][1]*dist));
-            if(d<80)dealDmg(f,'liri',1.4*skillMul);
-          }
-        },delayT*1000);
-      }
-      addShake(2.4,0.35);
-      toast('⚔️ KOSIARA! Trzy fale przechodzą!');
+    skill(skM){// KOSIARA — trzy błyski cięcia lecące coraz dalej
+      const skillMul=skM*(S.gear.liri&&S.gear.liri.w==='kosamCiekla'?1.05:1);
+      const dv=DV[P.dir];
+      /* trzy szarpnięcia: przy niej, dalej, najdalej. Ostatnie się zawija
+         i bije najmocniej — to ono kończy serię. */
+      const fale=[
+        {d:30,dmg:1.1,zawija:false,t:0},
+        {d:58,dmg:1.3,zawija:false,t:110},
+        {d:88,dmg:1.7,zawija:true, t:230},
+      ];
+      for(const f of fale)setTimeout(()=>{
+        if(scene!=='world')return;
+        const cx0=P.x+dv[0]*f.d,cy0=P.y-6+dv[1]*f.d;
+        addCiecie(P.x,P.y-6,P.dir,f.d,f.zawija);   // łuk wygięty WOKÓŁ Liri
+        /* iskry lecą WZDŁUŻ cięcia, nie na wszystkie strony */
+        const baza=Math.atan2(dv[1],dv[0]);
+        fxSparks(cx0,cy0,'#ffe9e9',f.zawija?9:6,120,
+          {ang:baza,spread:1.15,g:0,sz:1.3,life:.3,add:true});
+        addShake(f.zawija?3.4:1.9,f.zawija?.26:.16);
+        if(f.zawija)addHitStop(.045);
+        beep(f.zawija?170:250,.13,'sawtooth',.075,f.zawija?70:110);
+        for(const foe of foes){
+          if(foe.dead)continue;
+          const rx=foe.x-P.x,ry=foe.y-P.y,dl=Math.hypot(rx,ry);
+          /* trafia to, co leży w stożku przed nią i w zasięgu tej fali */
+          if(dl<f.d+18&&dl>f.d-26&&(rx*dv[0]+ry*dv[1])>dl*.25)
+            dealDmg(foe,'liri',f.dmg*skillMul,{ox:cx0,oy:cy0});
+        }
+      },f.t);
+      toast('⚔️ KOSIARA! Trzy cięcia — ostatnie zawija!');
       SFX.hit();
     },n:'Karmazynowa Liri',elId:'ostrze',star:5,
     spd:83,batk:26,rng:24,atk:'melee',
@@ -3067,6 +3124,67 @@ const WEAPONS={
     desc:'Płynna jak krew. W rękach Liri dokłada +5% do obrażeń [E] i [Q].'},
 };
 WEAPONS.kosamCiekla.draw=g=>drawLiriKosa(g,false);
+/* --- IKONY UMIEJĘTNOŚCI LIRI (orby [E]/[Q] w rogu ekranu) ----------------
+   Czarne sylwetki wektorowe zamiast kolorowych emoji — kontrast robi czerń
+   na cieczy orba. Oczodół i szczeliny są WYCIĘTE (destination-out), więc
+   prześwieca przez nie poziom naładowania. Rysowane wokół (0,0), `r` to
+   promień orba. */
+function ikonaLiriE(g,r){
+  /* Rysowane pod ~21 px, więc niesie SYLWETKA, nie detale. Czaszkę czyta się
+     dzięki trzem rzeczom: okrągłemu czerepowi, ZWĘŻENIU przy jarzmie i węższej
+     szczęce. Bez tego zwężenia wychodziła litera „D" z dziurą. */
+  const u=r/10;
+  g.save();g.scale(u,u);
+  g.fillStyle='#07050a';
+  /* PÓŁ CZASZKI — przekrój pionowy, jakby ostrze przeszło przez środek */
+  g.beginPath();
+  g.moveTo(0,-7);
+  g.bezierCurveTo(-4.6,-7,-7.1,-4.8,-7.1,-1.6);   // czerep
+  g.bezierCurveTo(-7.1,.5,-5.9,1.3,-5.5,2.2);     // skroń schodzi do jarzma
+  g.lineTo(-4.3,2.5);                              // ZWĘŻENIE (jarzmo)
+  g.bezierCurveTo(-5,3.1,-5.1,4.2,-5,5.2);        // szczęka, węższa od czerepu
+  g.bezierCurveTo(-4.9,6.4,-3.9,7,-2.5,7);
+  g.lineTo(0,7);
+  g.closePath();g.fill();
+  /* SIERP — szeroki u nasady, zwężony w szpic; obok czaszki */
+  g.beginPath();
+  g.moveTo(2.2,-6.8);
+  g.bezierCurveTo(8.4,-6.2,9.2,.9,3.6,5.2);
+  g.bezierCurveTo(7.4,.2,6.6,-3.6,2.2,-4.3);
+  g.closePath();g.fill();
+  g.beginPath();
+  g.moveTo(1.7,-5.6);g.lineTo(3.3,-5.6);g.lineTo(2.8,7);g.lineTo(1.9,7);
+  g.closePath();g.fill();
+  /* wycięcia: oczodół (największy nośnik czytelności), nozdrze, dwa zęby */
+  g.globalCompositeOperation='destination-out';
+  g.beginPath();g.ellipse(-4.3,-2.6,2.45,2.25,-.18,0,7);g.fill();
+  g.beginPath();
+  g.moveTo(-.75,-.3);g.lineTo(-2.3,1.7);g.lineTo(-.75,1.7);g.closePath();g.fill();
+  g.fillRect(-3.9,4.4,.95,2.6);
+  g.fillRect(-2.1,4.4,.95,2.6);
+  g.restore();
+}
+function ikonaLiriQ(g,r){
+  const u=r/10;
+  g.save();g.scale(u,u);
+  g.fillStyle='#07050a';
+  /* PARĘ WYGIĘTYCH OSTRZY w wirze — każde to ten sam sierp, obrócony */
+  for(let i=0;i<3;i++){
+    g.save();
+    g.rotate(i*2.094);                // 120° między ostrzami
+    g.beginPath();
+    g.moveTo(0,-1.5);
+    g.bezierCurveTo(4.4,-3.9,7.3,-2.2,7.6,1.9);
+    g.bezierCurveTo(5.9,-.9,3.4,-1.2,.6,.7);
+    g.closePath();g.fill();
+    g.restore();
+  }
+  g.beginPath();g.arc(0,0,1.5,0,7);g.fill();   // piasta wiru
+  g.globalCompositeOperation='destination-out';
+  g.beginPath();g.arc(0,0,.62,0,7);g.fill();   // prześwit w środku
+  g.restore();
+}
+CHARS.liri.ico={e:ikonaLiriE,q:ikonaLiriQ};
 /* BROŃ SYGNATUROWA — baner broni zawsze pokazuje sygnaturę postaci z banera postaci */
 /* --- ARTEFAKTY: 3 sloty (0=TALIZMAN, 1=BIŻUTERIA, 2=GADŻET) --- */
 const ART_SLOTS=['🧿 TALIZMAN','💍 BIŻUTERIA','🎽 GADŻET'];
@@ -9385,11 +9503,17 @@ function drawSkillOrb(ox,oy,r,fill,col,icon,ready,key,subtxt){
     cx.fillRect(-2,-r*1.7,3.5,r*3.4);cx.restore();
   }
   cx.restore();
-  /* symbol umiejętności */
+  /* Symbol umiejętności. Postać może dać własny RYSUNEK zamiast emoji
+     (CHARS[id].ico) — emoji zostaje dla reszty ekipy. */
   cx.globalAlpha=ready?1:.55;
-  cx.font=Math.round(r*1.05)+'px serif';cx.textAlign='center';cx.textBaseline='middle';
-  cx.fillText(icon,ox,oy+1);
-  cx.textBaseline='alphabetic';cx.globalAlpha=1;
+  if(typeof icon==='function'){
+    cx.save();cx.translate(ox,oy+1);icon(cx,r);cx.restore();
+  }else{
+    cx.font=Math.round(r*1.05)+'px serif';cx.textAlign='center';cx.textBaseline='middle';
+    cx.fillText(icon,ox,oy+1);
+    cx.textBaseline='alphabetic';
+  }
+  cx.globalAlpha=1;
   /* obwódka + aura gotowości + iskra krążąca po obwodzie */
   cx.lineWidth=1.6;cx.strokeStyle=ready?'#fff':alpha(UI.text,.45);
   cx.beginPath();cx.arc(ox,oy,r,0,7);cx.stroke();
@@ -9508,7 +9632,7 @@ function doSelfie(){
   selfie.st='leave';selfie.t=Math.min(selfie.t,3);
 }
 function updateWorld(dt){
-  updateFX(dt);updateKosy(dt);
+  updateFX(dt);updateKosy(dt);updateCiecia(dt);
   if(hitStop>0){hitStop-=dt;return;}   // hit-stop: świat zamiera na ułamek sekundy
   /* SUPER-HIT: przerywnik zatrzymuje świat, potem lecą wybuchy w rytmie */
   if(burstCut>0){
@@ -11050,6 +11174,7 @@ function drawWorld(){
   ents.push({y:P.y,d:()=>drawHero(S.ch,P.x+DV[atkDir][0]*lunge,P.y+DV[atkDir][1]*lunge,P.dir,Math.floor(P.frame)%2,hurtT>0&&hurtT<1.2)});
   /* KOSY LIRI krążą wokół niej — każda osobnym bytem, żeby te za plecami
      chowały się za sylwetką, a te z przodu przelatywały przed nią */
+  drawCiecia(cx,camX,camY);          // błyski cięć [E] — nad terenem, pod postaciami
   for(const k of KOSY)ents.push({y:k.y+8,d:()=>{
     const zanik=Math.min(1,k.life/.5);
     cx.save();cx.translate(k.x-camX,k.y-camY);
@@ -11325,12 +11450,13 @@ function drawWorld(){
   // UMIEJĘTNOŚCI: okrągłe naczynia (E = skill, Q = SUPER-HIT) w prawym dolnym rogu
   {const c=CHARS[S.ch],B=CHARS[S.ch].burst;
    const ready=spcT<=0,cdFill=c.spcCd?1-Math.max(0,spcT)/c.spcCd:1;
+   const ikE=(c.ico&&c.ico.e)||c.el,ikQ=(c.ico&&c.ico.q)||'💥';
    if(B){
-     drawSkillOrb(W-58,H-40,10.5,cdFill,c.col,c.el,ready,'E',Math.ceil(spcT)+'s');
+     drawSkillOrb(W-58,H-40,10.5,cdFill,c.col,ikE,ready,'E',Math.ceil(spcT)+'s');
      const e=burstE[S.ch]||0,full=e>=100;
-     drawSkillOrb(W-26,H-44,14.5,e/100,B.bar,'💥',full,'Q',Math.floor(e)+'%');
+     drawSkillOrb(W-26,H-44,14.5,e/100,B.bar,ikQ,full,'Q',Math.floor(e)+'%');
    }else{
-     drawSkillOrb(W-26,H-44,12.5,cdFill,c.col,c.el,ready,'E',Math.ceil(spcT)+'s');
+     drawSkillOrb(W-26,H-44,12.5,cdFill,c.col,ikE,ready,'E',Math.ceil(spcT)+'s');
    }
    if(BUFF.t>0){cx.fillStyle=UI.ok;cx.font='6px "Jersey 25"';
      cx.fillText('🍴 BUFF '+Math.ceil(BUFF.t)+'s',8,H-10-S.party.length*17-4);}}
