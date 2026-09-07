@@ -815,7 +815,19 @@ function buildChodziez(){
      x=66, żeby nie wejść w pas areny MEGA DRESA). Do plaży na drugim brzegu
      prowadzi jedyna droga: ścieżka przez lasek wzdłuż wschodniego brzegu. */
   rect(0,26,60,46,3);rect(0,25,58,25,1);           // jezioro + promenada nad wodą
-  rect(0,14,47,15,2);                              // szosa
+  rect(0,14,47,15,2);                              // szosa przez miasto
+  /* SZOSA NA WSCHÓD — do remizy. Wcześniej wschodnia część mapy była odcięta
+     pasem drzew i dojście do WESELA W REMIZIE wykuwała dopiero siatka
+     bezpieczeństwa: jednokaflowy tunel przez las, po którym nie było widać,
+     że to w ogóle droga. Teraz jest tam normalna szosa ze zjazdem i placykiem.
+     Kładziemy ją TUTAJ, przed `wildFill`: generator nie rusza kafli drogi ani
+     ich sąsiedztwa (`adjSpecial`), więc las sam się przed nią rozstępuje. */
+  rect(47,14,88,15,2);                             // szosa dalej na wschód
+  rect(86,16,87,29,1);                             // zjazd w prawo, na remizę
+  rect(83,29,89,32,1);                             // placyk przed remizą
+  set(84,27,29);set(50,16,29);                     // drogowskazy „REMIZA →"
+  for(let x=54;x<=82;x+=7)if(at(x,16)===0)set(x,16,11);  // latarnie wzdłuż szosy
+  set(90,30,10);set(82,31,12);                     // ławka i kwietnik przy placyku
   rect(23,4,24,13,1);rect(10,17,10,23,1);rect(10,17,37,17,1);rect(37,17,37,23,1);
   rect(16,4,16,13,1);rect(16,4,23,4,1);
   const trees=[[3,3],[6,5],[9,2],[13,6],[29,3],[33,5],[41,3],[44,6],[40,9],[44,11],[36,4],

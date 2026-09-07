@@ -140,6 +140,12 @@ nigdy się nie odpali.
   stała `MAPA_KOMNATY`.
 - Kłódki domen (kafle 48–50) są `SOLID`, więc BFS kontrolny musi je przepuszczać
   jawnie, inaczej wszystko za nimi zgłasza się jako nieosiągalne.
+- **`ensureConnectivity` NIE jest gwarancją, że da się gdzieś dojść po ludzku.**
+  Wykuje przejście, ale jednokaflowym tunelem przez las — gra widzi „osiągalne",
+  gracz widzi ścianę drzew. Drogi do domen kładź JAWNIE w `build…()` regionu
+  (kafel drogi 1/2), PRZED `wildFill`: generator nie tyka drogi ani jej
+  sąsiedztwa (`adjSpecial`), więc las sam się przed nią rozstępuje.
+  Pilnuje tego `test_regiony.js`.
 
 ## Testy i narzędzia
 
@@ -148,6 +154,7 @@ Pełny opis w `TESTOWANIE.md` (tam też skróty `?test=…` i komendy konsoli).
 ```bash
 ./testy/sprawdz.sh test_jama.js       # SMOCZA JAMA: 5 plansz w grze + ataki WAWELINA
 ./testy/sprawdz.sh test_wesele.js     # WESELE: kałuże, beczki i obie fazy PAŃSTWA MŁODYCH
+./testy/sprawdz.sh test_regiony.js    # czy w KAŻDYM regionie da się dojść do domen i drzwi
 ./testy/sprawdz.sh test_menu.js       # menu: zakładki, sterowanie, zapis, zdarzenia
 ./testy/sprawdz.sh test_brama.js      # brama Poland Rocka: widoczność i przejezdność
 ./testy/sprawdz.sh test_czcionki.js   # polskie znaki: ogonki, kreski, spójność

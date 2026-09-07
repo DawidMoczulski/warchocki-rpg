@@ -270,6 +270,7 @@ których już nie było. Cokolwiek ma przeżyć do jutra, ląduje w `testy/`.
 node testy/test_mapy.js               # ręczne plansze domen: format i zdrowy rozsądek
 ./testy/sprawdz.sh test_jama.js       # SMOCZA JAMA: pięć plansz w grze + wszystkie ataki WAWELINA
 ./testy/sprawdz.sh test_wesele.js     # WESELE: plansze, kałuże, beczki i obie fazy PAŃSTWA MŁODYCH
+./testy/sprawdz.sh test_regiony.js    # czy w KAŻDYM regionie da się dojść do domen, drzwi i aren
 ./testy/sprawdz.sh test_liri.js       # umiejętności KAŻDEJ postaci: [E], [Q], ikony orbów
 ```
 
@@ -278,6 +279,12 @@ ma flagę kolizji, czy paleta piętra faktycznie wylądowała na mapie i czy da 
 planszę przejść **w grze** (`domSprawdzMape`). Odpala też każdy atak smoka —
 łącznie z podniebnym ostrzałem, który trwa 10 sekund i przechodzi przez trzy
 stany — bo to są funkcje, których `node --check` nigdy nie uruchomi.
+
+`test_regiony.js` sprawdza rzecz, którą łatwo przeoczyć, bo gra jej nie zgłasza:
+czy do domeny da się DOJŚĆ. Siatka bezpieczeństwa (`ensureConnectivity`) zawsze
+w końcu wykuje przejście, ale robi to jednokaflowym tunelem przez las — dla gry
+„przejście istnieje", dla gracza „nie da się tam wejść". Dlatego test mierzy nie
+tylko osiągalność, ale i SZEROKOŚĆ drogi.
 
 `test_wesele.js` pilnuje rzeczy, które łatwo po cichu zepsuć: czy kałuże z beczek
 NAPRAWDĘ zostają na drugą fazę, czy panna młoda wywraca się w spirytusie i czy on
