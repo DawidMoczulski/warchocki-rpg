@@ -1135,6 +1135,10 @@ PITF[44]=1;PITF[70]=1;              // 70 = dno rozpadliny z wodą (też się w 
 SOLIDF[60]=1;                                 // MUR PIWNICY (60) i POSADZKA (61)
 [62,63,65,66,67,68].forEach(v=>{SOLIDF[v]=1;});  // las: klon, świerk, ruina, stos drewna, szałas, gęstwina
 [71,72].forEach(v=>{SOLIDF[v]=1;});  // BRAMA POLA: słupek i ZAMKNIĘTE skrzydło (73 = otwarte przejście, przechodzi się)
+/* GÓRY I SMOCZA JAMA (74-86): blokują skała, kosówka, turnia, stalagmit,
+   skarb, jajo i ściana jaskini. Piarg, hala, kładka, kości, żarząca szczelina
+   i dno jamy są DEPTALNE — po nich się chodzi. */
+[74,77,78,80,82,84,85].forEach(v=>{SOLIDF[v]=1;});
 /* MECH (64) i ŚCIÓŁKA (69) są deptalne — to podłoga DZIKIEGO LASU */
 const ZAMEK={48:'zloty',49:'czerwony',50:'niebieski'};
 const jestZamek=v=>!!ZAMEK[v];
@@ -1533,6 +1537,10 @@ const FOE_TYPES={
   ul:{hp:2000,atk:14,spd:0,c:'#c8935a',hood:'#8a5a2a',skin:'#a3743f',dia:0,pts:0,kbres:true,rooted:true},
   pszczola:{hp:24,atk:11,spd:106,c:'#f5c542',dia:2,pts:600,flying:true},
   krolowa:{hp:1900,atk:25,spd:76,c:'#f5c542',hood:'#3a2410',skin:'#f5c542',dia:0,pts:0,flying:true},
+  /* WAWELIN — boss ostatniego piętra SMOCZEJ JAMY. `zar` = kolory żaru,
+     który się z niego unosi przez CAŁĄ walkę (nie tylko w fazie szału). */
+  wawelin:{hp:3400,atk:32,spd:46,c:'#43285a',hood:'#8a4fc0',skin:'#c87a2a',dia:0,pts:0,
+    zar:['#b98cf0','#8a4fc0','#f5a032','#e04848']},
 };
 function spawnFoe(){
   const cfg=REGIONS[REG];
@@ -1564,7 +1572,13 @@ function mbShoot(f,type,n,sp){
   beep(type==='flash'?700:type==='rolex'?1000:300,.12,'square',.06,150);
 }
 function mbBlastAt(x,y,r,atk,poison,honey){
-  miniBlasts.push({x,y,warn:.8,r,atk,poison:!!poison,honey:!!honey});
+  miniBlasts.push({x,y,warn:.8,warn0:.8,r,atk,poison:!!poison,honey:!!honey});
+}
+/* GŁAZ Z NIEBA — ten sam mechanizm co wybuch mini-bossa (cień-ostrzeżenie,
+   potem uderzenie), tylko z własnym `warn` i własną oprawą. Dzięki temu
+   deszcz skał Wawelina nie potrzebuje drugiej pętli w update ani w draw. */
+function mbRock(x,y,r,atk,warn){
+  miniBlasts.push({x,y,warn,warn0:warn,r,atk,rock:true});
 }
 const MB_MOVES={
   widly:  f=>{mbShoot(f,'widly',1,180);addHit(f.x,f.y-30,'A SIO MI TU!','#c8a858');},
@@ -1709,7 +1723,142 @@ const BOSS_MOVES={
       mbBlastAt(P.x+Math.cos(a)*r,P.y+Math.sin(a)*r,30,dmg,false,true);}
     addHit(f.x,f.y-34,'MIODOSPAD!','#f5a032');
     beep(180,.35,'sine',.08,70);},
+  /* =================================================================
+     WAWELIN, PRADAWNY SMOK (domena SMOCZA JAMA) — trzy ataki
+     -----------------------------------------------------------------
+     Każdy jest o czymś innym: PIERŚCIEŃ każe uciekać w bok, WYDECH+SZARŻA
+     każe zejść z linii dwa razy pod rząd, a PODNIEBNY OSTRZAŁ zabiera
+     w ogóle możliwość bicia i zostawia sam unik. W fazie szału (poniżej
+     połowy HP) każdy z nich jest szybszy i gęstszy.
+     ================================================================= */
+  /* PIERŚCIEŃ OGNIA — zieje dookoła siebie, we wszystkie strony naraz.
+     Między pociskami zostaje szpara i im dalej od smoka, tym jest szersza:
+     unik polega na odbiegnięciu i wejściu w lukę, nie na przeczekaniu. */
+  ogniokrag:f=>{
+    bossHold(f,f.ph2?.8:1.15);
+    const n=f.ph2?18:13,fale=f.ph2?2:1,dmg=Math.round(f.atk*.85);
+    for(let w=0;w<fale;w++)for(let i=0;i<n;i++){
+      const a=i/n*6.28+w*(3.14/n)+f.x*.013;
+      bossShots.push({x:f.x,y:f.y-6,dx:Math.cos(a)*(112+w*44),dy:Math.sin(a)*(112+w*44),
+        life:2.8,t:'smokogien',atk:dmg});
+    }
+    fxRing(f.x,f.y-6,74,'#f5a032',{life:.5,w:5});
+    fxRing(f.x,f.y+8,60,'#b98cf0',{life:.45,w:3,ground:true});
+    fxSparks(f.x,f.y-12,'#b98cf0',18,180,{life:.6});
+    addShake(4.2,.34);worldFlash=Math.max(worldFlash,.22);
+    addHit(f.x,f.y-48,'PIERŚCIEŃ OGNIA!','#f5a032');
+    beep(150,.42,'sawtooth',.09,60);
+  },
+  /* OGNISTY WYDECH + SZARŻA — najpierw wachlarz ognia w gracza, a zaraz
+     po nim wjazd łbem po tej samej linii. Kto uniknie tylko ognia, dostaje
+     rogami; trzeba zejść z linii, a potem zejść jeszcze raz. */
+  ogienszarza:f=>{
+    const a=Math.atan2(P.y-f.y,P.x-f.x),n=f.ph2?5:3,dmg=Math.round(f.atk*.9);
+    for(let i=0;i<n;i++){
+      const off=(i-(n-1)/2)*.2;
+      bossShots.push({x:f.x+Math.cos(a)*14,y:f.y-10+Math.sin(a)*8,
+        dx:Math.cos(a+off)*196,dy:Math.sin(a+off)*196,life:2.2,t:'smokogien',atk:dmg});
+    }
+    f.zar=.55;                                  // gardło zostaje rozgrzane
+    fxSparks(f.x+Math.cos(a)*16,f.y-10+Math.sin(a)*10,'#f5a032',14,160,{life:.45,ang:a,spread:.7});
+    addHit(f.x,f.y-48,'SPALĘ CIĘ, BLASZAKU!','#e04848');
+    beep(220,.3,'sawtooth',.08,90);
+    f.telT=f.ph2?.42:.6;f.telMv='smokszarza';   // …a to jest tell szarży
+    bossHold(f,f.telT);
+  },
+  /* PODNIEBNY OSTRZAŁ — podrywa się i ZNIKA z areny. Przez ~10 s (8 s
+     w szale) na całą jamę lecą głazy: każdy ma cień-ostrzeżenie, więc unik
+     jest kwestią czytania mapy, a nie szczęścia. Dopiero po wylądowaniu
+     znowu da się go dosięgnąć — sterowanie tym stanem siedzi w smokLot(). */
+  podniebny:f=>{
+    f.lot={faza:'wzlot',t:LOT_WZLOT,dl:f.ph2?8:10.5,rz:.6,h:0,
+      a:Math.random()*6.28,cx:f.homeX,cy:f.homeY,r:66};
+    bossHold(f,LOT_WZLOT);
+    fxRing(f.x,f.y+8,64,'#b98cf0',{life:.55,w:4,ground:true});
+    fxRing(f.x,f.y-10,46,'#e8dcff',{life:.4,w:2});
+    fxDust(f.x,f.y+10,16);
+    addShake(4.5,.45);
+    addHit(f.x,f.y-50,'DO GÓRY!','#b98cf0');
+    beep(90,.55,'sawtooth',.1,240);
+  },
 };
+/* Ataki, które trwają DŁUGO, nie mogą wracać co drugi raz — tu stoi ich
+   własny odstęp w sekundach. Ruch bez wpisu odstępu nie potrzebuje. */
+const MOVE_CD={podniebny:24};
+/* --------------------------------------------------------------------
+   PODNIEBNY OSTRZAŁ — trzy fazy jednego ataku
+   --------------------------------------------------------------------
+   WZLOT   smok podrywa się na oczach gracza (widać, co się święci),
+   DESZCZ  nie ma go na arenie: krąży wysoko, po ziemi sunie jego cień,
+           a na planszę lecą głazy — to jedyny moment walki, w którym
+           nie ma czego bić, jest tylko unik,
+   POWRÓT  ląduje z hukiem i znowu da się go dosięgnąć.
+
+   `f.gone` to jedna flaga, którą rozumie cała reszta walki: nie zadaje
+   obrażeń dotykiem, nie da się go trafić i nie rysuje się sylwetki.
+   -------------------------------------------------------------------- */
+const LOT_WZLOT=1.05,LOT_LAD=.9;
+/* pojedynczy głaz: częściej pod gracza (żeby trzeba było biegać), czasem
+   w losowy punkt kadru (żeby nie dało się przewidzieć, gdzie jest bezpiecznie) */
+function smokSkala(f){
+  const przy=Math.random()<.58;
+  let x,y;
+  if(przy){const a=Math.random()*6.28,r=Math.random()*48;x=P.x+Math.cos(a)*r;y=P.y+Math.sin(a)*r;}
+  else{x=camX+20+Math.random()*(W-40);y=camY+24+Math.random()*(H-48);}
+  x=Math.max(24,Math.min(MW*16-24,x));y=Math.max(24,Math.min(MH*16-24,y));
+  mbRock(x,y,f.ph2?27:24,Math.round(f.atk*.9),f.ph2?.62:.85);
+}
+function smokLot(f,dt){
+  const L=f.lot;
+  f.dx=0;f.dy=0;L.t-=dt;
+  if(L.faza==='wzlot'){
+    L.h=Math.min(1,1-L.t/LOT_WZLOT);
+    if(!reduceMotion&&Math.random()<.7)
+      fxDust(f.x+(Math.random()-.5)*30,f.y+10,1);
+    if(L.t<=0){
+      L.faza='deszcz';L.t=L.dl;f.gone=true;
+      toast('🐉 WAWELIN JEST W POWIETRZU!<br>Skały lecą na całą jamę — patrz na cienie i UCIEKAJ!',3200);
+      addHit(P.x,P.y-40,'KRYJ SIĘ!','#b98cf0');SFX.no();
+      if(!curVoice&&S.ch==='edek')vsay('c_koniecswiata');
+    }
+    return;
+  }
+  if(L.faza==='deszcz'){
+    /* krąży nad areną — po ziemi sunie cień, po którym widać, gdzie jest */
+    L.a+=dt*(f.ph2?1.5:1.05);
+    f.x=L.cx+Math.cos(L.a)*L.r;
+    f.y=L.cy+Math.sin(L.a)*L.r*.62;
+    L.rz-=dt;
+    if(L.rz<=0){
+      L.rz=f.ph2?.24:.4;
+      for(let i=0;i<(f.ph2?2:1);i++)smokSkala(f);
+      if(Math.random()<.35)beep(1400,.06,'triangle',.03,900);   // świst spadającego głazu
+    }
+    if(L.t<=0){
+      L.faza='powrot';L.t=LOT_LAD;f.gone=false;
+      /* ląduje OBOK gracza, nie na nim — ma zaskoczyć, nie zabić z zaskoczenia */
+      const a=Math.random()*6.28;
+      f.x=Math.max(24,Math.min(MW*16-24,P.x+Math.cos(a)*64));
+      f.y=Math.max(24,Math.min(MH*16-24,P.y+Math.sin(a)*54));
+      addHit(f.x,f.y-52,'SCHODZĘ!','#e04848');
+      beep(70,.5,'sawtooth',.1,30);
+    }
+    return;
+  }
+  /* POWRÓT: opada i wbija się w dno jamy */
+  L.h=Math.max(0,L.t/LOT_LAD);
+  if(L.t>0)return;
+  delete f.lot;
+  fxRing(f.x,f.y+8,72,'#f5a032',{life:.5,w:5,ground:true});
+  fxRing(f.x,f.y-8,54,'#b98cf0',{life:.45,w:3});
+  fxSparks(f.x,f.y-6,'#b98cf0',22,200,{life:.6});
+  fxDust(f.x,f.y+10,18);
+  addShake(6.5,.5);addHitStop(.09);worldFlash=Math.max(worldFlash,.3);
+  beep(60,.45,'sawtooth',.11,28);
+  if(Math.hypot(P.x-f.x,P.y-f.y)<44)hurtPlayer(f);   // kto stał pod nim, ten oberwał
+  f.at=f.ph2?1:1.6;
+}
+
 /* --- RÓJ: wypuszczenie pszczół z ula albo zza królowej ---------------------
    `moc` (1-4) = faza ula: im wyżej, tym pszczoły twardsze, mocniejsze i szybsze.
    `swarm:true` przepuszcza je przez barierę areny (inBossArena blokuje zwykłe
@@ -1766,9 +1915,17 @@ function hiveUpdate(f,dt){
 /* głos bossa przy ataku — rzadko, żeby nie zagłuszał muzyki bitewnej */
 function bossVoice(f,key){if(Math.random()<.28&&!curVoice)vsay(key);}
 /* telegraf → wykonanie (szarża na rogi). Wywoływane z pętli wrogów. */
+/* SZARŻE — jeden wpis na rodzaj rozpędu. `sp` to prędkość [spokój, szał],
+   reszta to oprawa. Dopisanie bossowi szarży = dopisanie wiersza tutaj. */
+const TEL_SZARZA={
+  szarza:    {sp:[360,420],txt:'SZARŻA!',col:'#f5a032',ryk:1},
+  narogi:    {sp:[360,420]},
+  smokszarza:{sp:[460,570],txt:'Z DROGI, BLASZAKU!',col:'#b98cf0',ogon:'#b98cf0'},
+};
 function updateBossTelegraph(f,dt){
   f.telT-=dt;
-  const tc=f.telMv==='szarza'?'#f5a032':f.telMv==='zadlo'?'#f5c542':'#e03050';
+  const tS=TEL_SZARZA[f.telMv];
+  const tc=(tS&&tS.col)||(f.telMv==='zadlo'?'#f5c542':'#e03050');
   if(!reduceMotion&&Math.floor(anim*20)%2===0)
     fxP({x:f.x+(Math.random()-.5)*24,y:f.y+6,vx:0,vy:-30,g:-40,life:.3,life0:.3,
       sz:1.8,col:tc,add:true,shrink:true});
@@ -1780,12 +1937,14 @@ function updateBossTelegraph(f,dt){
     f.charging=.42;f.postHold=.5;
     fxSparks(f.x,f.y-8,'#f5c542',10,140,{life:.4});addShake(3,.25);
     beep(1500,.18,'sawtooth',.08,400);
-  }else if(f.telMv==='narogi'||f.telMv==='szarza'){
-    const d=Math.max(1,Math.hypot(P.x-f.x,P.y-f.y)),sp=f.ph2?420:360;
+  }else if(tS){
+    const d=Math.max(1,Math.hypot(P.x-f.x,P.y-f.y)),sp=tS.sp[f.ph2?1:0];
     f.kb=.55;f.kbx=(P.x-f.x)/d*sp;f.kby=(P.y-f.y)/d*sp;
     f.charging=.55;f.chDust=.5;f.postHold=.6;   // po szarży sapie — okno na kontrę
     fxDust(f.x,f.y+10,10);addShake(3.2,.3);
-    if(f.telMv==='szarza'){addHit(f.x,f.y-26,'SZARŻA!','#f5a032');SFX.boar();}
+    if(tS.txt)addHit(f.x,f.y-26,tS.txt,tS.col||'#f5a032');
+    if(tS.ryk)SFX.boar();
+    if(tS.ogon)fxSparks(f.x,f.y-10,tS.ogon,14,180,{life:.5});
     beep(90,.3,'sawtooth',.1,45);
   }
   delete f.telMv;
@@ -1795,11 +1954,15 @@ function updateMiniBlasts(dt){
     b.warn-=dt;
     if(b.warn<=0&&!b.done){
       b.done=true;
-      const bc=b.honey?'#f5a032':b.poison?'#7bc950':'#b98cf0';
-      fxStarFlash(b.x,b.y-4,bc,10,{life:.25});
+      const bc=b.rock?'#8a8494':b.honey?'#f5a032':b.poison?'#7bc950':'#b98cf0';
+      fxStarFlash(b.x,b.y-4,b.rock?'#e8e0f4':bc,10,{life:.25});
       fxRing(b.x,b.y,b.r,bc,{life:.3,w:3,ground:true});
-      fxSparks(b.x,b.y-4,bc,8,120,{life:.4});
-      addShake(2,.15);beep(b.poison?300:90,.15,'sawtooth',.07,45);
+      fxSparks(b.x,b.y-4,bc,b.rock?12:8,b.rock?170:120,{life:.45});
+      if(b.rock){                       // odłamki i kurz — głaz rozbija się o dno
+        fxDust(b.x,b.y+2,8);
+        fxSparks(b.x,b.y-6,'#b98cf0',6,120,{life:.5,g:320});
+        addShake(3.4,.24);beep(64,.24,'sawtooth',.1,32);
+      }else{addShake(2,.15);beep(b.poison?300:90,.15,'sawtooth',.07,45);}
       if(Math.hypot(P.x-b.x,P.y-b.y)<b.r){
         hurtPlayer({x:b.x,y:b.y,atk:b.atk});
         if(b.poison){poison.t=3.5;poison.dmg=Math.max(2,Math.round(b.atk*.25));poison.tick=.7;
@@ -1813,7 +1976,26 @@ function updateMiniBlasts(dt){
 }
 function drawMiniBlasts(){
   for(const b of miniBlasts){ // ostrzeżenie: pulsujący, kurczący się okrąg
-    const sx=b.x-camX,sy=b.y-camY,k=Math.max(0,b.warn/.8);
+    const sx=b.x-camX,sy=b.y-camY,k=Math.max(0,b.warn/(b.warn0||.8));
+    if(b.rock){                 // GŁAZ: cień rośnie, a nad nim leci sam głaz
+      cx.globalAlpha=.26+(1-k)*.34;
+      cx.fillStyle='#07050e';
+      cx.beginPath();cx.ellipse(sx,sy,b.r*(.34+.66*(1-k)),b.r*(.34+.66*(1-k))*.5,0,0,7);cx.fill();
+      cx.globalAlpha=.5+Math.sin(anim*22)*.28;
+      cx.strokeStyle='#b98cf0';cx.lineWidth=1.5;
+      cx.beginPath();cx.ellipse(sx,sy,b.r,b.r*.5,0,0,7);cx.stroke();
+      cx.globalAlpha=1;
+      const gy=sy-k*k*168,rr2=b.r*.44;
+      cx.save();cx.translate(sx+Math.sin(anim*8+b.x)*2.4*k,gy);cx.rotate(anim*2.6+b.x);
+      cx.fillStyle='#4a4356';cx.beginPath();
+      cx.moveTo(-rr2,-rr2*.4);cx.lineTo(-rr2*.4,-rr2);cx.lineTo(rr2*.6,-rr2*.78);
+      cx.lineTo(rr2,rr2*.34);cx.lineTo(rr2*.2,rr2);cx.lineTo(-rr2*.7,rr2*.7);cx.closePath();cx.fill();
+      cx.fillStyle='#6a6276';cx.beginPath();
+      cx.moveTo(-rr2*.4,-rr2);cx.lineTo(rr2*.6,-rr2*.78);cx.lineTo(rr2*.1,-rr2*.08);cx.closePath();cx.fill();
+      cx.fillStyle='#8a5fd0';cx.fillRect(-rr2*.24,-rr2*.2,rr2*.5,rr2*.24);
+      cx.restore();
+      continue;
+    }
     cx.globalAlpha=.5+Math.sin(anim*20)*.2;
     cx.strokeStyle=b.honey?'#f5a032':b.poison?'#7bc950':'#b98cf0';cx.lineWidth=1.6;
     cx.beginPath();cx.ellipse(sx,sy,b.r*(.4+.6*k),b.r*(.4+.6*k)*.5,0,0,7);cx.stroke();
@@ -2079,7 +2261,9 @@ function drawFXover(){
 /* centralne zadawanie obrażeń: ATK ×mnożnik, kryt, aura żywiołu + REAKCJE */
 function dealDmg(f,chId,mult,opts){
   opts=opts||{};
-  if(f.sub){addHit(f.x,f.y-14,'PLUSK!','#6fd8e8');return 0;}   // utopiec pod wodą — nietykalny
+  /* NIETYKALNY: utopiec pod wodą i smok w powietrzu. Jedna flaga, jedna zasada —
+     kto nie stoi na arenie, ten nie obrywa (i sam nie bije, patrz updateWorld). */
+  if(f.sub||f.gone){addHit(f.x,f.y-14,f.gone?'W POWIETRZU!':'PLUSK!','#6fd8e8');return 0;}
   const c=CHARS[chId],el=c.elId,eCol=ELEMENTS[el].col;
   let dmg=chATK(chId)*mult;
   if(chId===S.ch&&BUFF.t>0)dmg*=(1+BUFF.atk);
@@ -2161,6 +2345,7 @@ function tryAttack(){
   beep(S.ch==='dych'?120:220,.08,'square',.06,S.ch==='dych'?60:120);
   let hit=false;
   for(const f of foes){
+    if(f.gone)continue;                       // smok w powietrzu — nie ma czego trafić
     const br=f.boss?12:0;
     if(Math.hypot(f.x-fx,f.y-fy)<rng+br||Math.hypot(f.x-P.x,f.y-P.y)<15+br){
       hit=true;dealDmg(f,S.ch,talMul(S.ch,'n'));   // talent CIOSÓW
@@ -2174,6 +2359,7 @@ function tryAttack(){
 /* Obrażenia SUROWE — dokładnie tyle punktów, ile podasz, bez żywiołów i krytyków.
    Używa tego to, co nie należy do żadnej postaci (np. wybuch bomby w domenie). */
 function hurtFoeRaw(f,dmg,ox,oy,chId){
+  if(f.sub||f.gone)return;                    // w powietrzu bomba go nie dosięgnie
   f.hp-=dmg;f.flash=.15;
   const d=Math.max(1,Math.hypot(f.x-ox,f.y-oy));
   if(!(FOE_TYPES[f.t]&&FOE_TYPES[f.t].rooted)){
@@ -2658,12 +2844,14 @@ function updateFoes(dt){
     if(f.haste>0)f.haste-=dt;
     /* BOSS: fazy + ataki specjalne + ARENA (leash — ucieczka gracza = walka od nowa) */
     if(f.boss){
-      /* faza szału: żar unosi się z bossa */
-      if(f.ph2&&!reduceMotion){f.emT=(f.emT||0)-dt;
-        if(f.emT<=0){f.emT=.12;
-          fxP({x:f.x+(Math.random()-.5)*26,y:f.y+6,vx:(Math.random()-.5)*12,
+      /* ŻAR UNOSZĄCY SIĘ Z BOSSA: w fazie szału z każdego, a z tych, które
+         mają własną paletę `zar` w FOE_TYPES (Wawelin) — przez całą walkę. */
+      if(f.zar>0)f.zar-=dt;
+      if((f.ph2||td.zar)&&!reduceMotion){f.emT=(f.emT||0)-dt;
+        if(f.emT<=0){f.emT=f.ph2?.09:.15;
+          fxP({x:f.x+(Math.random()-.5)*(td.zar?32:26),y:f.y+6,vx:(Math.random()-.5)*12,
             vy:-26-Math.random()*30,g:-40,life:.6,life0:.6,sz:1.7,
-            col:Math.random()<.5?'#e04848':'#f5a032',add:true,shrink:true});}}
+            col:pickA(td.zar||['#e04848','#f5a032']),add:true,shrink:true});}}
       const hd=Math.hypot(P.x-f.homeX,P.y-f.homeY);
       if(hd>BOSS_LEASH){
         if(!f.leash){
@@ -2689,15 +2877,20 @@ function updateFoes(dt){
           addShake(5,.4);addHitStop(.08);
           toast('⚠️ '+f.bn+' WPADA W SZAŁ!');SFX.no();}}
       if(f.hive){hiveUpdate(f,dt);}                        // UL: stoi i wypuszcza rój
+      else if(f.lot){smokLot(f,dt);}                       // WAWELIN: jest w powietrzu
       else if(f.telT!==undefined){updateBossTelegraph(f,dt);}   // telegraf trwa — żadnego nowego ataku
       else if(f.moves&&f.moves.length){
-        /* boss z własnym zestawem ataków: losowanie bez powtórki tego samego pod rząd */
+        /* boss z własnym zestawem ataków: losowanie bez powtórki tego samego
+           pod rząd i z pominięciem tych, które stoją na własnym odstępie (MOVE_CD) */
         f.at=(f.at||2.6)-dt;
         if(f.at<=0&&d<260){
-          f.at=f.ph2?1.7:2.6;
-          let mv=pickA(f.moves);
-          if(f.moves.length>1)for(let g=0;g<4&&mv===f.lastMv;g++)mv=pickA(f.moves);
+          f.at=f.ph2?(f.cd2||1.7):(f.cd||2.6);
+          let pula=f.moves.filter(m=>!(f.mvT&&f.mvT[m]>anim));
+          if(!pula.length)pula=f.moves;
+          let mv=pickA(pula);
+          if(pula.length>1)for(let g=0;g<4&&mv===f.lastMv;g++)mv=pickA(pula);
           f.lastMv=mv;
+          if(MOVE_CD[mv]){f.mvT=f.mvT||{};f.mvT[mv]=anim+MOVE_CD[mv]*(f.ph2?.75:1);}
           if(BOSS_MOVES[mv])BOSS_MOVES[mv](f);
         }
       }else{
@@ -2743,9 +2936,9 @@ function updateFoes(dt){
       if(!foeBlok(at(Math.floor(nx/16),Math.floor(f.y/16)),f)&&(f.boss||f.swarm||!inBossArena(nx,f.y)))f.x=nx;else f.dx*=-1;
       if(!foeBlok(at(Math.floor(f.x/16),Math.floor(ny/16)),f)&&(f.boss||f.swarm||!inBossArena(f.x,ny)))f.y=ny;else f.dy*=-1;
     }
-    if(!f.sub&&d<(f.boss?22:td.elite?16:13))hurtPlayer(f);
+    if(!f.sub&&!f.gone&&d<(f.boss?22:td.elite?16:13))hurtPlayer(f);
     /* SZARŻA: jeden czysty cios na wroga + odrzut, żeby Dych nie utknął w przeciwniku */
-    if(dashT>0&&Math.hypot(P.x-f.x,P.y-f.y)<(f.boss?28:20)&&!(f.dHit>anim)){
+    if(dashT>0&&!f.gone&&Math.hypot(P.x-f.x,P.y-f.y)<(f.boss?28:20)&&!(f.dHit>anim)){
       f.dHit=anim+.6;
       dealDmg(f,'dych',1.3*chSkillMul('dych'));
       if(!f.boss&&!f.dead){
@@ -2761,7 +2954,7 @@ function updateFoes(dt){
     b.life-=dt;b.x+=b.dx*dt;b.y+=b.dy*dt;
     if(!reduceMotion){b.trT=(b.trT||0)-dt;
       if(b.trT<=0){b.trT=.035;
-        const tc=b.t==='ogien'?'#f5a032':b.t==='snieg'?'#bfe8f4':b.t==='laser'?'#e03028':
+        const tc=b.t==='smokogien'?'#b98cf0':b.t==='ogien'?'#f5a032':b.t==='snieg'?'#bfe8f4':b.t==='laser'?'#e03028':
                  b.t==='flash'?'#ffffff':b.t==='kettle'?'#8f88b0':
                  b.t==='fon'?'#6fd8e8':b.t==='konfet'?'#e88ac8':b.t==='zadlo'?'#f5c542':'#6fd8e8';
         fxP({x:b.x,y:b.y,vx:(Math.random()-.5)*14,vy:(Math.random()-.5)*14,g:0,
@@ -2780,7 +2973,7 @@ function updateFoes(dt){
     if(SOLID(at(Math.floor(p.x/16),Math.floor(p.y/16)))){p.life=0;
       fxSparks(p.x,p.y,p.type==='julka'?'#e88ac8':'#9ab8d0',5,80,{life:.3});continue;}
     for(const f of foes){
-      if(f.dead)continue;
+      if(f.dead||f.gone)continue;
       if(Math.hypot(f.x-p.x,(f.y-8)-p.y)<(f.boss?24:13)){
         dealDmg(f,p.type,talMul(p.type,'n'),{ox:p.x-p.dx*.1,oy:p.y-p.dy*.1});
         if(p.type==='julka'&&!f.boss&&!FOE_TYPES[f.t].elite&&Math.random()<.25){f.charm=Math.max(f.charm||0,2.5);addHit(f.x,f.y-20,'💘','#e88ac8');}
@@ -3422,6 +3615,7 @@ const ARTS={
   pierscionek:{n:'Pierścionek z Tindera',slot:1,star:3,st:{cd:25},ic:'💖'},
   lancuchG:{n:'Łańcuch Grubości Palca',slot:1,star:4,st:{atk:14,hp:30},ic:'⛓️'},
   kolczykK:{n:'Kolczyk Krakena',slot:1,star:5,st:{cd:45,atk:8},ic:'🌀'},
+  serceSmoka:{n:'Serce Wawelina',slot:1,star:5,st:{atk:19,cd:32},ic:'💜'},
   skarpety:{n:'Skarpety i Sandały',slot:2,star:2,st:{def:10},ic:'🩴'},
   pasDP:{n:'Pas Mistrza Disco Polo',slot:2,star:3,st:{atk:12},ic:'🕺'},
   nerka:{n:'Nerka Prawdziwego Ziomala',slot:2,star:3,st:{hp:50,def:5},ic:'👝'},
@@ -3754,8 +3948,12 @@ const DOMAINS={
   molo_d:{r:'morze',dni:2,x:54,y:18,n:'ZATOPIONE MOLO',floor:8,acc:1,wall:3,
     pietra:['przedsionek','krata','komnaty','zapadnia','skarbiec'],
     foes:['dres','hejter','krab'],elite:'utopiec',mini:['paparazzo','dj','smog'],ing:['ryba_sur','czosnek'],col:'#6fd8e8'},
-  jama:{r:'krakow',dni:0,x:18,y:31,n:'SMOCZA JAMA',floor:2,acc:9,wall:16,
-    pietra:['przedsionek','krata','komnaty','zapadnia','skarbiec'],
+  /* SMOCZA JAMA — trzecia domena z RĘCZNYMI planszami (js/mapy.js), stąd brak
+     pola `pietra`. Paleta siedzi w PIĘTRACH, bo droga prowadzi z lasu pod
+     Wawelem przez piarg i mosty aż do jaskini; to tutaj to tylko wartości
+     awaryjne. Na ostatnim piętrze czeka WAWELIN. */
+  jama:{r:'krakow',dni:0,x:18,y:31,n:'SMOCZA JAMA',floor:75,acc:76,wall:74,
+    mrok:.5,mrokCol:'18,10,26',
     foes:['hejter','dres','zmija'],elite:'smoczatko',mini:['soltys','betoniarz','smog'],ing:['ziolo','jablko'],col:'#c8384a'},
   grota:{r:'tatry',dni:1,x:4,y:10,n:'LODOWA GROTA',floor:17,acc:8,wall:16,
     pietra:['przedsionek','krata','komnaty','zapadnia','skarbiec'],
@@ -3831,6 +4029,11 @@ const FLOOR_KINDS={
   skarbiec:{n:'SKARBIEC',w:44,h:26,siatka:[1,1],walka:1,straz:1,limit:0,min:3,gest:.08,
     opis:'STRAŻNIK i skrzynia. Tu się rozstrzyga.'},
 };
+/* Pola, które RĘCZNA PLANSZA może nadpisać ponad rodzajem piętra. Rodzaj mówi,
+   CZYM piętro jest (czy jest walka, kłódki, zegar), plansza — jak wygląda,
+   czym pachnie i kto na niej stoi. Nowe pole dopisuje się TUTAJ, nie w pięciu
+   miejscach na krzyż. */
+const FK_WLASNE=['floor','acc','wall','amb','mrok','mrokCol','mgla','kurz','iskry','boss','promienie'];
 /* Przy ręcznej planszy `fk` jest scalone z wpisem mapy (nazwa, opis, limit,
    rozmiar) — stąd czytamy je z DOM, a nie prosto z rejestru. */
 const flKind=()=>DOM.fk||FLOOR_KINDS[DOM.kind]||FLOOR_KINDS.komnaty;
@@ -4146,12 +4349,16 @@ const MAPA_ZNAKI={
   /* --- las: część kafli była w grze od dawna, część doszła z domeną --- */
   'd':30,'q':62,'s':63,'y':18,'x':19,'f':31,'u':26,'i':27,'w':23,'c':21,'+':61,
   'v':25,'z':28,'l':29,'Q':24,'m':64,'e':65,'n':66,'j':67,'g':68,
+  /* --- góry i smocza jama (patrz TILES 74-86) --- */
+  'a':74,'/':75,'h':76,'t':77,'!':78,'N':79,'V':80,'Y':81,'$':82,';':83,'&':84,'R':85,
 };
 /* do której listy dekoracji trafia znak (animacje i dźwięk czytają gotowe listy,
    zamiast skanować planszę co klatkę) */
 const MAPA_DEKO={'W':'wod','T':'lampy','~':'woda','|':'rury',
-  'i':'ogniska','s':'szyszki','q':'liscie','d':'liscie'};
-function DEKO_PUSTE(){return{wod:[],lampy:[],woda:[],rury:[],ogniska:[],szyszki:[],liscie:[]};}
+  'i':'ogniska','s':'szyszki','q':'liscie','d':'liscie',
+  ';':'zar','$':'blask'};
+function DEKO_PUSTE(){return{wod:[],lampy:[],woda:[],rury:[],ogniska:[],szyszki:[],liscie:[],
+  zar:[],blask:[]};}
 /* Litery komnat WYPISANE JAWNIE — zakres 'A'..'H' łapał też 'G' (głaz)
    i po każdej skale robiła się komnata-widmo w litej ścianie. */
 const MAPA_KOMNATY='ABCDEFH';
@@ -4192,8 +4399,8 @@ function domBuildFromMap(cfg,fk,def){
     for(let x=0;x<MW;x++){
       const z=wiersz[x]!==undefined?wiersz[x]:'#';
       const co=MAPA_ZNAKI[z];
-      if(co===undefined){set(x,y,cfg.wall);continue;}   // nieznany znak = ściana, nie wywrotka
-      set(x,y,typeof co==='number'?co:cfg[co]);
+      if(co===undefined){set(x,y,domMotyw('wall'));continue;}   // nieznany znak = ściana, nie wywrotka
+      set(x,y,typeof co==='number'?co:domMotyw(co));
       if(z==='S')spawn=[x,y];
       else if(z==='>')schody=[x,y];
       else if(MAPA_KLUCZ[z])klucze.push({kolor:MAPA_KLUCZ[z],tx:x,ty:y});
@@ -4362,12 +4569,16 @@ function domPlanFloor(cfg,fk,idx){
       if(!wejsciowa&&(i===ost||zKluczem.has(i)))plan.push({t:domPick(cfg.foes),n:2,r:80});
     }
     if(fk.elita&&i===ost)plan.push({t:cfg.elite,elite:1});
-    if(fk.straz&&i===ost){
+    /* BOSS PIĘTRA (pole `boss` we wpisie planszy) wchodzi ZAMIAST strażnika
+       i trzyma komnatę SAM: żadnej hałastry pod nogami, bo taka walka ma być
+       czytelna — same jego ataki i twoje uniki. */
+    if(fk.boss&&i===ost){plan.length=0;plan.push({boss:fk.boss});}
+    else if(fk.straz&&i===ost){
       plan.push({straz:1});
       if(lvl>=1)plan.push({t:cfg.elite,elite:1,ox:0,oy:40});
     }
     /* mini-boss: jeden na piętro, progi 2 / 5 / 10 poziomu domeny */
-    if(i===ost&&idx>0){
+    if(i===ost&&idx>0&&!fk.boss){
       const prog=[2,5,10][DOM.usedMini.length];
       if(prog!==undefined&&lvl+1>=prog)plan.push({mini:1,ox:0,oy:-30});
     }
@@ -4883,6 +5094,7 @@ let domVign=null,domVignK='';
 function drawDomainDeko(){
   if(!DOM.cur||!DOM.deko)return;
   const D=DOM.deko,t=anim,widok=(sx,sy)=>sx>-24&&sx<W+24&&sy>-24&&sy<H+24;
+  const fkD=DOM.fk||{};
   /* --- WODOSPAD: strugi lecą w dół, u podstawy bije piana i mgiełka --- */
   for(const[tx,ty]of D.wod){
     const sx=tx*16-camX,sy=ty*16-camY;
@@ -4988,12 +5200,85 @@ function drawDomainDeko(){
     cx.fillStyle='rgba(190,224,244,.75)';
     cx.fillRect(sx+11,sy+12+faza*26,1.4,2.6);
   }
+  /* --- ŻARZĄCE SIĘ SZCZELINY: pod dnem jamy coś się jeszcze tli. Pulsują
+     własnym rytmem i sypią iskrami, które gasną po drodze do góry. --- */
+  for(const[tx,ty]of D.zar){
+    const sx=tx*16-camX+8,sy=ty*16-camY+8;
+    if(!widok(sx,sy))continue;
+    const m=.72+Math.abs(Math.sin(t*3.2+tx*.7))*.28+Math.sin(t*17+ty)*.04;
+    cx.save();cx.globalCompositeOperation='lighter';
+    cx.fillStyle='rgba(200,58,38,.11)';cx.beginPath();cx.arc(sx,sy,26*m,0,7);cx.fill();
+    cx.fillStyle='rgba(245,160,50,.10)';cx.beginPath();cx.arc(sx,sy,13*m,0,7);cx.fill();
+    cx.restore();
+    for(let i=0;i<2;i++){
+      const f=(t*.42+i*.5+tx*.13+ty*.07)%1;
+      cx.fillStyle='rgba(245,'+(120+((tx*7+i)%80))+',60,'+(.7*(1-f))+')';
+      cx.fillRect(sx-4+Math.sin(f*8+i+tx)*4,sy-2-f*26,1.4,1.4);
+    }
+  }
+  /* --- SKARB: pojedynczy błysk przelatujący po monetach --- */
+  for(const[tx,ty]of D.blask){
+    const sx=tx*16-camX,sy=ty*16-camY;
+    if(!widok(sx,sy))continue;
+    const okres=3.5+((tx*5+ty*3)%5);
+    const f=((t+tx*1.7+ty*2.3)%okres)/okres;
+    if(f>.22)continue;
+    const u=f/.22,bx=sx+3+u*10,by=sy+4+Math.sin(u*3.14)*-3;
+    cx.save();cx.globalCompositeOperation='lighter';
+    cx.globalAlpha=Math.sin(u*3.14);
+    cx.fillStyle='#fff7d6';cx.fillRect(bx,by,1.6,1.6);
+    cx.fillRect(bx-2,by+.4,5.6,.8);cx.fillRect(bx+.4,by-2,.8,5.6);
+    cx.restore();cx.globalAlpha=1;
+  }
+  /* --- MGŁA NAD PRZEPAŚCIĄ: chmury pod mostami suną własnym tempem.
+     Liczymy ją tylko po kaflach W KADRZE i co trzeci, bo to ma być nastrój,
+     a nie 600 elips na klatkę. --- */
+  if(fkD.mgla&&!reduceMotion){
+    const tx0=Math.floor(camX/16),ty0=Math.floor(camY/16);
+    cx.save();cx.globalCompositeOperation='lighter';
+    for(let ty=ty0;ty<=ty0+Math.ceil(H/16);ty++)for(let tx=tx0;tx<=tx0+Math.ceil(W/16)+1;tx++){
+      if((tx*2+ty)%3)continue;
+      if(!PIT(at(tx,ty)))continue;
+      const dryf=Math.sin(t*.35+tx*.2+ty*.13);
+      cx.globalAlpha=(.05+Math.max(0,dryf)*.06)*fkD.mgla;
+      cx.fillStyle='#c9c4dd';
+      cx.beginPath();cx.ellipse(tx*16+8-camX+dryf*10,ty*16+9-camY,15,5.5,0,0,7);cx.fill();
+    }
+    cx.restore();cx.globalAlpha=1;
+  }
+  /* --- KURZ NA WIETRZE: na graniach powietrze nigdy nie stoi. Cząstki żyją
+     w układzie EKRANU (nie świata) — to halny, a nie śmieci na ziemi. --- */
+  if(fkD.kurz&&!reduceMotion){
+    const n=Math.round(18*fkD.kurz);
+    for(let i=0;i<n;i++){
+      const sp=52+((i*37)%60);
+      const x=((t*sp+i*97)%(W+40))-20;
+      const y=((i*53)%H)+Math.sin(t*1.7+i)*7;
+      cx.fillStyle='rgba(232,238,248,'+(.10+((i*13)%7)*.02)+')';
+      cx.fillRect(x,y,2.4+((i*7)%3),.9);
+    }
+  }
+  /* --- ISKRY W JAMIE: fiolet unoszący się znikąd. To jego oddech. --- */
+  if(fkD.iskry&&!reduceMotion){
+    const n=Math.round(16*fkD.iskry);
+    cx.save();cx.globalCompositeOperation='lighter';
+    for(let i=0;i<n;i++){
+      const okres=5+((i*7)%6);
+      const f=((t+i*1.31)%okres)/okres;
+      const x=((i*89)%W)+Math.sin(t*.9+i)*9;
+      const y=H-f*(H+30)+((i*29)%40);
+      cx.globalAlpha=Math.sin(f*3.14)*.5;
+      cx.fillStyle=i%3?'#b98cf0':'#f5a032';
+      cx.fillRect(x,y,1.6,1.6);
+    }
+    cx.restore();cx.globalAlpha=1;
+  }
   /* --- MROK: delikatna winieta wokół gracza. Rysowana POD postaciami, więc nie
      przygasza ekipy ani liczb obrażeń, tylko domyka nastrój. Siłę i barwę bierze
      domena (`mrok`, `mrokCol`) — w piwnicy jest czarno, w lesie tylko cień koron. --- */
   const cfgD=DOMAINS[DOM.cur]||{};
-  const sila=cfgD.mrok!==undefined?cfgD.mrok:1;
-  const barwa=cfgD.mrokCol||'8,6,18';
+  const sila=fkD.mrok!==undefined?fkD.mrok:(cfgD.mrok!==undefined?cfgD.mrok:1);
+  const barwa=fkD.mrokCol||cfgD.mrokCol||'8,6,18';
   const k=W+'x'+H+'/'+sila+'/'+barwa;
   if(domVignK!==k||!domVign){
     domVign=cx.createRadialGradient(0,0,40,0,0,Math.max(W,H)*.75);
@@ -5076,7 +5361,8 @@ function ptakCwierk(){
 let ptakT=4;
 function domAmbientUpdate(dt){
   if(!AC)return;
-  const cfg=(DOM.cur&&DOMAINS[DOM.cur])||{},amb=cfg.amb||{};
+  const cfg=(DOM.cur&&DOMAINS[DOM.cur])||{};
+  const amb=(DOM.fk&&DOM.fk.amb)||cfg.amb||{};
   const t=AC.currentTime;
   const w=(DOM.deko&&DOM.deko.wod)||[];
   const wDom=REG==='arena'&&DOM.cur;
@@ -5229,6 +5515,12 @@ function domLoadFloor(idx){
     n:def.n||(FLOOR_KINDS[kind]||{}).n,opis:def.opis||(FLOOR_KINDS[kind]||{}).opis,
     limit:def.limit!==undefined?def.limit:(FLOOR_KINDS[kind]||{}).limit,
   }):FLOOR_KINDS[kind];
+  /* PIĘTRO MOŻE MIEĆ WŁASNĄ PALETĘ, POGODĘ I BOSSA. To jest cała różnica
+     między „pięć plansz w tej samej piwnicy" a drogą, która naprawdę gdzieś
+     prowadzi: `floor`/`acc`/`wall` zmieniają kafle pod nogami i mur dookoła,
+     `amb`/`mrok`/`mgla`/`kurz`/`iskry` — powietrze, a `boss` stawia w komnacie
+     finałowej bossa zamiast zwykłego strażnika. */
+  if(def)for(const pole of FK_WLASNE)if(def[pole]!==undefined)fk[pole]=def[pole];
   DOM.floor=idx;DOM.kind=kind;DOM.fk=fk;
   /* MW/MH ustawiamy PRZED nową mapą — inaczej `set()` pisałoby poza zakres
      (Uint8Array po cichu to zjada) i piętro wyszłoby dziurawe */
@@ -5368,7 +5660,8 @@ function domSpawnRoom(i){
     DOM.usedMini.push(id2);return id2;};
   let gadal=false;
   for(const e of plan){
-    if(e.straz){
+    if(e.boss){domBossSpawn(e.boss,rm,i);}
+    else if(e.straz){
       const lvl=S.domLvl[DOM.cur]||0,td=FOE_TYPES.straznik,gh=Math.round(td.hp*(1+.45*lvl)*bossScale().hp);
       foes.push({t:'straznik',guard:true,room:i,gatk:Math.round(td.atk*.7)+Math.round(lvl*1.6),
         x:rm.cx,y:rm.cy-24,hp:gh,hp0:gh,atk:td.atk+Math.round(lvl*1.6),
@@ -5381,6 +5674,41 @@ function domSpawnRoom(i){
   }
   if(gadal&&S.ch==='edek'&&!curVoice&&Math.random()<.5)vsay('c_typy');
   if(plan.length)SFX.no();
+}
+/* --------------------------------------------------------------------
+   BOSS NA PIĘTRZE DOMENY
+   --------------------------------------------------------------------
+   Ta sama tożsamość co bossowie regionalni (`bid`), więc łup, film, poziom
+   rewanżu, pasek HP i motyw areny działają bez ani jednego wyjątku. Różnice
+   są dwie: budzi go wejście do KOMNATY FINAŁOWEJ (a nie arena w świecie)
+   i dostaje `room`, żeby liczył się do jej wyczyszczenia — inaczej piętro
+   zaliczyłoby się samo, zanim boss zdąży ryknąć.
+   Sylwetkę smoka wciąż widać w trakcie scenki, bo dialog zamraża świat,
+   a nie rysowanie.
+   -------------------------------------------------------------------- */
+function domBossSpawn(id,rm,i){
+  const b=BOSSES[id];
+  if(!b)return;
+  const lvl=S.bossLvl[id]||0,td=FOE_TYPES[b.t],sc=bossScale();
+  /* skalowanie: poziom rewanżu × siła ekipy × poziom domeny */
+  const pie=1+.12*(S.domLvl[DOM.cur]||0);
+  const maxHp=Math.round(td.hp*(1+.5*lvl)*sc.hp*pie);
+  const mvT={};
+  for(const m of(b.moves||[]))if(MOVE_CD[m])mvT[m]=anim+MOVE_CD[m]*.55;  // długi atak nie na otwarcie
+  foes.push({t:b.t,boss:true,bid:id,bn:b.n,batk:b.batk,moves:b.moves,cd:b.cd,cd2:b.cd2,mvT,
+    room:i,x:rm.cx,y:rm.cy-12,homeX:rm.cx,homeY:rm.cy,
+    hp:maxHp,maxHp,hp0:maxHp,atk:Math.round(td.atk*(1+.15*lvl)*sc.atk*BOSS_ATK_UP),
+    dx:0,dy:0,wt:0,stun:0,kb:0,kbx:0,kby:0,flash:0,at:2.6});
+  fxRing(rm.cx,rm.cy-8,74,'#b98cf0',{life:.6,w:5});
+  fxRing(rm.cx,rm.cy+8,60,'#f5a032',{life:.5,w:3,ground:true});
+  fxSparks(rm.cx,rm.cy-10,'#b98cf0',24,190,{life:.7});
+  fxStarFlash(rm.cx,rm.cy-14,'#fff7f2',16,{life:.35});
+  addShake(6,.5);addHitStop(.08);worldFlash=.55;SFX.no();
+  killRadio();
+  toast('🐉 '+b.n+(lvl?' — POZIOM '+(lvl+1):'')+'!<br>Trzy ataki. Naucz się ich albo zostaniesz tu na zawsze.',4400);
+  const lines=(b.intro2&&lvl>0)?b.intro2:b.intro;
+  if(lines&&lines.length)say(lines.map(([who,t,v])=>({who,t,v})));
+  initAudio().then(startBossMusic);
 }
 /* piętro zaliczone: schody się odsłaniają albo (na ostatnim) leci skrzynia */
 function domFloorDone(cicho){
@@ -5759,6 +6087,22 @@ const BOSSES={
     intro2:[['Klaunica','Wróciłeś? Nagranie dalej mam. Jest dowód, że to zrobiłeś, Edward.','k_jestdowod'],
             ['Edek','Chyba ci się z kimś innym pomyliłem.','c_pomylilem'],
             ['Klaunica','No to jedziemy jeszcze raz, blaszaku.']]},
+  /* WAWELIN — jedyny boss, który NIE STOI W ŚWIECIE, tylko na ostatnim
+     piętrze domeny (patrz `boss:'wawelin'` w js/mapy.js). Dlatego `r` nie
+     wskazuje żadnego regionu: wszystkie pętle po BOSSES filtrują po `b.r===REG`,
+     więc nie postawi mu znacznika na mapie ani nie zbuduje areny w Krakowie.
+     `cd`/`cd2` to odstęp między atakami w spokoju i w fazie szału. */
+  wawelin:{drop:['art','serceSmoka'],r:'jama',t:'wawelin',n:'WAWELIN, PRADAWNY SMOK',
+    moves:['ogniokrag','ogienszarza','podniebny'],cd:2.4,cd2:1.25,
+    film:'ZESZEDŁEM DO SMOCZEJ JAMY I OBUDZIŁEM COŚ STARSZEGO OD SMOKA',
+    intro:[['Edek','Ludzie, zobaczcie jak to wszystko lśni. Złoto, korony, rolexy… cała jama lśni!','c_lsni'],
+           ['???','…'],
+           ['WAWELIN','TYSIĄC LAT NIKT MI TU NIE ŚWIECIŁ LAMPĄ W OCZY. A TY JESZCZE NAGRYWASZ.'],
+           ['Edek','O matko jedyna, ludzie… tego mi nikt nie uwierzy bez nagrania!','c_koniecswiata'],
+           ['WAWELIN','SMOK WAWELSKI TO MÓJ SYN, BLASZAKU. JA JESTEM TYM, OD KTÓREGO SIĘ ZACZĘŁO.'],
+           ['Edek','Nikt nie będzie zaczepiał tu moich ziomali. A mnie tym bardziej. Lecimy!','c_ziomali']],
+    intro2:[['WAWELIN','WRÓCIŁEŚ. Z TĄ SAMĄ KAMERĄ.'],
+            ['Edek','No dawaj dawaj człowieku, jedziemy z tym koksem jeszcze raz!','c_spokoj']]},
   yeti:{drop:['weap','ciupaga'],r:'tatry',x:96,y:57,t:'yeti',n:'YETI Z GIEWONTU',batk:'snieg',
     film:'YETI ISTNIEJE!!! (nagranie z Giewontu, nie klikbajt)',
     intro:[['Baca','Edek, cosik po graniach chodzi i porywa oscypki! Jak nic — YETI!'],
@@ -5854,6 +6198,9 @@ function bossDefeated(f){
   save();refreshHUD();
   bossShots=[];bossCdT[id]=90;
   stopBossMusic();                 // motyw areny milknie razem z bossem
+  /* boss domeny: po nim zostaje jeszcze skrzynia i droga do wyjścia,
+     więc wraca zwykła muzyka bitewna piętra, a nie cisza */
+  if(REG==='arena'&&DOM.cur)initAudio().then(startBattleMusic);
   worldFlash=.8;burstConfetti();burstConfetti();SFX.buy();
   addHit(f.x,f.y-20,'BOSS DOWN!','#f5c542');
   toast('👑 POKONANY: '+f.bn+'!<br>+'+di+'💠 +'+ch+'⚙️ +'+dd+'💎'+(rx?' +'+rx+' '+RLX+' ZŁOTY ROLEX':''),4200);
@@ -8837,6 +9184,195 @@ const BOSS_DRAW={
     g.strokeStyle='#2a2a34';g.lineWidth=3;
     g.beginPath();g.arc(17.5,0,4,Math.PI,0);g.stroke();
   },
+  /* =================================================================
+     WAWELIN, PRADAWNY SMOK — boss ostatniego piętra SMOCZEJ JAMY
+     -----------------------------------------------------------------
+     Sylwetka jest budowana od bryły, nie od detalu: masywny korpus,
+     złota płyta brzucha, DŁUGA szyja z wyraźnym łbem i dwie kanciaste
+     błony skrzydeł odchylone DO TYŁU. Detal (łuski, kolce, pazury,
+     pęknięcia) dochodzi na wierzch — ale to bryła ma się czytać z drugiego
+     końca komory.
+     Kolor jest jego podpisem: fiolet iskier i pomarańcz ognia. W fazie
+     szału po łuskach idą rozgrzane pęknięcia.
+     Gdy jest w powietrzu (`f.lot`), cała sylwetka jedzie w górę razem
+     z `wys`, blednie i maleje — a na dnie jamy zostaje SAM CIEŃ. To po nim
+     gracz poznaje, gdzie smok krąży i skąd zaraz spadnie.
+     ================================================================= */
+  wawelin(g,f){
+    const fl=P.x<f.x?-1:1;                        // 1 = łbem w prawo
+    const L=f.lot,wys=L?(L.faza==='deszcz'?1:(L.h||0)):0;
+    const t=anim,zar=(f.zar>0)?1:0;
+    const sz=Math.sin(t*(wys>0?8.5:4.2));         // trzepot skrzydeł
+    const od=Math.sin(t*2.1)*1.3;                 // oddech
+    /* CIEŃ NA DNIE JAMY. W locie NIE jest plamą, tylko SYLWETKĄ z rozłożonymi
+       skrzydłami — inaczej gracz myli go z cieniem spadającego głazu, a to po
+       nim ma czytać, gdzie smok właśnie krąży. */
+    g.fillStyle='rgba(6,4,12,'+(.44-wys*.14).toFixed(3)+')';
+    if(wys>.15){
+      const r=20+wys*8,rozp=r*(1.55+Math.abs(sz)*.3);
+      g.beginPath();
+      g.moveTo(-rozp,9);g.lineTo(-r*.42,3.5);g.lineTo(0,7.5);g.lineTo(r*.42,3.5);g.lineTo(rozp,9);
+      g.lineTo(r*.5,14.5);g.lineTo(0,18.5);g.lineTo(-r*.5,14.5);g.closePath();g.fill();
+      g.beginPath();g.ellipse(0,11.5,r*.55,6.5,0,0,7);g.fill();
+    }else{
+      g.beginPath();g.ellipse(0,12,22,7.5,0,0,7);g.fill();
+    }
+    g.save();
+    g.translate(0,-wys*152);
+    if(wys>0){g.globalAlpha=1-wys*.2;g.scale(1-wys*.28,1-wys*.28);}
+    const X=v=>fl*v;                              // wszystko liczone „w stronę łba"
+    /* --- SKRZYDŁO: kanciasta błona na trzech palcach, odchylona DO TYŁU --- */
+    const skrzydlo=(tyl)=>{
+      const rx=X(tyl?-30:-38),ry=(tyl?-56:-46)-sz*(tyl?6:10);
+      const bx=X(tyl?-4:2),by=tyl?-30:-25;
+      g.fillStyle=tyl?'rgba(44,20,62,.95)':'rgba(92,42,124,.95)';
+      g.beginPath();
+      g.moveTo(bx,by);
+      g.lineTo(bx+rx*.42,ry+6);                   // bark błony
+      g.lineTo(bx+rx,ry);                         // czubek 1. palca
+      g.lineTo(bx+rx*.80,ry+13);
+      g.lineTo(bx+rx*.86,ry+10);                  // wcięcie między palcami
+      g.lineTo(bx+rx*.56,ry+24);
+      g.lineTo(bx+rx*.62,ry+21);
+      g.lineTo(bx+rx*.30,ry+32);
+      g.lineTo(bx,by+10);
+      g.closePath();g.fill();
+      g.strokeStyle=tyl?'#5a2f7a':'#c89af0';g.lineWidth=1.5;
+      for(const u of[1,.78,.54]){                 // kości palców — po nich poznaje się błonę
+        g.beginPath();g.moveTo(bx,by);
+        g.lineTo(bx+rx*.42*u,ry+6+(1-u)*14);
+        g.lineTo(bx+rx*u,ry+(1-u)*26);g.stroke();
+      }
+      g.strokeStyle=tyl?'#6a3a8a':'#b07ae0';g.lineWidth=1.3;
+      g.beginPath();g.moveTo(bx,by);g.lineTo(bx+rx*.42,ry+6);g.lineTo(bx+rx,ry);g.stroke();
+      g.fillStyle=tyl?'#c9c0e0':'#e8e0f4';        // pazur na zgięciu
+      g.beginPath();g.moveTo(bx+rx,ry);
+      g.lineTo(bx+rx*1.16,ry-6);g.lineTo(bx+rx*.92,ry+5);g.closePath();g.fill();
+    };
+    skrzydlo(true);
+    /* --- OGON: gruby u nasady, zakończony płetwą --- */
+    const ow=Math.sin(t*2.4)*6;
+    g.lineCap='round';
+    g.strokeStyle='#291737';g.lineWidth=11;
+    g.beginPath();g.moveTo(X(-14),-10);
+    g.quadraticCurveTo(X(-32),-14+ow,X(-46),-1+ow*1.3);g.stroke();
+    g.strokeStyle='#43285a';g.lineWidth=5.5;
+    g.beginPath();g.moveTo(X(-14),-10);
+    g.quadraticCurveTo(X(-32),-15+ow,X(-45),-2+ow*1.3);g.stroke();
+    g.lineCap='butt';
+    const tx2=X(-46),ty2=-1+ow*1.3;
+    g.fillStyle='#8a4fc0';g.beginPath();
+    g.moveTo(tx2,ty2);g.lineTo(tx2+X(-13),ty2-11);g.lineTo(tx2+X(-8),ty2);
+    g.lineTo(tx2+X(-14),ty2+10);g.closePath();g.fill();
+    g.fillStyle='#b07ae0';g.beginPath();
+    g.moveTo(tx2,ty2);g.lineTo(tx2+X(-13),ty2-11);g.lineTo(tx2+X(-7),ty2-2);g.closePath();g.fill();
+    /* --- ŁAPA TYLNA (za korpusem) --- */
+    const lapa=(lx,ly,s2)=>{
+      rr(g,lx-5.5*s2,ly-9,11*s2,13,3.4,'#291737');
+      rr(g,lx-3.6*s2,ly-8,5.4*s2,9.4,2.4,'#4e2e6a');
+      g.fillStyle='#e8e0f4';
+      for(let i=0;i<3;i++){
+        g.beginPath();g.moveTo(lx-4.8+i*3.6,ly+4);
+        g.lineTo(lx-3.2+i*3.6,ly+9);g.lineTo(lx-6.2+i*3.6,ly+5.8);g.closePath();g.fill();
+      }
+    };
+    lapa(X(-9),-2,1);
+    /* --- KORPUS: dwie bryły + obrys, żeby odciął się od ciemnej jamy --- */
+    g.fillStyle='#1c1028';g.beginPath();g.ellipse(0,-19+od,20.5,17.5,0,0,7);g.fill();
+    g.fillStyle='#33203f';g.beginPath();g.ellipse(0,-19+od,19,16,0,0,7);g.fill();
+    g.fillStyle='#4a2c66';g.beginPath();g.ellipse(X(-3),-22+od,15,13,0,0,7);g.fill();
+    g.strokeStyle='#63407f';g.lineWidth=1.3;                     // rzędy łusek
+    for(let i=0;i<3;i++){
+      g.beginPath();g.arc(X(-3),-22+od,6.5+i*3.8,fl>0?3.3:5.5,fl>0?5.5:1.3);g.stroke();
+    }
+    g.strokeStyle='#8f5cb8';g.lineWidth=1.8;                     // światło na grzbiecie
+    g.beginPath();g.arc(0,-19+od,18,fl>0?3.5:4.9,fl>0?4.5:5.9);g.stroke();
+    /* PŁYTY BRZUCHA — jedyne ciepłe miejsce na tej sylwetce */
+    g.save();
+    g.beginPath();g.ellipse(X(6),-14+od,11.5,12.5,0,0,7);g.clip();
+    R(g,-28,-36,56,52,'#a85c1e');
+    for(let i=0;i<8;i++)R(g,-28,-30+i*3.8+od,56,2.6,i%2?'#e8a444':'#c87a2a');
+    g.restore();
+    g.strokeStyle='#8a5220';g.lineWidth=1;
+    g.beginPath();g.ellipse(X(6),-14+od,11.5,12.5,0,0,7);g.stroke();
+    lapa(X(12),0,1);                                             // łapa przednia
+    /* --- GRZBIET: kolce po łuku pleców --- */
+    g.fillStyle='#b07ae0';
+    for(let i=0;i<7;i++){
+      const u=i/6,px=X(-17+u*30),py=-33-Math.sin(u*3.14)*8+od;
+      g.beginPath();g.moveTo(px-2.6,py+5);g.lineTo(px+X(1),py-7.5);g.lineTo(px+2.6,py+5);g.closePath();g.fill();
+    }
+    skrzydlo(false);
+    /* --- SZYJA: gruba, w łuku --- */
+    const hx=X(31),hy=-49+Math.sin(t*2.3)*2+od;
+    g.lineCap='round';
+    g.strokeStyle='#291737';g.lineWidth=13;
+    g.beginPath();g.moveTo(X(7),-30);g.quadraticCurveTo(X(19),-48,hx-X(4),hy+5);g.stroke();
+    g.strokeStyle='#4a2c66';g.lineWidth=7.5;
+    g.beginPath();g.moveTo(X(7),-30);g.quadraticCurveTo(X(18),-48,hx-X(4),hy+5);g.stroke();
+    g.lineCap='butt';
+    g.fillStyle='#8a4fc0';                                       // kolce na karku
+    for(let i=0;i<4;i++){
+      const u=i/3,px=X(9+u*15),py=-32-u*14;
+      g.beginPath();g.moveTo(px-X(2.4),py+4);g.lineTo(px,py-7);g.lineTo(px+X(2.4),py+4);g.closePath();g.fill();
+    }
+    /* --- ŁEB: czaszka + wydłużony pysk --- */
+    g.fillStyle='#291737';g.beginPath();g.ellipse(hx,hy,13.5,10,fl*.12,0,7);g.fill();
+    g.fillStyle='#4a2c66';g.beginPath();g.ellipse(hx-X(1),hy-1,12,8.6,fl*.12,0,7);g.fill();
+    g.strokeStyle='#8f5cb8';g.lineWidth=1.4;                     // światło na czaszce
+    g.beginPath();g.ellipse(hx-X(1),hy-1,11,7.8,fl*.12,3.5,5.6);g.stroke();
+    const paszcza=zar?5.5:1.6;
+    g.fillStyle='#4a2c66';g.beginPath();                         // GÓRNA szczęka
+    g.moveTo(hx+X(4),hy-6);g.lineTo(hx+X(24),hy-1.5);g.lineTo(hx+X(23),hy+2.6);
+    g.lineTo(hx+X(4),hy+3.4);g.closePath();g.fill();
+    g.fillStyle='#5e3a80';g.beginPath();
+    g.moveTo(hx+X(4),hy-6);g.lineTo(hx+X(24),hy-1.5);g.lineTo(hx+X(20),hy-.6);
+    g.lineTo(hx+X(4),hy-3.4);g.closePath();g.fill();
+    g.fillStyle='#1c1028';g.beginPath();                         // DOLNA szczęka
+    g.moveTo(hx+X(4),hy+2.6);g.lineTo(hx+X(20),hy+2.6+paszcza);
+    g.lineTo(hx+X(4),hy+8+paszcza);g.closePath();g.fill();
+    g.fillStyle='#f2ecfa';                                       // kły
+    for(let i=0;i<6;i++){
+      const zx=hx+X(6+i*3);
+      g.beginPath();g.moveTo(zx,hy+2);g.lineTo(zx+X(2),hy+2);g.lineTo(zx+X(1),hy+5.6);g.closePath();g.fill();
+    }
+    g.fillStyle='#e8e0f4';                                       // rogi — dwie pary do tyłu
+    g.beginPath();g.moveTo(hx-X(6),hy-7);g.lineTo(hx-X(23),hy-21);g.lineTo(hx-X(7),hy-12);g.closePath();g.fill();
+    g.fillStyle='#c9c0e0';
+    g.beginPath();g.moveTo(hx-X(1),hy-8);g.lineTo(hx-X(12),hy-25);g.lineTo(hx-X(3),hy-13);g.closePath();g.fill();
+    g.fillStyle='#8a4fc0';                                       // kolce policzkowe
+    g.beginPath();g.moveTo(hx-X(5),hy+4);g.lineTo(hx-X(16),hy+11);g.lineTo(hx-X(5),hy+8);g.closePath();g.fill();
+    g.beginPath();g.moveTo(hx-X(3),hy+6);g.lineTo(hx-X(12),hy+14);g.lineTo(hx-X(3),hy+9);g.closePath();g.fill();
+    g.save();g.globalCompositeOperation='lighter';               // ŚLEPIE świeci na całą jamę
+    g.globalAlpha=.5+Math.sin(t*5)*.16;
+    g.fillStyle='#f5a032';g.beginPath();g.arc(hx+X(5),hy-3,7,0,7);g.fill();
+    g.restore();
+    g.fillStyle='#f5c542';g.beginPath();g.ellipse(hx+X(5),hy-3,4,3.4,0,0,7);g.fill();
+    R(g,hx+X(5)-1.1,hy-6.4,2.2,6.4,'#1a0f24');                   // pionowa źrenica
+    R(g,hx+X(3),hy-8,4.4,1.4,'#291737');                         // brew
+    R(g,hx+X(20),hy-2.6,1.8,1.8,'#1a0f24');                      // nozdrze
+    if(zar){                                                     // rozgrzane gardło
+      g.save();g.globalCompositeOperation='lighter';
+      g.globalAlpha=.6+Math.sin(t*26)*.22;
+      g.fillStyle='#f5a032';g.beginPath();g.arc(hx+X(16),hy+4,6.5,0,7);g.fill();
+      g.fillStyle='#fff2c8';g.beginPath();g.arc(hx+X(16),hy+4,2.8,0,7);g.fill();
+      g.restore();
+    }else if(!reduceMotion&&Math.floor(t*3)%2){                  // …a poza tym dymi z nozdrzy
+      g.fillStyle='rgba(184,140,240,.45)';
+      g.beginPath();g.arc(hx+X(25),hy-5-Math.sin(t*4)*2,3,0,7);g.fill();
+    }
+    if(f.ph2){                                                   // FAZA SZAŁU: pęknięcia w łusce
+      g.save();g.globalCompositeOperation='lighter';
+      g.globalAlpha=.45+Math.sin(t*7)*.22;
+      g.strokeStyle='#e04848';g.lineWidth=1.6;
+      g.beginPath();g.moveTo(X(-12),-30);g.lineTo(X(-5),-22);g.lineTo(X(-11),-13);g.stroke();
+      g.beginPath();g.moveTo(X(2),-34);g.lineTo(X(-2),-26);g.lineTo(X(3),-17);g.stroke();
+      g.beginPath();g.moveTo(X(-19),-16);g.lineTo(X(-13),-10);g.stroke();
+      g.beginPath();g.moveTo(hx-X(8),hy+2);g.lineTo(hx-X(2),hy+6);g.stroke();
+      g.restore();
+    }
+    g.restore();
+  },
   smok(g,f){// SMOK WAWELSKI — zielony, zieje ogniem
     const fl=P.x<f.x;
     // ogon
@@ -10075,7 +10611,12 @@ const MAPCOL={0:'#2f6b3a',1:'#b39a68',2:'#454552',3:'#2f6db0',4:'#173a20',5:'#9a
   24:'#2f6db0',25:'#4a7a3a',26:'#5a4028',27:'#e0662a',28:'#4a9a52',29:'#c8a86a',31:'#357a3e',
   32:'#e04848',33:'#1a1a24',34:'#b0b0be',35:'#3a7ad0',36:'#d84848',37:'#9a9aa4',
   /* BRAMA POLA — na minimapie ma się rzucać w oczy, bo to cel wędrówki */
-  71:'#f5c542',72:'#d02828',73:'#7bc950'};
+  71:'#f5c542',72:'#d02828',73:'#7bc950',
+  /* GÓRY I SMOCZA JAMA — na minimapie skała jest jasna, jama czarna,
+     a skarb i szczelina świecą, bo po nich orientujesz się w komnacie */
+  74:'#5a5468',75:'#7a7488',76:'#4a7a46',77:'#2c5030',78:'#a8a2bc',79:'#8a6a40',
+  80:'#6a6276',81:'#cfc8b4',82:'#f5c542',83:'#e04848',84:'#8a5fd0',85:'#1a1424',86:'#3a3048',
+  87:'#dfe6f2'};
 const mapColor=v=>MAPCOL[v]||(v>=10&&v<=15?'#6a6a80':'#2f6b3a');
 function drawMapOverlay(){
   cx.fillStyle='rgba(9,7,18,.93)';cx.fillRect(0,0,W,H);
@@ -10126,7 +10667,11 @@ const TCOL={0:'#2e5a34',1:'#a08a5a',2:'#3a3a48',7:'#2e5a34',8:'#d8c084',9:'#8a6a
   62:'#c8562a',63:'#12301c',64:'#2c4a30',65:'#6b675e',66:'#7a5a36',67:'#6e5030',
   68:'#0e2214',69:'#55522f',70:'#12181a',
   /* brama pola festiwalowego */
-  71:'#2e5a34',72:'#2e5a34',73:'#7a5636'};
+  71:'#2e5a34',72:'#2e5a34',73:'#7a5636',
+  /* góry i smocza jama */
+  74:'#544f61',75:'#6b6576',76:'#4a6a44',77:'#6b6576',78:'#6b6576',79:'#0b0d12',
+  80:'#332a40',81:'#332a40',82:'#332a40',83:'#332a40',84:'#332a40',85:'#231b2e',86:'#332a40',
+  87:'#6b6576'};
 /* podłoże pod asset (trawa/piasek/śnieg wg regionu) — spójne tło dekoracji */
 function baseTile(){return REG==='morze'?8:REG==='tatry'?17:0;}
 /* PODKŁAD POD ASSETEM ŚWIATA. Poza domeną to trawa/piach/śnieg regionu, ale
@@ -10153,6 +10698,19 @@ function baseCol(){return REG==='morze'?'#d8c084':REG==='tatry'?'#e8eef8':'#2e5a
    i ewentualnie kolizja w SOLIDF) — nie dopisywanie kolejnego `if`
    do funkcji rysującej.
    ===================================================================== */
+/* PLAMA ZROŚNIĘTA Z SĄSIADEM (darń, zaspa). Kafel rysuje zaokrągloną plamę,
+   ale KRAWĘDŹ OD STRONY SĄSIADA tej samej klasy jest ścinana do prostej —
+   inaczej każdy kafel zostaje osobną poduszką i śnieg wygląda jak pianki,
+   a nie jak jedna zaspa. `sas(dx,dy)` mówi, po której stronie jest sąsiad. */
+function plama(g,sx,sy,l,t,r,b,sas,dol,gora){
+  const w=Math.max(2,r-l),h=Math.max(2,b-t);
+  rr(g,sx+l,sy+t,w,h,2.2,dol);
+  if(sas(-1,0))R(g,sx,sy+t,3,h,dol);
+  if(sas(1,0))R(g,sx+13,sy+t,3,h,dol);
+  if(sas(0,-1))R(g,sx+l,sy,w,3,dol);
+  if(sas(0,1))R(g,sx+l,sy+13,w,3,dol);
+  R(g,sx+l+.8,sy+t+.7,Math.max(1,w-1.6),Math.max(1,h*.42),gora);   // światło od góry
+}
 const TILES={
   0:{paint(g,sx,sy,tx,ty){if((tx+ty)%2===0)R(g,sx,sy,16,16,'rgba(255,255,255,.025)');
       if((tx*7+ty*13)%9===0)R(g,sx+6,sy+7,2,2,'#376b3e');
@@ -10914,6 +11472,238 @@ const TILES={
       for(let i=0;i<3;i++)R(g,bx+1,sy+3+i*3.4,2,2.2,'#4e4e5e');
       if(!reduceMotion&&Math.floor(anim*2)%2===0)R(g,lewe?sx+6:sx+8,sy-1,2,2,'#7bc950'); // zielone światło
   }},
+  /* ------------------------------------------------------------------
+     GÓRY I SMOCZA JAMA (74-86) — jeden komplet kafli na całą drogę:
+     las pod Wawelem → piarżysko → półki skalne → mosty nad przepaścią →
+     jama. Pięter nie różni inny generator, tylko INNY ZESTAW tych kafli
+     i własna paleta podłogi/ściany (pole `floor`/`acc`/`wall` we wpisie
+     piętra w js/mapy.js) — stąd pięć plansz, które nie wyglądają jak jedna.
+     ------------------------------------------------------------------ */
+  74:{paint(g,sx,sy,tx,ty){// SKAŁA GÓRSKA — ściana z warstwowanego wapienia
+      const sk=(dx,dy)=>{const v=at(tx+dx,ty+dy);return v===74||v===78||v===85;};
+      const pas=['#605b70','#4c4859','#585366','#443f52'];
+      for(let i=0;i<4;i++)R(g,sx,sy+i*4,16,4,pas[(tx*3+ty*5+i)%4]);
+      for(let i=1;i<4;i++)R(g,sx,sy+i*4-.5,16,.9,'#38344a');       // spoiny warstw
+      if((tx*7+ty*11)%3===0)R(g,sx+3+((ty*5)%9),sy+((tx*3)%5),1.2,9,'#3b374d'); // pęknięcie
+      if(!sk(0,-1)){                                               // grań w słońcu + śnieg
+        R(g,sx,sy,16,1.6,'#7b7590');R(g,sx,sy+1.6,16,.8,'#8e88a4');
+        if((tx*5+ty*3)%4!==0)R(g,sx+((tx*7)%7),sy-.6,7,1.6,'#e8eef8');
+      }
+      if(!sk(-1,0))R(g,sx,sy,1.4,16,'#3b374d');
+      if(!sk(1,0))R(g,sx+14.6,sy,1.4,16,'#6a6479');
+      if(!sk(0,1)){R(g,sx,sy+14,16,2,'#454154');                   // piarg u podstawy
+        if((tx+ty)%2===0)R(g,sx+2+((tx*3)%9),sy+13,2,1.6,'#6a6479');}
+  }},
+  75:{paint(g,sx,sy,tx,ty){// PIARG — sypki żwir pod nogami (deptalny)
+      R(g,sx,sy,16,16,'#6b6576');
+      /* Plamy kładziemy MIĘKKO i po nieregularnym haszu. Wcześniej szło to
+         po `(tx*7+ty*13)%4`, czyli po przekątnej co cztery kafle — i piarg
+         wychodził w szachownicę, którą widać było przez cały ekran. */
+      R(g,sx,sy,16,16,['rgba(255,255,255,.018)','rgba(0,0,0,.03)','rgba(0,0,0,.012)',
+                       'rgba(212,204,228,.022)','rgba(0,0,0,.024)'][(tx*5+ty*11+((tx*ty)%7))%5]);
+      if((tx*5+ty*3)%3===0){R(g,sx+2,sy+3,2.4,1.6,'#847e93');R(g,sx+3,sy+4.4,1.4,1,'#514c5e');}
+      if((tx*3+ty*7)%4===0){R(g,sx+9,sy+7,3,2,'#7a7488');R(g,sx+9.6,sy+8.4,1.8,1,'#4d485a');}
+      if((tx*11+ty*5)%5===0){R(g,sx+5,sy+11,2,1.6,'#8e88a0');R(g,sx+12,sy+2,1.6,1.4,'#7a7488');}
+      if((tx*13+ty*3)%7===0)R(g,sx+6,sy+13,4,1.2,'#575264');
+  }},
+  76:{paint(g,sx,sy,tx,ty){// HALA — kępa górskiej murawy NA piargu (deptalna)
+      /* Murawa nie wypełnia kafla po brzegi: to PLAMA darni położona na tym,
+         co jest pod spodem, zrośnięta z sąsiednimi kępami. Zielony kwadrat
+         rozsypany po szarym piargu wyglądał jak konfetti, a nie jak hala. */
+      podklad(g,sx,sy,tx,ty);
+      const h=(dx,dy)=>at(tx+dx,ty+dy)===76;
+      const l=h(-1,0)?0:1.4+((ty*7)%3), r2=h(1,0)?16:14.6-((ty*5)%3);
+      const t2=h(0,-1)?0:1.6+((tx*5)%3), b2=h(0,1)?16:14.2-((tx*3)%3);
+      plama(g,sx,sy,l,t2,r2,b2,h,'#3f6238','#4d7546');
+      for(let i=0;i<3;i++){
+        const a=l+1+((tx*7+ty*5+i*11)%Math.max(2,Math.round(r2-l-3)));
+        const b=t2+1+((tx*3+ty*11+i*7)%Math.max(2,Math.round(b2-t2-3)));
+        R(g,sx+a,sy+b,1,2.6,'#63895a');R(g,sx+a+1.3,sy+b+.8,1,2,'#55794c');
+      }
+      if((tx*5+ty*7)%5===0){                                        // krokus
+        R(g,sx+4.4,sy+10.4,1.2,2,'#3f6238');R(g,sx+4,sy+8.6,2,2,'#a276d8');
+        R(g,sx+4.6,sy+8,.8,1.2,'#d8bcf4');}
+      if((tx*11+ty*3)%7===0){R(g,sx+10.4,sy+6.6,1,1.8,'#3f6238');R(g,sx+10,sy+5,1.8,1.8,'#8f62c8');}
+  }},
+  87:{paint(g,sx,sy,tx,ty){// ZASPA — śnieg leżący na piargu, zrośnięty z sąsiednim (deptalna)
+      podklad(g,sx,sy,tx,ty);
+      const z=(dx,dy)=>at(tx+dx,ty+dy)===87;
+      const l=z(-1,0)?0:1.6+((ty*5)%3), r2=z(1,0)?16:14.4-((ty*7)%3);
+      const t2=z(0,-1)?0:1.8+((tx*3)%3), b2=z(0,1)?16:13.8-((tx*11)%3);
+      plama(g,sx,sy,l,t2,r2,b2,z,'#b9c2d6','#d2dbea');
+      if((tx*7+ty*3)%3===0)R(g,sx+5,sy+9.4,2.4,1.4,'#8f8aa4');      // ziarno piargu przebija
+      if((tx*5+ty*11)%4===0)R(g,sx+10,sy+5.6,1.8,1.4,'#8f8aa4');
+  }},
+  77:{paint(g,sx,sy,tx,ty){// KOSÓWKA — kosodrzewina: niska, powyginana, kolczasta
+      podklad(g,sx,sy,tx,ty);
+      g.fillStyle='rgba(0,0,0,.28)';g.beginPath();g.ellipse(sx+8,sy+14,7,2.4,0,0,7);g.fill();
+      g.strokeStyle='#4a3a24';g.lineWidth=1.6;
+      g.beginPath();g.moveTo(sx+8,sy+14);g.quadraticCurveTo(sx+4,sy+11,sx+2.5,sy+7);g.stroke();
+      g.beginPath();g.moveTo(sx+8,sy+14);g.quadraticCurveTo(sx+12,sy+10,sx+13.5,sy+6);g.stroke();
+      const kepa=(x,y,r,c)=>{g.fillStyle=c;g.beginPath();g.arc(sx+x,sy+y,r,0,7);g.fill();};
+      kepa(4,7.5,4,'#1f3a24');kepa(11.5,6.5,4.2,'#24422a');kepa(8,4.5,4.4,'#2c5030');kepa(8,9.5,4.6,'#1c3520');
+      g.strokeStyle='#37613a';g.lineWidth=1;
+      for(let i=0;i<7;i++){
+        const a=i/7*6.28+((tx*3+ty*5)%7)*.22;
+        g.beginPath();g.moveTo(sx+8+Math.cos(a)*4.4,sy+7+Math.sin(a)*4);
+        g.lineTo(sx+8+Math.cos(a)*6.8,sy+7+Math.sin(a)*5.8);g.stroke();
+      }
+      if((tx*7+ty*3)%4===0){R(g,sx+5,sy+2.6,2,2.6,'#6a4a2a');R(g,sx+5.4,sy+3.2,1.2,1.4,'#8a6a44');}
+  }},
+  78:{paint(g,sx,sy,tx,ty){// TURNIA — skalna igła z czapą śniegu (rysuje PONAD kafel)
+      podklad(g,sx,sy,tx,ty);
+      g.fillStyle='rgba(0,0,0,.3)';g.beginPath();g.ellipse(sx+8,sy+14.6,7.4,2.4,0,0,7);g.fill();
+      const czub=sx+5+((tx*5+ty*7)%3)*3;
+      g.fillStyle='#6a6479';g.beginPath();
+      g.moveTo(sx+.6,sy+15);g.lineTo(sx+3,sy+6);g.lineTo(czub,sy-9);
+      g.lineTo(sx+13,sy+5);g.lineTo(sx+15.4,sy+15);g.closePath();g.fill();
+      g.fillStyle='#514c5e';g.beginPath();                          // ściana w cieniu
+      g.moveTo(czub,sy-9);g.lineTo(sx+13,sy+5);g.lineTo(sx+15.4,sy+15);g.lineTo(sx+9,sy+15);g.closePath();g.fill();
+      g.fillStyle='#847e93';g.beginPath();                          // grań w słońcu
+      g.moveTo(czub,sy-9);g.lineTo(sx+3,sy+6);g.lineTo(sx+6.4,sy+7);g.closePath();g.fill();
+      g.fillStyle='#e8eef8';g.beginPath();                          // czapa śniegu
+      g.moveTo(czub,sy-9);g.lineTo(czub-3,sy-4);g.lineTo(czub-.6,sy-4.8);
+      g.lineTo(czub+1.8,sy-2.8);g.lineTo(czub+2.6,sy-5.2);g.closePath();g.fill();
+      R(g,sx+4,sy+9,5,1,'#3b374d');R(g,sx+9,sy+12,4,1,'#3b374d');
+  }},
+  79:{paint(g,sx,sy,tx,ty){// KŁADKA — deski i liny nad przepaścią (deptalna)
+      const most=v=>v===79||v===43;
+      const poz=most(at(tx-1,ty))||most(at(tx+1,ty));
+      R(g,sx,sy,16,16,'#0b0d12');                                   // pod deskami: pustka
+      g.save();g.translate(sx+8,sy+8);if(!poz)g.rotate(Math.PI/2);g.translate(-8,-8);
+      R(g,0,2.4,16,1.6,'#4e3820');R(g,0,12,16,1.6,'#4e3820');       // belki nośne
+      for(let i=0;i<5;i++){
+        const k=(tx*7+ty*5+i)%4;
+        R(g,i*3.2+.3,1.4,2.6,13.2,['#7a5a36','#6e5030','#82603c','#5f4528'][k]);
+        R(g,i*3.2+.3,1.4,2.6,.9,'#9a7550');R(g,i*3.2+.3,13.9,2.6,.7,'#3f2d18');
+      }
+      g.strokeStyle='#8a7a5a';g.lineWidth=1;                        // liny poręczy
+      g.beginPath();g.moveTo(0,.7);g.lineTo(16,.7);g.stroke();
+      g.beginPath();g.moveTo(0,15.3);g.lineTo(16,15.3);g.stroke();
+      if((tx+ty)%2===0){R(g,4,0,1,3.4,'#6a5a3a');R(g,11,12.6,1,3.4,'#6a5a3a');}
+      g.restore();
+  }},
+  80:{paint(g,sx,sy,tx,ty){// STALAGMIT — naciek z dna jamy
+      podklad(g,sx,sy,tx,ty);
+      g.fillStyle='rgba(0,0,0,.34)';g.beginPath();g.ellipse(sx+8,sy+14.4,6.4,2.4,0,0,7);g.fill();
+      const w=(tx*7+ty*5)%2;
+      const igla=(bx,h,c1,c2)=>{
+        g.fillStyle=c1;g.beginPath();
+        g.moveTo(sx+bx-3.2,sy+15);g.lineTo(sx+bx,sy+15-h);g.lineTo(sx+bx+3.2,sy+15);g.closePath();g.fill();
+        g.fillStyle=c2;g.beginPath();
+        g.moveTo(sx+bx,sy+15-h);g.lineTo(sx+bx+3.2,sy+15);g.lineTo(sx+bx+.6,sy+15);g.closePath();g.fill();};
+      igla(5.5,w?12:15,'#6a6276','#4a4356');
+      igla(11,w?8:6,'#5e576b','#433d4f');
+      R(g,sx+4.4,sy+9,1.2,3,'#847c94');                             // połysk wilgoci
+      if((tx*3+ty*7)%3===0)R(g,sx+5,sy+6,1.2,2.4,'#8a5fd0');        // żyłka minerału
+  }},
+  81:{paint(g,sx,sy,tx,ty){// KOŚCI — po tych, co przyszli tu przed tobą (deptalne)
+      podklad(g,sx,sy,tx,ty);
+      const kosc=(x,y,dl,kat)=>{
+        g.save();g.translate(sx+x,sy+y);g.rotate(kat);
+        R(g,-dl/2,-.9,dl,1.8,'#cfc8b4');
+        R(g,-dl/2-1,-1.8,2,3.6,'#e2dcc8');R(g,dl/2-1,-1.8,2,3.6,'#e2dcc8');
+        g.restore();};
+      const w=(tx*7+ty*11)%4;
+      if(w===0){kosc(6,9,8,.35);kosc(11,12.5,5,-.7);}
+      else if(w===1){                                               // czaszka
+        g.fillStyle='#ded7c2';g.beginPath();g.ellipse(sx+7,sy+8,4.4,3.6,.2,0,7);g.fill();
+        R(g,sx+8.6,sy+9.4,3.6,2.4,'#cfc8b4');
+        R(g,sx+5,sy+7,1.8,1.8,'#241c30');R(g,sx+8.2,sy+6.6,1.8,1.8,'#241c30');
+        kosc(12,13.5,5,.2);}
+      else if(w===2){                                               // klatka żeber
+        g.strokeStyle='#cfc8b4';g.lineWidth=1.2;
+        for(let i=0;i<4;i++){g.beginPath();g.arc(sx+3,sy+5+i*3,4.4,-.6,.9);g.stroke();}
+        R(g,sx+2,sy+3,1.6,13,'#e2dcc8');}
+      else kosc(8,11,7,-.25);
+  }},
+  82:{paint(g,sx,sy,tx,ty){// SKARB SMOKA — kopiec monet, a w nim pamiątki po gościach
+      podklad(g,sx,sy,tx,ty);
+      g.fillStyle='rgba(0,0,0,.3)';g.beginPath();g.ellipse(sx+8,sy+14.4,7.6,2.6,0,0,7);g.fill();
+      g.fillStyle='#8f6612';g.beginPath();
+      g.moveTo(sx-.5,sy+15.5);g.quadraticCurveTo(sx+8,sy+2,sx+16.5,sy+15.5);g.closePath();g.fill();
+      g.fillStyle='#c89a1e';g.beginPath();
+      g.moveTo(sx-.5,sy+15.5);g.quadraticCurveTo(sx+6,sy+4.5,sx+11,sy+15.5);g.closePath();g.fill();
+      const moneta=(x,y,r)=>{
+        g.fillStyle='#f5c542';g.beginPath();g.ellipse(sx+x,sy+y,r,r*.62,0,0,7);g.fill();
+        g.fillStyle='#fff2b0';g.beginPath();g.ellipse(sx+x-r*.3,sy+y-r*.2,r*.34,r*.24,0,0,7);g.fill();};
+      moneta(4.5,11,2.2);moneta(9,9.5,2);moneta(12,12.5,2.4);
+      const w=(tx*7+ty*5)%3;
+      if(w===0){                                                    // puchar
+        g.fillStyle='#e0b62c';g.beginPath();
+        g.moveTo(sx+6,sy+4);g.lineTo(sx+11,sy+4);g.lineTo(sx+9.6,sy+8.4);g.lineTo(sx+7.4,sy+8.4);g.closePath();g.fill();
+        R(g,sx+8,sy+8.4,1.4,2,'#c89a1e');R(g,sx+6.6,sy+10.2,4.2,1.4,'#e0b62c');}
+      else if(w===1){                                               // korona
+        R(g,sx+5,sy+6.4,6.4,2.2,'#f5c542');
+        for(let i=0;i<3;i++)R(g,sx+5+i*2.6,sy+3.8,1.8,3,'#f5c542');
+        R(g,sx+7.6,sy+6.8,1.4,1.4,'#c8384a');}
+      else{                                                         // ROLEX Z DIAMENTAMI
+        R(g,sx+6.6,sy+3.4,3.4,1.8,'#c9c4dd');R(g,sx+6.6,sy+9,3.4,1.8,'#c9c4dd');
+        R(g,sx+5.6,sy+5,5,4.4,'#f5c542');R(g,sx+6.4,sy+5.8,3.4,2.8,'#3a3450');
+        R(g,sx+7.4,sy+6.6,1,1,'#fff7d6');}
+  }},
+  83:{paint(g,sx,sy,tx,ty){// ŻARZĄCA SIĘ SZCZELINA — pod jamą coś jeszcze się tli
+      podklad(g,sx,sy,tx,ty);
+      g.fillStyle='#2a1420';g.beginPath();
+      const w=(tx*5+ty*7)%3;
+      if(w===0){g.moveTo(sx+1,sy+9);g.lineTo(sx+6,sy+5);g.lineTo(sx+10,sy+8);g.lineTo(sx+15,sy+6);
+                g.lineTo(sx+15,sy+9.4);g.lineTo(sx+10,sy+11.4);g.lineTo(sx+6,sy+8.4);g.lineTo(sx+1,sy+12.4);}
+      else if(w===1){g.moveTo(sx+7,sy+.5);g.lineTo(sx+10,sy+6);g.lineTo(sx+7,sy+11);g.lineTo(sx+9,sy+15.5);
+                     g.lineTo(sx+6,sy+15.5);g.lineTo(sx+4,sy+10.6);g.lineTo(sx+7,sy+5.6);g.lineTo(sx+4,sy+.5);}
+      else{g.moveTo(sx+2,sy+3);g.lineTo(sx+8,sy+7);g.lineTo(sx+14,sy+4);
+           g.lineTo(sx+14,sy+7.4);g.lineTo(sx+8,sy+10.4);g.lineTo(sx+2,sy+6.4);}
+      g.closePath();g.fill();
+      g.save();g.clip();
+      R(g,sx,sy,16,16,'#c83a26');R(g,sx,sy,16,16,'rgba(245,180,60,.45)');
+      R(g,sx,sy+((tx*3+ty)%9),16,2,'#fff2c8');
+      g.restore();
+      if((tx+ty)%2===0)R(g,sx+3,sy+12.6,3,1,'#5a2a2a');             // przypalony brzeg
+  }},
+  84:{paint(g,sx,sy,tx,ty){// SMOCZE JAJO — niektóre już pękły
+      podklad(g,sx,sy,tx,ty);
+      g.fillStyle='rgba(0,0,0,.3)';g.beginPath();g.ellipse(sx+8,sy+14.6,5.4,2,0,0,7);g.fill();
+      g.fillStyle='#4a3a58';g.beginPath();g.ellipse(sx+8,sy+9,5.4,6.4,0,0,7);g.fill();
+      g.fillStyle='#5e4c70';g.beginPath();g.ellipse(sx+6.6,sy+8,3.4,4.6,0,0,7);g.fill();
+      g.strokeStyle='#3a2e46';g.lineWidth=.8;
+      for(let i=0;i<3;i++){g.beginPath();g.arc(sx+8,sy+6.6+i*3,3.4,.4,2.7);g.stroke();}
+      if((tx*7+ty*11)%3===0){                                       // pęknięte — świeci fioletem
+        g.fillStyle='#b98cf0';g.beginPath();
+        g.moveTo(sx+6,sy+4.4);g.lineTo(sx+8.6,sy+8);g.lineTo(sx+6.6,sy+9);g.lineTo(sx+9,sy+13);
+        g.lineTo(sx+7.6,sy+13.4);g.lineTo(sx+5.2,sy+9.2);g.lineTo(sx+7,sy+8.2);g.lineTo(sx+4.8,sy+5);
+        g.closePath();g.fill();
+        R(g,sx+6.8,sy+6,1,2,'#e8dcff');}
+      R(g,sx+5.6,sy+5.6,1.4,2,'#7a6690');
+  }},
+  85:{paint(g,sx,sy,tx,ty){// ŚCIANA JASKINI — czarny kamień z fioletową żyłą
+      const sk=(dx,dy)=>{const v=at(tx+dx,ty+dy);return v===85||v===74||SOLID(v);};
+      R(g,sx,sy,16,16,'#231b2e');
+      R(g,sx,sy,16,16,['rgba(255,255,255,.03)','rgba(0,0,0,.10)',
+                       'rgba(140,90,200,.05)','rgba(0,0,0,.04)'][(tx*7+ty*13)%4]);
+      if((tx*5+ty*3)%3===0){R(g,sx+2,sy+3,5,1.4,'#180f22');R(g,sx+8,sy+9,6,1.2,'#180f22');}
+      if((tx*11+ty*7)%4===0)R(g,sx+4,sy+11,3,3,'#2e2440');
+      /* ŻYŁA MINERAŁU co piąty kafel, nie co trzeci: ma być rzadkim znakiem
+         szczególnym ściany, a nie fioletową tapetą przez cały ekran. */
+      if((tx*5+ty*7+((tx*ty)%5))%5===0){
+        const a=sy+((tx*7)%10),b=sy+((ty*5)%12),c=sy+((tx*3+ty)%11);
+        g.strokeStyle='rgba(106,62,168,.7)';g.lineWidth=1.1;
+        g.beginPath();g.moveTo(sx+1,a);g.lineTo(sx+7,b);g.lineTo(sx+15,c);g.stroke();
+        g.strokeStyle='rgba(185,140,240,.55)';g.lineWidth=.6;
+        g.beginPath();g.moveTo(sx+1,a);g.lineTo(sx+7,b);g.stroke();
+      }
+      if(!sk(0,-1)){R(g,sx,sy,16,1.6,'#3a2e50');R(g,sx,sy+1.6,16,.8,'#4a3a64');}
+      if(!sk(0,1))R(g,sx,sy+14.4,16,1.6,'#150e1e');
+  }},
+  86:{paint(g,sx,sy,tx,ty){// DNO JAMY — kamień wypalony tysiącem oddechów (deptalne)
+      R(g,sx,sy,16,16,'#332a40');
+      R(g,sx,sy,16,16,['rgba(255,255,255,.014)','rgba(0,0,0,.045)','rgba(0,0,0,.018)',
+                       'rgba(180,120,60,.026)','rgba(0,0,0,.03)'][(tx*5+ty*11+((tx*ty)%7))%5]);
+      if((tx*5+ty*3)%4===0){g.fillStyle='rgba(60,26,20,.5)';
+        g.beginPath();g.ellipse(sx+6,sy+9,5,3.4,0,0,7);g.fill();}
+      if((tx*13+ty*7)%6===0){g.fillStyle='rgba(90,40,20,.36)';
+        g.beginPath();g.ellipse(sx+11,sy+4,3.4,2.2,0,0,7);g.fill();}
+      if((tx*3+ty*7)%3===0){R(g,sx+3,sy+12,2,1.2,'#443a52');R(g,sx+10,sy+6,1.6,1,'#4e4460');}
+      if((tx*11+ty*5)%9===0)R(g,sx+7,sy+13,2.4,1.6,'#5a3f6e');      // odprysk łuski
+  }},
 };
 /* Baner „POLAND ROCK" rozpięty nad bramą pola. Wywołuje go każdy z czterech
    kafli bramy dla SWOJEGO wycinka; `napis` to fragment tekstu do wypisania
@@ -11029,6 +11819,97 @@ const SKINY={
       }else{R(g,sx+2,sy+12,4,2,'#2e6236');R(g,sx+11,sy+1,3,2.4,'#3d8a44');}   // bluszcz
     },
   },
+  /* SMOCZA JAMA — ta sama mechanika w skórze gór i jaskini. Betonowy pustak
+     i stalowa maszyna wyglądałyby tu jak pomyłka, więc pustak jest głazem,
+     filar naciekiem, krucha płyta spróchniałą deską mostu, a przepaść —
+     przepaścią, jaka jest w Tatrach: skalne urwisko i mgła gdzieś w dole. */
+  jama:{
+    41(g,sx,sy,tx,ty){                     // pustak → GŁAZ WAPIENNY (tylko ładunek)
+      domFloorBase(g,sx,sy,tx,ty);
+      g.fillStyle='rgba(0,0,0,.32)';g.beginPath();g.ellipse(sx+8,sy+14,7.6,2.6,0,0,7);g.fill();
+      g.fillStyle='#5e5970';g.beginPath();
+      g.moveTo(sx+.4,sy+14.6);g.lineTo(sx+1.6,sy+4.6);g.lineTo(sx+8,sy+.6);
+      g.lineTo(sx+14.4,sy+4);g.lineTo(sx+15.6,sy+14.6);g.closePath();g.fill();
+      g.fillStyle='#7b7590';g.beginPath();
+      g.moveTo(sx+2,sy+5);g.lineTo(sx+8,sy+1.2);g.lineTo(sx+11,sy+6);g.lineTo(sx+4.4,sy+9);g.closePath();g.fill();
+      g.fillStyle='#443f52';g.beginPath();
+      g.moveTo(sx+11,sy+6);g.lineTo(sx+14.4,sy+4);g.lineTo(sx+15.6,sy+14.6);g.lineTo(sx+10,sy+14.6);g.closePath();g.fill();
+      R(g,sx+9,sy+8.4,5,1.2,'#38344a');R(g,sx+3,sy+11,6,1.2,'#38344a');
+      if((tx*5+ty*3)%3===0)R(g,sx+9,sy+2.4,4,1.6,'#e8eef8');        // czapka śniegu
+      if((tx+ty)%2===0)R(g,sx+2,sy+12,3,1.4,'#8e88a4');
+    },
+    42(g,sx,sy,tx,ty){                     // filar → SKALNA KOLUMNA (naciek od stropu po dno)
+      domFloorBase(g,sx,sy,tx,ty);
+      g.fillStyle='rgba(0,0,0,.3)';g.beginPath();g.ellipse(sx+8,sy+14.4,6.6,2.4,0,0,7);g.fill();
+      g.fillStyle='#4a4356';g.beginPath();
+      g.moveTo(sx+1.6,sy+15);g.lineTo(sx+4,sy+8);g.lineTo(sx+3.4,sy+0);
+      g.lineTo(sx+12.6,sy+0);g.lineTo(sx+12,sy+8);g.lineTo(sx+14.4,sy+15);g.closePath();g.fill();
+      g.fillStyle='#6a6276';g.beginPath();
+      g.moveTo(sx+3.4,sy+0);g.lineTo(sx+7.6,sy+0);g.lineTo(sx+7,sy+8);g.lineTo(sx+4,sy+8);
+      g.lineTo(sx+2.6,sy+15);g.lineTo(sx+1.6,sy+15);g.closePath();g.fill();
+      for(let i=0;i<3;i++)R(g,sx+4,sy+2.4+i*4.4,8,1,'#38344a');     // przewężenia nacieku
+      if((tx*3+ty*7)%3===0)R(g,sx+9.4,sy+5,1.2,4,'#8a5fd0');        // żyłka minerału
+      R(g,sx+5,sy+1,1.4,3,'#847e93');
+    },
+    43(g,sx,sy,tx,ty){                     // krucha płyta → SPRÓCHNIAŁA DESKA MOSTU
+      R(g,sx,sy,16,16,'#0b0d12');                                   // pod spodem: pustka
+      for(let i=0;i<3;i++){
+        const py=sy+.8+i*5.1,t=(tx*7+ty*5+i*3)%4;
+        R(g,sx,py,16,4.2,['#6a4c2e','#5f4528','#745534','#573f24'][t]);
+        R(g,sx,py,16,.9,'#8a6a44');R(g,sx,py+3.4,16,.8,'#3f2d18');
+        if((tx*3+i)%3===0)R(g,sx+3+((ty*5)%8),py+1.4,3,1.4,'#452f1a');
+      }
+      R(g,sx+((tx*5+ty)%12),sy+1,1.6,14,'#241a10');                 // pęknięcie w poprzek
+      g.strokeStyle='#7a6a4a';g.lineWidth=.9;                       // resztka liny
+      g.beginPath();g.moveTo(sx,sy+.5);g.lineTo(sx+16,sy+.5);g.stroke();
+    },
+    44(g,sx,sy,tx,ty){                     // przepaść → URWISKO, a w dole mgła
+      R(g,sx,sy,16,16,'#141824');
+      const brzeg=(dx,dy)=>!PIT(at(tx+dx,ty+dy));
+      if(brzeg(0,-1)){                                              // ściana urwiska od góry
+        R(g,sx,sy,16,5,'#4c4859');R(g,sx,sy,16,1.4,'#7b7590');
+        R(g,sx,sy+1.4,16,.8,'#605b70');
+        R(g,sx+2,sy+3,4,1.4,'#38344a');R(g,sx+9,sy+3.4,5,1.2,'#38344a');
+        if((tx*5+ty*3)%4!==0)R(g,sx+((tx*7)%7),sy-.6,6,1.4,'#e8eef8');   // okap śniegu
+      }
+      if(brzeg(0,1)){R(g,sx,sy+11.6,16,4.4,'#2a2836');R(g,sx,sy+14.6,16,1.4,'#3d3b4c');}
+      if(brzeg(-1,0))R(g,sx,sy,3,16,'#2a2836');
+      if(brzeg(1,0))R(g,sx+13,sy,3,16,'#2a2836');
+      /* dalekie dno: im głębiej w kadr, tym jaśniejsza mgła */
+      if((tx*7+ty*5)%5===0)R(g,sx+4,sy+8,7,1.6,'rgba(201,196,221,.10)');
+      if((tx*3+ty*11)%7===0)R(g,sx+2,sy+11,10,1.2,'rgba(201,196,221,.07)');
+      if((tx*11+ty*3)%9===0)R(g,sx+7,sy+6,2,2,'#232838');           // turnia gdzieś w dole
+    },
+    45(g,sx,sy,tx,ty){                     // maszyna → SKRZYNIA GÓRNICZA Z ŁADUNKIEM
+      domFloorBase(g,sx,sy,tx,ty);
+      g.fillStyle='rgba(0,0,0,.3)';g.beginPath();g.ellipse(sx+8,sy+14.5,6.6,2,0,0,7);g.fill();
+      rr(g,sx+1,sy+3,14,11,1.5,'#5f4528');
+      R(g,sx+1,sy+3,14,2,'#7a5a36');R(g,sx+1,sy+12,14,2,'#3f2d18');
+      R(g,sx+1,sy+7.6,14,1.2,'#3f2d18');R(g,sx+7.4,sy+3,1.2,11,'#3f2d18');
+      R(g,sx+2.5,sy+4.6,3,2,'#c8384a');R(g,sx+9.5,sy+9,3,2,'#c8384a');    // laski ładunku
+      R(g,sx+3.4,sy+4,1,1.6,'#3a2a12');R(g,sx+10.4,sy+8.4,1,1.6,'#3a2a12');
+      R(g,sx+10.6,sy+4.6,3,2,'#8e88a4');                                  // okucie
+      R(g,sx+2.6,sy+9,3,2,'#8e88a4');
+    },
+    48(g,sx,sy,tx,ty,col){                 // kłódka → BRAMA Z BLOKÓW, spięta łańcuchem
+      domFloorBase(g,sx,sy,tx,ty);
+      R(g,sx,sy,16,16,'#3f3a4e');
+      for(let i=0;i<4;i++){                                          // ciosane bloki
+        const py=sy+i*4,prz=(i%2)?0:4;
+        R(g,sx+prz-4,py,8,3.6,'#544f61');R(g,sx+prz+4,py,8,3.6,'#4a4557');
+        R(g,sx+prz-4,py,8,.8,'#6a6479');R(g,sx+prz+4,py,8,.8,'#6a6479');
+      }
+      g.strokeStyle=alpha(col,.85);g.lineWidth=2.4;                  // łańcuch w kolorze klucza
+      g.beginPath();g.moveTo(sx,sy+7.4);g.lineTo(sx+16,sy+8.6);g.stroke();
+      g.strokeStyle='#e8e4f0';g.lineWidth=.8;
+      g.beginPath();g.moveTo(sx,sy+7.4);g.lineTo(sx+16,sy+8.6);g.stroke();
+      if((tx+ty)%2===0){
+        R(g,sx+6,sy+6,4,5,col);
+        R(g,sx+7,sy+3.4,2,3,'#e8e4f0');
+        R(g,sx+7.4,sy+7.4,1.2,2,'#241c30');
+      }else R(g,sx+3,sy+12,3,1.6,'#8a5fd0');                         // żyłka minerału w bloku
+    },
+  },
 };
 /* zwraca true, jeśli skin domeny sam pomalował kafel */
 function domSkin(v,g,sx,sy,tx,ty,extra){
@@ -11039,7 +11920,12 @@ function domSkin(v,g,sx,sy,tx,ty,extra){
 }
 /* podkład pod dekoracją: kafle klimatyczne siadają na podłodze/ścianie
    AKTUALNEJ domeny, dzięki czemu ta sama paproć pasuje i do piwnicy, i do lasu */
+/* Paletę bierzemy najpierw z PIĘTRA (`floor`/`acc`/`wall` we wpisie planszy),
+   a dopiero potem z domeny. Dzięki temu jedna domena może prowadzić z lasu
+   w skały i do jaskini, zamiast pięć razy powtarzać tę samą piwnicę. */
 function domMotyw(pole,dom){
+  const fk=DOM&&DOM.fk;
+  if(fk&&fk[pole]!==undefined)return fk[pole];
   const cfg=DOMAINS[(DOM&&DOM.cur)||dom||'piwnica']||{};
   return cfg[pole]!==undefined?cfg[pole]:(pole==='wall'?20:2);
 }
@@ -11483,6 +12369,15 @@ function drawWorld(){
       cx.fillStyle='#e04848';cx.beginPath();cx.arc(sx,sy,5.5*fl,0,7);cx.fill();
       cx.fillStyle='#f5a032';cx.beginPath();cx.arc(sx,sy,3.5*fl,0,7);cx.fill();
       cx.fillStyle='#fff7d6';cx.beginPath();cx.arc(sx-1,sy-1,1.6,0,7);cx.fill();
+    }else if(b.t==='smokogien'){   // SMOCZY OGIEŃ — fioletowy rdzeń w pomarańczowym płomieniu
+      const fl=1+Math.sin(anim*20+sx)*.28,ang=Math.atan2(b.dy,b.dx);
+      cx.save();cx.globalCompositeOperation='lighter';
+      cx.fillStyle='rgba(138,79,192,.5)';cx.beginPath();cx.arc(sx,sy,8*fl,0,7);cx.fill();
+      cx.restore();
+      cx.fillStyle='#8a4fc0';cx.beginPath();cx.ellipse(sx,sy,6.4*fl,4.4*fl,ang,0,7);cx.fill();
+      cx.fillStyle='#e0662a';cx.beginPath();cx.ellipse(sx,sy,4.4*fl,3*fl,ang,0,7);cx.fill();
+      cx.fillStyle='#f5c542';cx.beginPath();cx.arc(sx,sy,2.2*fl,0,7);cx.fill();
+      cx.fillStyle='#fff7d6';cx.beginPath();cx.arc(sx-1,sy-1,1.1,0,7);cx.fill();
     }else if(b.t==='snieg'){
       cx.fillStyle='#ece9f4';cx.beginPath();cx.arc(sx,sy,4.5,0,7);cx.fill();
       cx.fillStyle='#bfe8f4';cx.beginPath();cx.arc(sx+1,sy+1,2,0,7);cx.fill();

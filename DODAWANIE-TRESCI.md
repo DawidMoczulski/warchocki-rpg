@@ -203,6 +203,36 @@ var MAPY={
 | `i` | ognisko (świeci) | `w` | ścieżka leśna | `c` | kamyki |
 | `v` | trzcina | `Q` | staw | `l` | drogowskaz |
 
+**Wyposażenie gór i jaskini** (SMOCZA JAMA — kafle 74–87):
+
+| znak | | znak | | znak | |
+|---|---|---|---|---|---|
+| `a` | skała górska (ściana) | `/` | piarg | `h` | hala — kępa murawy |
+| `t` | kosówka | `!` | turnia | `N` | kładka nad przepaścią |
+| `V` | stalagmit | `Y` | kości | `$` | skarb smoka |
+| `;` | żarząca się szczelina | `&` | smocze jajo | `R` | ściana jaskini |
+
+Zaspa śnieżna (kafel 87) nie ma własnego znaku — wchodzi przez `,`, bo na
+piętrach górskich to ONA jest „podłogą akcentową" (`acc:87`).
+
+**Piętro może mieć własną scenografię.** Poza `kind`, `n`, `opis` i `limit` wpis
+planszy przyjmuje pola z listy `FK_WLASNE`:
+
+| pole | co robi |
+|---|---|
+| `floor` `acc` `wall` | kafle pod `.`, `,` i `#` — czyli cała paleta piętra |
+| `amb` | syntezowane tło: `{wiatr:0-1.5, ptaki:1}` |
+| `mrok` `mrokCol` | siła i barwa winiety (`0` = pełne światło, `1` = piwnica) |
+| `kurz` | halny: pył lecący w poprzek kadru |
+| `mgla` | chmury pod mostami (rysowane tylko nad przepaścią) |
+| `iskry` | żar unoszący się z dna (jama) |
+| `boss` | id z `BOSSES` — staje w komnacie finałowej ZAMIAST strażnika |
+
+Dzięki temu SMOCZA JAMA prowadzi z lasu pod Wawelem (`floor:69`, ptaki, lekki
+cień koron) przez piarg i mosty (`floor:75`, halny, mgła w dole) do czarnej
+jaskini (`floor:86`, cisza, `mrok:.78`, fioletowe iskry) — a nie pięć razy przez
+tę samą salę. Nowe pole dopisuje się do `FK_WLASNE`, nie do pięciu funkcji.
+
 Zasady, których pilnuje test `test_mapy.js` (i sama gra — krzyczy do konsoli):
 
 - **wszystkie wiersze piętra równej długości** (z nich bierze się `MW`), max **64 × 32**;

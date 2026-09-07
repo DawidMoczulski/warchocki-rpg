@@ -8,22 +8,32 @@ albo wyjście = **CAŁA domena od nowa** (wyjście pyta drugim `[E]`).
 
 ### Plansze są RĘCZNIE RYSOWANE (od v22)
 
-**PIWNICA HEJTERÓW** i **DZIKI LAS** mają po pięć plansz narysowanych znak po znaku
-w `js/mapy.js` — takich samych przy każdym wejściu:
+**PIWNICA HEJTERÓW**, **DZIKI LAS** i **SMOCZA JAMA** mają po pięć plansz
+narysowanych znak po znaku w `js/mapy.js` — takich samych przy każdym wejściu:
 
-| | PIWNICA HEJTERÓW | DZIKI LAS |
-|---|---|---|
-| 1 | ZALANA PRALNIA — kaskada z pękniętego pionu | SKRAJ LASU — ścieżka, strumień, drogowskaz |
-| 2 | KOTŁOWNIA — beton i dwie kłódki | WYRĄB — karpy, stosy, skrzynki dynamitu |
-| 3 | BIBLIOTEKA PIWNICZNA — regały i sadzawka | STARY BÓR — świerki, mech, kręgi grzybów |
-| 4 | ZAWALONY STROP — przepaść i kruche płyty | JAR — rzeczka na dnie, spróchniałe kładki |
-| 5 | SALA POD KASKADĄ — strażnik | RUINY LEŚNICZÓWKI — mury, sadzawka, strażnik |
+| | PIWNICA HEJTERÓW | DZIKI LAS | SMOCZA JAMA |
+|---|---|---|---|
+| 1 | ZALANA PRALNIA — kaskada z pękniętego pionu | SKRAJ LASU — ścieżka, strumień, drogowskaz | ŚCIEŻKA POD WAWELEM — las, potok, pierwszy kamień |
+| 2 | KOTŁOWNIA — beton i dwie kłódki | WYRĄB — karpy, stosy, skrzynki dynamitu | PIARŻYSKO — wyrobisko, trzy tarasy na kłódki |
+| 3 | BIBLIOTEKA PIWNICZNA — regały i sadzawka | STARY BÓR — świerki, mech, kręgi grzybów | PÓŁKI SKALNE — sześć półek nad urwiskiem |
+| 4 | ZAWALONY STROP — przepaść i kruche płyty | JAR — rzeczka na dnie, spróchniałe kładki | MOSTY NAD PRZEPAŚCIĄ — pięć turni, kładki i halny |
+| 5 | SALA POD KASKADĄ — strażnik | RUINY LEŚNICZÓWKI — mury, sadzawka, strażnik | SMOCZA JAMA — skarb, kości i **WAWELIN** |
 
 Legenda znaków i zasady autorskie: `DODAWANIE-TRESCI.md`.
 Dźwięk domeny jest **syntezowany**: w piwnicy szum kaskady, w lesie dodatkowo
-wiatr w koronach i ptaki (`amb:{wiatr,ptaki}` we wpisie domeny).
+wiatr w koronach i ptaki (`amb:{wiatr,ptaki}`).
 
-Pozostałe pięć domen **nadal się losuje** — do czasu, aż dostaną swoje mapy.
+**Piętro może mieć WŁASNĄ paletę i pogodę** (od wersji ze SMOCZĄ JAMĄ). Rodzaj
+piętra mówi, CZYM ono jest (walka, kłódki, zegar), a wpis planszy — jak wygląda
+i czym pachnie: `floor`/`acc`/`wall` (kafle pod nogami i mur dookoła),
+`amb` (wiatr, ptaki), `mrok`/`mrokCol` (siła i barwa winiety), `kurz` (halny),
+`mgla` (chmury pod mostami), `iskry` (żar w jamie), `boss` (kto stoi w komnacie
+finałowej). Lista dozwolonych pól to `FK_WLASNE` w `game.js` — **nowe pole
+dopisuje się TAM, nie w pięciu miejscach na krzyż**. To dzięki temu SMOCZA JAMA
+prowadzi z lasu przez piarg i mosty do jaskini, zamiast pięć razy powtarzać
+tę samą salę.
+
+Pozostałe cztery domeny **nadal się losują** — do czasu, aż dostaną swoje mapy.
 Opis niżej dotyczy właśnie ich.
 
 Piętro losowane to **LABIRYNT komnat na siatce** (`siatka:[kolumny,rzędy]`) —
@@ -247,7 +257,15 @@ których już nie było. Cokolwiek ma przeżyć do jutra, ląduje w `testy/`.
 ./testy/sprawdz.sh test_brama.js      # brama pola: widoczność, przejezdność, patrol
 ./testy/sprawdz.sh test_czcionki.js   # polskie znaki: ogonki, kreski, spójność wysokości
 node testy/test_mapy.js               # ręczne plansze domen: format i zdrowy rozsądek
+./testy/sprawdz.sh test_jama.js       # SMOCZA JAMA: pięć plansz w grze + wszystkie ataki WAWELINA
+./testy/sprawdz.sh test_liri.js       # umiejętności KAŻDEJ postaci: [E], [Q], ikony orbów
 ```
+
+`test_jama.js` sprawdza to, czego `test_mapy.js` z zasady nie zobaczy: czy kafel
+ma flagę kolizji, czy paleta piętra faktycznie wylądowała na mapie i czy da się
+planszę przejść **w grze** (`domSprawdzMape`). Odpala też każdy atak smoka —
+łącznie z podniebnym ostrzałem, który trwa 10 sekund i przechodzi przez trzy
+stany — bo to są funkcje, których `node --check` nigdy nie uruchomi.
 
 **Prawdziwa mysz.** Syntetyczne zdarzenia nie ruszą natywnego suwaka — Chrome
 reaguje tylko na zdarzenia zaufane. Żeby odtworzyć przeciąganie, trzeba wstrzyknąć

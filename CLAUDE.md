@@ -82,6 +82,20 @@ w JEJ wpisie w `CHARS`: `skill()`, `burst.plan` (co wybucha), `burst.pose`
 EDEK — każda nowa postać po cichu dziedziczyła jego choreografię, jego okrzyk
 i jego obrażenia. Pilnuje tego `test_liri.js`.
 
+**Piętro domeny to osobna scenografia.** Rodzaj piętra (`FLOOR_KINDS`) mówi, CZYM
+ono jest — czy jest walka, kłódki, zegar. Wpis planszy w `js/mapy.js` mówi, jak
+wygląda i czym pachnie: `floor`/`acc`/`wall`, `amb`, `mrok`/`mrokCol`, `kurz`,
+`mgla`, `iskry`, `boss`. Lista dozwolonych pól to **`FK_WLASNE`** — nowe pole
+dopisuje się TAM, a `domMotyw()` czyta najpierw piętro, potem domenę. Dzięki temu
+jedna domena prowadzi z lasu w skały i do jaskini.
+
+**Boss na piętrze domeny** (`boss:'wawelin'`) to zwykły wpis w `BOSSES` — ta sama
+tożsamość `bid`, więc łup, film, poziom rewanżu i pasek HP działają bez wyjątków.
+Dwie rzeczy MUSZĄ się zgadzać: jego `r` nie może wskazywać istniejącego regionu
+(inaczej stanie znacznikiem na mapie świata i dostanie arenę w terenie), a foe
+musi dostać pole `room` — bez niego komnata liczy się jako pusta i piętro zalicza
+się samo, zanim boss zdąży ryknąć.
+
 **Zapis.** `DEFAULT_SAVE` dokłada brakujące pola przy KAŻDYM wczytaniu, więc
 migracje sprawdzaj na obiekcie **wczytanym**, nie na scalonym — inaczej warunek
 nigdy się nie odpali.
@@ -118,6 +132,7 @@ nigdy się nie odpali.
 Pełny opis w `TESTOWANIE.md` (tam też skróty `?test=…` i komendy konsoli).
 
 ```bash
+./testy/sprawdz.sh test_jama.js       # SMOCZA JAMA: 5 plansz w grze + ataki WAWELINA
 ./testy/sprawdz.sh test_menu.js       # menu: zakładki, sterowanie, zapis, zdarzenia
 ./testy/sprawdz.sh test_brama.js      # brama Poland Rocka: widoczność i przejezdność
 ./testy/sprawdz.sh test_czcionki.js   # polskie znaki: ogonki, kreski, spójność
@@ -141,17 +156,18 @@ których nie było.
 
 ## Aktualny stan treści
 
-8 postaci · 8 żywiołów · 24 zadania · 6 regionów + arena · 7 domen · 8 bossów ·
-45 typów wrogów · 73 kafle · 37 NPC · 19 broni · 51 ubrań · 158 klipów audio.
+8 postaci · 8 żywiołów · 24 zadania · 6 regionów + arena · 7 domen · 9 bossów ·
+46 typów wrogów · 88 kafli · 37 NPC · 19 broni · 51 ubrań · 158 klipów audio.
 
 - **Regiony:** Warszawa, Chodzież, Polskie Morze, Kraków, Tatry, Trasa na Poland Rock
 - **Postacie:** Edek, Dych Dziki, Grażynka 3000, Jarek Zegarek, Zenek Spawacz, Julka z Tindera,
   Rybak Bogdan, Karmazynowa Liri (żywioł OSTRZE, kosa; baner po Edku)
-- **Domeny:** Piwnica Hejterów, Dziki Las (obie z RĘCZNIE rysowanymi planszami po 5 pięter),
-  Zatopione Molo, Smocza Jama, Lodowa Grota, Wesele w Remizie, Pole Namiotowe.
-  Pozostałe pięć wciąż losuje piętra — do czasu, aż dostaną swoje mapy.
-- **Bossowie:** Król Dzików, Mega Dres, Kraken, Horda Pszczół, Smok, Pan Laweta 3000,
-  Klaunica, Yeti
+- **Domeny:** Piwnica Hejterów, Dziki Las, **Smocza Jama** (te trzy z RĘCZNIE
+  rysowanymi planszami po 5 pięter), Zatopione Molo, Lodowa Grota, Wesele w Remizie,
+  Pole Namiotowe. Pozostałe cztery wciąż losują piętra — do czasu, aż dostaną swoje mapy.
+- **Bossowie:** Król Dzików, Mega Dres, Kraken, Horda Pszczół, Smok Wawelski,
+  Pan Laweta 3000, Klaunica, Yeti + **WAWELIN** (jedyny boss stojący nie w świecie,
+  tylko na ostatnim piętrze domeny)
 - **Menu główne:** pełnoekranowe, koncept „plan zdjęciowy Edka" — Edek w zimnym
   świetle po lewej, monitor z zakładkami po prawej (Zagraj / Jak grać / Sterowanie / Dźwięk)
 
