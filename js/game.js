@@ -10763,7 +10763,10 @@ function drawFoeKomendant(f,sx,sy,b){
 function drawFoeWujek(f,sx,sy,bob){
   const gar='#2a3a68',kosz='#f2f0f8',skora='#e8a888';
   const chwiej=Math.sin(anim*2.6+f.x*.1)*(reduceMotion?0:1.2);
-  cx.save();cx.translate(sx+8,sy+22);cx.rotate(chwiej*.035);cx.translate(-8,-22);
+  /* OBRÓT WOKÓŁ PUNKTU: wracamy CAŁYM wektorem (-(sx+8),-(sy+22)), nie samym
+     (-8,-22). Reszta sylwetki jest rysowana we współrzędnych EKRANU (sx+…),
+     więc skrócony powrót podwajał je i wujek odlatywał od własnego cienia. */
+  cx.save();cx.translate(sx+8,sy+22);cx.rotate(chwiej*.035);cx.translate(-(sx+8),-(sy+22));
   R(cx,sx+4.4,sy+18,3.4,6,'#1a1a24');R(cx,sx+9,sy+18,3.4,6,'#1a1a24');
   R(cx,sx+4.2,sy+22.6,3.8,1.6,'#0e0e16');R(cx,sx+8.8,sy+22.6,3.8,1.6,'#0e0e16');
   R(cx,sx+3.6,sy+9+bob,9,9.4,gar);                       // marynarka
@@ -10811,7 +10814,7 @@ function drawFoeCiotka(f,sx,sy,bob){
 function drawFoeDruhna(f,sx,sy,bob){
   const suk='#e88ac8',skora='#f0d8b0',wlos='#8a5a2e';
   const wir=Math.sin(anim*7+f.x*.2)*(reduceMotion?0:2.4);
-  cx.save();cx.translate(sx+8,sy+20);cx.rotate(wir*.05);cx.translate(-8,-20);
+  cx.save();cx.translate(sx+8,sy+20);cx.rotate(wir*.05);cx.translate(-(sx+8),-(sy+20));
   R(cx,sx+5.4,sy+19,2.6,5,'#e0d0d8');R(cx,sx+8.2,sy+19,2.6,5,'#e0d0d8');
   cx.fillStyle=suk;cx.beginPath();                         // sukienka rozkloszowana
   cx.moveTo(sx+5.4,sy+8+bob);cx.lineTo(sx+10.8,sy+8+bob);
@@ -12845,7 +12848,7 @@ const TILES={
       const w=(tx*7+ty*11)%4,faza=anim*3.4+tx*.9+ty*.6;
       const kiw=Math.sin(faza),reka=Math.sin(faza*2)>.3;           // co jakiś czas ręce w górę
       g.fillStyle='rgba(0,0,0,.26)';g.beginPath();g.ellipse(sx+8,sy+14.6,4.6,1.8,0,0,7);g.fill();
-      g.save();g.translate(sx+8,sy+14);g.rotate(kiw*.09);g.translate(-8,-14);
+      g.save();g.translate(sx+8,sy+14);g.rotate(kiw*.09);g.translate(-(sx+8),-(sy+14));
       const ubior=['#2a3a68','#7a2a4a','#3a5a3a','#5a3a7a'][w];    // garnitur / sukienka
       const skora=['#e8c9a0','#d8b890','#e8c9a0','#f0d8b0'][w];
       const wlos=['#3a2a1a','#c8a858','#5a3a20','#2a1a14'][w];

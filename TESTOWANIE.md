@@ -271,6 +271,7 @@ node testy/test_mapy.js               # ręczne plansze domen: format i zdrowy r
 ./testy/sprawdz.sh test_jama.js       # SMOCZA JAMA: pięć plansz w grze + wszystkie ataki WAWELINA
 ./testy/sprawdz.sh test_wesele.js     # WESELE: plansze, kałuże, beczki i obie fazy PAŃSTWA MŁODYCH
 ./testy/sprawdz.sh test_regiony.js    # czy w KAŻDYM regionie da się dojść do domen, drzwi i aren
+./testy/sprawdz.sh test_sylwetki.js   # czy każdy wróg, boss i animowany kafel rysuje się TAM, GDZIE STOI
 ./testy/sprawdz.sh test_liri.js       # umiejętności KAŻDEJ postaci: [E], [Q], ikony orbów
 ```
 
@@ -279,6 +280,12 @@ ma flagę kolizji, czy paleta piętra faktycznie wylądowała na mapie i czy da 
 planszę przejść **w grze** (`domSprawdzMape`). Odpala też każdy atak smoka —
 łącznie z podniebnym ostrzałem, który trwa 10 sekund i przechodzi przez trzy
 stany — bo to są funkcje, których `node --check` nigdy nie uruchomi.
+
+`test_sylwetki.js` to jedyny test, który patrzy na PIKSELE. Rysuje każdą
+sylwetkę na prawdziwym płótnie i sprawdza, gdzie faktycznie wylądowały —
+bo „postać odlatuje od własnego cienia" nie jest błędem logiki i żaden inny
+test tego nie zobaczy. Złapał trzy takie sylwetki naraz (wujek, druhna i gość
+weselny na arenie), wszystkie z tym samym skróconym `translate` po obrocie.
 
 `test_regiony.js` sprawdza rzecz, którą łatwo przeoczyć, bo gra jej nie zgłasza:
 czy do domeny da się DOJŚĆ. Siatka bezpieczeństwa (`ensureConnectivity`) zawsze
