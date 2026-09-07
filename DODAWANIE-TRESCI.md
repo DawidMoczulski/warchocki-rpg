@@ -215,6 +215,16 @@ var MAPY={
 Zaspa śnieżna (kafel 87) nie ma własnego znaku — wchodzi przez `,`, bo na
 piętrach górskich to ONA jest „podłogą akcentową" (`acc:87`).
 
+**Wyposażenie wesela** (WESELE W REMIZIE — kafle 88–100):
+
+| znak | | znak | | znak | |
+|---|---|---|---|---|---|
+| `P` | parkiet | `]` | posadzka remizy | `[` | ściana remizy (lamperia) |
+| `U` | stół weselny | `K` | krzesło z kokardą | `J` | beczka z alkoholem |
+| `Z` | gość weselny (żywa ściana areny) | `@` | głośnik | `"` | girlanda z lampkami |
+| `?` | tort weselny | `<` | wóz strażacki | `(` | szafka strażacka |
+| `)` | kuchenka z garami | | | | |
+
 **Piętro może mieć własną scenografię.** Poza `kind`, `n`, `opis` i `limit` wpis
 planszy przyjmuje pola z listy `FK_WLASNE`:
 
@@ -226,6 +236,7 @@ planszy przyjmuje pola z listy `FK_WLASNE`:
 | `kurz` | halny: pył lecący w poprzek kadru |
 | `mgla` | chmury pod mostami (rysowane tylko nad przepaścią) |
 | `iskry` | żar unoszący się z dna (jama) |
+| `disco` | kolorowe światła i konfetti nad parkietem (wesele) |
 | `boss` | id z `BOSSES` — staje w komnacie finałowej ZAMIAST strażnika |
 
 Dzięki temu SMOCZA JAMA prowadzi z lasu pod Wawelem (`floor:69`, ptaki, lekki

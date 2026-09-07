@@ -8,16 +8,17 @@ albo wyjście = **CAŁA domena od nowa** (wyjście pyta drugim `[E]`).
 
 ### Plansze są RĘCZNIE RYSOWANE (od v22)
 
-**PIWNICA HEJTERÓW**, **DZIKI LAS** i **SMOCZA JAMA** mają po pięć plansz
-narysowanych znak po znaku w `js/mapy.js` — takich samych przy każdym wejściu:
+**PIWNICA HEJTERÓW**, **DZIKI LAS**, **SMOCZA JAMA** i **WESELE W REMIZIE**
+mają po pięć plansz narysowanych znak po znaku w `js/mapy.js` — takich samych
+przy każdym wejściu:
 
-| | PIWNICA HEJTERÓW | DZIKI LAS | SMOCZA JAMA |
-|---|---|---|---|
-| 1 | ZALANA PRALNIA — kaskada z pękniętego pionu | SKRAJ LASU — ścieżka, strumień, drogowskaz | ŚCIEŻKA POD WAWELEM — las, potok, pierwszy kamień |
-| 2 | KOTŁOWNIA — beton i dwie kłódki | WYRĄB — karpy, stosy, skrzynki dynamitu | PIARŻYSKO — wyrobisko, trzy tarasy na kłódki |
-| 3 | BIBLIOTEKA PIWNICZNA — regały i sadzawka | STARY BÓR — świerki, mech, kręgi grzybów | PÓŁKI SKALNE — sześć półek nad urwiskiem |
-| 4 | ZAWALONY STROP — przepaść i kruche płyty | JAR — rzeczka na dnie, spróchniałe kładki | MOSTY NAD PRZEPAŚCIĄ — pięć turni, kładki i halny |
-| 5 | SALA POD KASKADĄ — strażnik | RUINY LEŚNICZÓWKI — mury, sadzawka, strażnik | SMOCZA JAMA — skarb, kości i **WAWELIN** |
+| | PIWNICA HEJTERÓW | DZIKI LAS | SMOCZA JAMA | WESELE W REMIZIE |
+|---|---|---|---|---|
+| 1 | ZALANA PRALNIA — kaskada z pękniętego pionu | SKRAJ LASU — ścieżka, strumień, drogowskaz | ŚCIEŻKA POD WAWELEM — las, potok, pierwszy kamień | PRZED REMIZĄ — nocny parking, wóz, chleb i sól |
+| 2 | KOTŁOWNIA — beton i dwie kłódki | WYRĄB — karpy, stosy, skrzynki dynamitu | PIARŻYSKO — wyrobisko, trzy tarasy na kłódki | KUCHNIA I ZAPLECZE — gary, skrzynki wódki, dwie kłódki |
+| 3 | BIBLIOTEKA PIWNICZNA — regały i sadzawka | STARY BÓR — świerki, mech, kręgi grzybów | PÓŁKI SKALNE — sześć półek nad urwiskiem | SALA I STOŁY — podkowa stołów, parkiet, tort |
+| 4 | ZAWALONY STROP — przepaść i kruche płyty | JAR — rzeczka na dnie, spróchniałe kładki | MOSTY NAD PRZEPAŚCIĄ — pięć turni, kładki i halny | GARAŻ REMIZY — kanał naprawczy, deski, wozy |
+| 5 | SALA POD KASKADĄ — strażnik | RUINY LEŚNICZÓWKI — mury, sadzawka, strażnik | SMOCZA JAMA — skarb, kości i **WAWELIN** | OCZEPINY O PÓŁNOCY — ściana gości i **PAŃSTWO MŁODZI** |
 
 Legenda znaków i zasady autorskie: `DODAWANIE-TRESCI.md`.
 Dźwięk domeny jest **syntezowany**: w piwnicy szum kaskady, w lesie dodatkowo
@@ -27,13 +28,23 @@ wiatr w koronach i ptaki (`amb:{wiatr,ptaki}`).
 piętra mówi, CZYM ono jest (walka, kłódki, zegar), a wpis planszy — jak wygląda
 i czym pachnie: `floor`/`acc`/`wall` (kafle pod nogami i mur dookoła),
 `amb` (wiatr, ptaki), `mrok`/`mrokCol` (siła i barwa winiety), `kurz` (halny),
-`mgla` (chmury pod mostami), `iskry` (żar w jamie), `boss` (kto stoi w komnacie
-finałowej). Lista dozwolonych pól to `FK_WLASNE` w `game.js` — **nowe pole
-dopisuje się TAM, nie w pięciu miejscach na krzyż**. To dzięki temu SMOCZA JAMA
-prowadzi z lasu przez piarg i mosty do jaskini, zamiast pięć razy powtarzać
-tę samą salę.
+`mgla` (chmury pod mostami), `iskry` (żar w jamie), `disco` (światła i konfetti
+nad parkietem), `boss` (kto stoi w komnacie finałowej). Lista dozwolonych pól to
+`FK_WLASNE` w `game.js` — **nowe pole dopisuje się TAM, nie w pięciu miejscach
+na krzyż**. To dzięki temu SMOCZA JAMA prowadzi z lasu przez piarg i mosty do
+jaskini, a WESELE z nocnego parkingu przez kuchnię i garaż na parkiet — zamiast
+pięć razy powtarzać tę samą salę.
 
-Pozostałe cztery domeny **nadal się losują** — do czasu, aż dostaną swoje mapy.
+Pozostałe trzy domeny **nadal się losują** — do czasu, aż dostaną swoje mapy.
+
+### Rozlany alkohol (`KALUZE`) — wspólny mechanizm wesela
+
+Wszystko, co się rozlewa, siedzi w jednej liście: butelka rzucona przez ŚWIADKA
+(mała, wsiąka) i przewrócone beczki z areny PANA MŁODEGO (wielkie, `t:Infinity`,
+zostają do końca całej walki — także po zmianie fazy). Kałuża może się ZAPALIĆ
+i wtedy parzy **wszystko, co w niej stoi**, pannę młodą włącznie. Obrażenia dla
+gracza idą z pominięciem `hurtPlayer`, bo tam siedzi 1,2 s nietykalności —
+stanie w ogniu ma boleć rytmicznie, a nie raz.
 Opis niżej dotyczy właśnie ich.
 
 Piętro losowane to **LABIRYNT komnat na siatce** (`siatka:[kolumny,rzędy]`) —
@@ -258,6 +269,7 @@ których już nie było. Cokolwiek ma przeżyć do jutra, ląduje w `testy/`.
 ./testy/sprawdz.sh test_czcionki.js   # polskie znaki: ogonki, kreski, spójność wysokości
 node testy/test_mapy.js               # ręczne plansze domen: format i zdrowy rozsądek
 ./testy/sprawdz.sh test_jama.js       # SMOCZA JAMA: pięć plansz w grze + wszystkie ataki WAWELINA
+./testy/sprawdz.sh test_wesele.js     # WESELE: plansze, kałuże, beczki i obie fazy PAŃSTWA MŁODYCH
 ./testy/sprawdz.sh test_liri.js       # umiejętności KAŻDEJ postaci: [E], [Q], ikony orbów
 ```
 
@@ -266,6 +278,12 @@ ma flagę kolizji, czy paleta piętra faktycznie wylądowała na mapie i czy da 
 planszę przejść **w grze** (`domSprawdzMape`). Odpala też każdy atak smoka —
 łącznie z podniebnym ostrzałem, który trwa 10 sekund i przechodzi przez trzy
 stany — bo to są funkcje, których `node --check` nigdy nie uruchomi.
+
+`test_wesele.js` pilnuje rzeczy, które łatwo po cichu zepsuć: czy kałuże z beczek
+NAPRAWDĘ zostają na drugą fazę, czy panna młoda wywraca się w spirytusie i czy on
+się po tym pali. **Pułapka przy pisaniu takich testów:** wejście bossa woła
+`addHitStop()`, a hit-stop robi `return` na wejściu `updateWorld` — dwie klatki po
+scence to wciąż zamrożony świat i test bada stan sprzed ataku.
 
 **Prawdziwa mysz.** Syntetyczne zdarzenia nie ruszą natywnego suwaka — Chrome
 reaguje tylko na zdarzenia zaufane. Żeby odtworzyć przeciąganie, trzeba wstrzyknąć

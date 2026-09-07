@@ -296,6 +296,8 @@ const AUDIO_KEYS=["song", "burst_byku", "liri_voice", "metro_rhythm", "s_dziki",
 "k_matko", "k_spodnica", "c_przykromi", "k_nieprosba", "c_nictakiego", "c_pomylilem",
 "k_mamnagrane", "k_jestdowod", "c_naprawde", "c_swietnie", "k_pokaz", "c_donamiotu",
 /* --- PŁYWAMY Z DYCH DZIKIM W JEZIORZE (short o Jeziorze Miejskim w Chodzieży) --- */
+/* --- WESELE W REMIZIE: głos panny młodej (plik od Dawida) --- */
+"w_howdare",
 "c_pletwy", "c_naplaze", "c_wakacje", "c_gdzieplaza", "c_plazowanie", "c_idziemynaplaze",
 "c_czegochciec", "c_cieplydzien", "c_sprawdzwode", "c_sluchajuwaznie", "c_torpeda",
 "c_cieplaczynie", "c_milczy", "c_lsni", "c_wodazywiol", "c_rajnaziemi", "c_chlupota",
@@ -1114,13 +1116,16 @@ const REGIONS={
 };
 let REG='wawa';
 /* kafle blokujące ruch (tablica = szybkie sprawdzanie w AI/ruchu). Nowe assety 18–31. */
-/* TABLICE WŁAŚCIWOŚCI KAFLI — 96 pozycji, bo kafle domen zaczynają się od 39. */
-const SOLIDF=new Uint8Array(96);
+/* TABLICE WŁAŚCIWOŚCI KAFLI — 128 pozycji. Kafle domen zaczynają się od 39
+   i rosną z każdą ręcznie rysowaną domeną (74–87 góry i jama, 88–100 wesele),
+   więc rozmiar podnosimy TUTAJ, w jednym miejscu — kafel poza zakresem tablicy
+   nie rzuca błędem, tylko po cichu przestaje blokować ruch. */
+const SOLIDF=new Uint8Array(128);
 [3,4,5,6,10,11,12,13,14,15,16,   18,19,20,22,24,26,27,29,30,   32,33,34,35,36,38].forEach(v=>{SOLIDF[v]=1;});
 const SOLID=v=>SOLIDF[v]===1;
 /* PRZEPAŚĆ to nie ściana: da się w nią WEJŚĆ (i spaść), więc ma własną flagę.
    Wypełnia ją blok domen — patrz „KAFLE DOMEN”. */
-const PITF=new Uint8Array(96);
+const PITF=new Uint8Array(128);
 const PIT=v=>PITF[v]===1;
 /* KAFLE DOMEN (patrz TILES 39–47): skrzynia, beczka, pustak, filar i maszyna
    blokują ruch; przepaść (44) NIE blokuje — po to, żeby dało się w nią wpaść. */
@@ -1139,6 +1144,10 @@ SOLIDF[60]=1;                                 // MUR PIWNICY (60) i POSADZKA (61
    skarb, jajo i ściana jaskini. Piarg, hala, kładka, kości, żarząca szczelina
    i dno jamy są DEPTALNE — po nich się chodzi. */
 [74,77,78,80,82,84,85].forEach(v=>{SOLIDF[v]=1;});
+/* WESELE W REMIZIE (88–100): blokują mur remizy, stoły, krzesła, beczki, sami
+   goście (żywa ściana areny), wieża, tort, wóz i szafka strażacka oraz kuchenka.
+   PARKIET, POSADZKA i GIRLANDA pod stropem są DEPTALNE. */
+[90,91,92,93,94,95,97,98,99,100].forEach(v=>{SOLIDF[v]=1;});
 /* MECH (64) i ŚCIÓŁKA (69) są deptalne — to podłoga DZIKIEGO LASU */
 const ZAMEK={48:'zloty',49:'czerwony',50:'niebieski'};
 const jestZamek=v=>!!ZAMEK[v];
@@ -1491,6 +1500,16 @@ const FOE_TYPES={
   prewencja:{hp:250,atk:16,spd:34,c:'#141c3a',dia:8,pts:2200,kbres:true,armor:.4},              // tarcza — wolny, pancerny
   drogowka:{hp:120,atk:15,spd:52,c:'#24305c',dia:7,pts:2000,shoots:true,shotType:'lizak',cover:true}, // strzela lizakiem zza szlabanu
   policjantka:{hp:180,atk:17,spd:80,c:'#2a3a68',dia:10,pts:2600,charge:true},                   // szybka, szarżuje
+  /* --- GOŚCIE WESELNI (domena WESELE W REMIZIE) — nie potwory, tylko ludzie,
+         którzy się DOBRZE bawią. Świadek jest elitą: rzuca butelką, a ta
+         rozbija się i zostawia kałużę, która parzy (patrz KALUZE). --- */
+  wujek:{hp:120,atk:15,spd:44,c:'#2a3a68',hood:'#1a2a48',skin:'#e8a888',dia:5,pts:1600,kbres:true},
+  ciotka:{hp:82,atk:12,spd:52,c:'#7a2a4a',hood:'#c8a858',skin:'#e8c9a0',dia:5,pts:1400,
+    shoots:true,shotType:'tort'},
+  druhna:{hp:74,atk:13,spd:90,c:'#e88ac8',hood:'#f2c8e0',skin:'#f0d8b0',dia:4,pts:1300,charge:true},
+  dzieciak:{hp:40,atk:9,spd:108,c:'#f2f0f8',hood:'#6a4a2a',skin:'#f0d8b0',dia:3,pts:800},
+  swiadek:{hp:310,atk:17,spd:56,c:'#23233a',dia:15,pts:3600,kbres:true,armor:.2,
+    elite:true,en:'ŚWIADEK Z BUTELKĄ',shoots:true,shotType:'wodka',shotArc:true},
   /* pol:true — mini-boss OBŁAWY, nie domen. Domeny biorą swoich z jawnej puli
      `mini` we wpisie DOMAINS, więc komendant nigdy tam nie wyskoczy. */
   komendant:{hp:760,atk:20,spd:52,c:'#0e1636',dia:30,pts:9000,mini:true,pol:true,elite:true,unlock:0,
@@ -1537,6 +1556,10 @@ const FOE_TYPES={
   ul:{hp:2000,atk:14,spd:0,c:'#c8935a',hood:'#8a5a2a',skin:'#a3743f',dia:0,pts:0,kbres:true,rooted:true},
   pszczola:{hp:24,atk:11,spd:106,c:'#f5c542',dia:2,pts:600,flying:true},
   krolowa:{hp:1900,atk:25,spd:76,c:'#f5c542',hood:'#3a2410',skin:'#f5c542',dia:0,pts:0,flying:true},
+  /* PAŃSTWO MŁODZI — boss ostatniego piętra WESELA W REMIZIE. Dwa etapy
+     jednej walki: pan młody (beczki), a po nim panna młoda (kałuże i ogień). */
+  panmlody:{hp:2600,atk:26,spd:58,c:'#23233a',hood:'#12121a',skin:'#e8c9a0',dia:0,pts:0},
+  pannamloda:{hp:2950,atk:28,spd:66,c:'#f4f1ea',hood:'#f2f0f8',skin:'#f0d8b0',dia:0,pts:0},
   /* WAWELIN — boss ostatniego piętra SMOCZEJ JAMY. `zar` = kolory żaru,
      który się z niego unosi przez CAŁĄ walkę (nie tylko w fazie szału). */
   wawelin:{hp:3400,atk:32,spd:46,c:'#43285a',hood:'#8a4fc0',skin:'#c87a2a',dia:0,pts:0,
@@ -1579,6 +1602,11 @@ function mbBlastAt(x,y,r,atk,poison,honey){
    deszcz skał Wawelina nie potrzebuje drugiej pętli w update ani w draw. */
 function mbRock(x,y,r,atk,warn){
   miniBlasts.push({x,y,warn,warn0:warn,r,atk,rock:true});
+}
+/* KOLEC Z PODŁOGI — z welonu panny młodej. Ten sam mechanizm co głaz i wybuch
+   (ostrzeżenie, potem cios), tylko wychodzi od dołu i kłuje w jednym punkcie. */
+function mbKolec(x,y,r,atk,warn){
+  miniBlasts.push({x,y,warn,warn0:warn,r,atk,kolec:true});
 }
 const MB_MOVES={
   widly:  f=>{mbShoot(f,'widly',1,180);addHit(f.x,f.y-30,'A SIO MI TU!','#c8a858');},
@@ -1766,6 +1794,58 @@ const BOSS_MOVES={
     f.telT=f.ph2?.42:.6;f.telMv='smokszarza';   // …a to jest tell szarży
     bossHold(f,f.telT);
   },
+  /* =================================================================
+     PAŃSTWO MŁODZI (domena WESELE W REMIZIE)
+     ================================================================= */
+  /* RÓŻE — rzuca bukietem pod nogi gracza. Sama róża w locie jest niegroźna;
+     groźne jest to, GDZIE wyląduje, bo tam pęka i rozsypuje płatki na
+     wszystkie strony (patrz POCISK_ROZBICIE.roza). */
+  roze:f=>{
+    bossHold(f,f.ph2?.7:.95);
+    const n=f.ph2?4:3,sp=140,cel=Math.hypot(P.x-f.x,P.y-f.y);
+    const a0=Math.atan2(P.y-f.y,P.x-f.x);
+    for(let i=0;i<n;i++){
+      const a=a0+(i-(n-1)/2)*.42;
+      const d=Math.max(34,Math.min(210,cel+(i-(n-1)/2)*14));
+      bossShots.push({x:f.x,y:f.y-14,dx:Math.cos(a)*sp,dy:Math.sin(a)*sp,
+        life:d/sp,t:'roza',atk:Math.round(f.atk*.9),duza:f.ph2});
+    }
+    fxSparks(f.x,f.y-14,'#e04848',10,120,{life:.4});
+    addHit(f.x,f.y-46,'DLA CIEBIE, KOCHANIE!','#e04848');
+    beep(700,.16,'triangle',.06,420);
+  },
+  /* SKOKI — zgina nogi i skacze POD GRACZA, kilka razy pod rząd. Każde
+     lądowanie to fala uderzeniowa; sam cykl skoków prowadzi panMlodyUpdate. */
+  skoki:f=>{
+    f.skok={n:f.ph2?4:3,i:0,faza:'przysiad',t:f.ph2?.34:.48,dl:f.ph2?.36:.44,h:0};
+    bossHold(f,.4);
+    fxRing(f.x,f.y+6,42,'#f5c542',{life:.4,w:3,ground:true});
+    fxDust(f.x,f.y+8,8);
+    addHit(f.x,f.y-46,'WSZYSCY DO GÓRY!','#f5c542');
+    beep(140,.3,'square',.08,70);
+  },
+  /* WELON — rzuca nim w gracza. Welon LĄDUJE, przez chwilę leży na parkiecie
+     (masz czas zejść), a potem wystrzeliwuje z niego seria kolców w poprzek. */
+  welon:f=>{
+    bossHold(f,f.ph2?.6:.8);
+    const a=Math.atan2(P.y-f.y,P.x-f.x),sp=155;
+    const d=Math.max(26,Math.hypot(P.x-f.x,P.y-f.y));
+    bossShots.push({x:f.x,y:f.y-18,dx:Math.cos(a)*sp,dy:Math.sin(a)*sp,
+      life:Math.min(2,d/sp),t:'welon',atk:Math.round(f.atk*.9),kat:a+1.5708});
+    fxSparks(f.x,f.y-18,'#f2f0f8',10,120,{life:.45});
+    addHit(f.x,f.y-48,'ŁAP WELON!','#f2f0f8');
+    beep(880,.18,'sine',.06,420);
+  },
+  /* PIRUET — zakręca się i JEDZIE przez salę, odbijając się od ścian. Kończy
+     się pięciosekundowym zawrotem głowy: to jest okno na obrażenia. A jeśli po
+     drodze wjedzie w rozlany spirytus — wywraca się i wszystko staje w ogniu. */
+  piruet:f=>{
+    f.telT=f.ph2?.45:.62;f.telMv='piruet';
+    bossHold(f,f.telT);
+    fxRing(f.x,f.y+6,40,'#e88ac8',{life:.4,w:3,ground:true});
+    addHit(f.x,f.y-48,'DO TAŃCA!','#e88ac8');
+    beep(420,.26,'triangle',.07,900);
+  },
   /* PODNIEBNY OSTRZAŁ — podrywa się i ZNIKA z areny. Przez ~10 s (8 s
      w szale) na całą jamę lecą głazy: każdy ma cień-ostrzeżenie, więc unik
      jest kwestią czytania mapy, a nie szczęścia. Dopiero po wylądowaniu
@@ -1925,7 +2005,7 @@ const TEL_SZARZA={
 function updateBossTelegraph(f,dt){
   f.telT-=dt;
   const tS=TEL_SZARZA[f.telMv];
-  const tc=(tS&&tS.col)||(f.telMv==='zadlo'?'#f5c542':'#e03050');
+  const tc=(tS&&tS.col)||(f.telMv==='zadlo'?'#f5c542':f.telMv==='piruet'?'#e88ac8':'#e03050');
   if(!reduceMotion&&Math.floor(anim*20)%2===0)
     fxP({x:f.x+(Math.random()-.5)*24,y:f.y+6,vx:0,vy:-30,g:-40,life:.3,life0:.3,
       sz:1.8,col:tc,add:true,shrink:true});
@@ -1937,6 +2017,13 @@ function updateBossTelegraph(f,dt){
     f.charging=.42;f.postHold=.5;
     fxSparks(f.x,f.y-8,'#f5c542',10,140,{life:.4});addShake(3,.25);
     beep(1500,.18,'sawtooth',.08,400);
+  }else if(f.telMv==='piruet'){          // PANNA MŁODA rusza w wir tańca
+    const d=Math.max(1,Math.hypot(P.x-f.x,P.y-f.y)),sp=f.ph2?178:152;
+    f.piruet={t:f.ph2?1.6:1.35,dx:(P.x-f.x)/d*sp,dy:(P.y-f.y)/d*sp,spin:0};
+    fxRing(f.x,f.y-10,44,'#f2f0f8',{life:.4,w:3});
+    fxSparks(f.x,f.y-16,'#e88ac8',14,150,{life:.5});
+    addHit(f.x,f.y-32,'PIRUET!','#e88ac8');
+    beep(900,.3,'triangle',.07,1600);
   }else if(tS){
     const d=Math.max(1,Math.hypot(P.x-f.x,P.y-f.y)),sp=tS.sp[f.ph2?1:0];
     f.kb=.55;f.kbx=(P.x-f.x)/d*sp;f.kby=(P.y-f.y)/d*sp;
@@ -1949,12 +2036,175 @@ function updateBossTelegraph(f,dt){
   }
   delete f.telMv;
 }
+/* =====================================================================
+   PAŃSTWO MŁODZI — boss domeny WESELE W REMIZIE
+   ---------------------------------------------------------------------
+   Walka jest DWUETAPOWA i jedno wynika z drugiego. Najpierw wychodzi
+   PAN MŁODY i rzuca różami albo skacze; co 25% jego HP jedna z czterech
+   beczek na arenie idzie na ziemię i wylewa się z niej spirytus, który
+   ZOSTAJE do końca walki. Kiedy pada, z sali wychodzi PANNA MŁODA —
+   i dopiero wtedy te kałuże zaczynają mieć sens: ona je omija, ale
+   w piruecie już nie patrzy pod nogi. Gracz ma ją tam zapędzić.
+   ===================================================================== */
+/* --- PAN MŁODY: cztery beczki i seria skoków ------------------------- */
+function panMlodyUpdate(f,dt){
+  /* PROGI BECZEK — 75%, 50%, 25%. Czwarta idzie, gdy on pada (patrz niżej). */
+  const prog=f.hp>f.maxHp*.75?0:f.hp>f.maxHp*.5?1:f.hp>f.maxHp*.25?2:3;
+  if(prog>(f.beczki||0)){f.beczki=prog;beczkaPrzewroc(f.homeX,f.homeY);}
+  const S2=f.skok;
+  if(!S2)return false;
+  f.dx=0;f.dy=0;S2.t-=dt;
+  if(S2.faza==='przysiad'){                       // zgina nogi — widać, że zaraz skoczy
+    if(!reduceMotion&&Math.random()<.5)fxDust(f.x+(Math.random()-.5)*18,f.y+8,1);
+    if(S2.t<=0){
+      S2.faza='lot';S2.t=S2.dl;
+      S2.x0=f.x;S2.y0=f.y;
+      /* ląduje TAM, GDZIE STOI GRACZ — ale nie w ścianie i nie poza mapą */
+      let tx=P.x,ty=P.y;
+      if(SOLID(at(Math.floor(tx/16),Math.floor(ty/16)))){tx=(tx+f.x)/2;ty=(ty+f.y)/2;}
+      S2.x1=Math.max(20,Math.min(MW*16-20,tx));
+      S2.y1=Math.max(20,Math.min(MH*16-20,ty));
+      fxRing(S2.x1,S2.y1,34,'#f5c542',{life:S2.dl,w:2,ground:true});   // cień lądowania
+      beep(520,.14,'square',.06,900);
+    }
+    return true;
+  }
+  if(S2.faza==='lot'){
+    const u=1-Math.max(0,S2.t/S2.dl);
+    f.x=S2.x0+(S2.x1-S2.x0)*u;
+    f.y=S2.y0+(S2.y1-S2.y0)*u;
+    S2.h=Math.sin(u*3.14)*32;                     // wysokość skoku (czyta ją rysunek)
+    if(S2.t<=0){
+      S2.h=0;S2.i++;
+      fxRing(f.x,f.y+6,40,'#f5c542',{life:.4,w:4,ground:true});
+      fxRing(f.x,f.y+6,26,'#ffffff',{life:.3,w:2,ground:true});
+      fxDust(f.x,f.y+8,12);addShake(5,.32);addHitStop(.05);
+      beep(70,.28,'sawtooth',.1,34);
+      if(Math.hypot(P.x-f.x,P.y-f.y)<40)hurtPlayer(f);
+      if(S2.i>=S2.n){delete f.skok;f.postHold=.85;f.at=f.ph2?1.1:1.8;
+        addHit(f.x,f.y-44,'UUCH…','#f5c542');}
+      else{S2.faza='przysiad';S2.t=f.ph2?.2:.3;}
+    }
+    return true;
+  }
+  return true;
+}
+/* --- PANNA MŁODA: suknia, welon, piruet i ta jedna kałuża ------------ */
+const BRUD_TXT=[null,
+  {t:'Suknia w plamach po sosie. Ona to WIDZI.',c:'#e0c8a0'},
+  {t:'Falbany urwane, welon krzywo. Robi się gorąco.',c:'#c8a858'},
+  {t:'Z sukni został ochłap. Teraz już naprawdę się wścieka!',c:'#e04848'}];
+function pannaMlodaUpdate(f,dt){
+  if(!f.weszla){                                  // wejście = CZWARTA beczka na ziemię
+    f.weszla=1;f.brud=0;
+    beczkaPrzewroc(f.homeX,f.homeY);
+  }
+  /* SUKNIA CORAZ BRUDNIEJSZA, ATAKI CORAZ SZYBSZE */
+  const b=f.hp>f.maxHp*.75?0:f.hp>f.maxHp*.5?1:f.hp>f.maxHp*.25?2:3;
+  if(b>(f.brud||0)){
+    f.brud=b;
+    const op=BRUD_TXT[b];
+    f.cd=Math.max(1.2,(f.cd||2.6)*.82);f.cd2=Math.max(.85,(f.cd2||1.5)*.85);
+    addHit(f.x,f.y-48,['','TA SUKNIA KOSZTOWAŁA!','MOJE WESELE!','NIENAWIDZĘ CIĘ!'][b],op.c);
+    fxSparks(f.x,f.y-16,op.c,14,140,{life:.5});
+    toast('👰 '+op.t,3000);SFX.no();
+  }
+  if(f.upadek>0){                                 // leży w płonącym spirytusie
+    f.upadek-=dt;f.dx=0;f.dy=0;
+    if(!reduceMotion&&Math.random()<.4)
+      fxSparks(f.x+(Math.random()-.5)*20,f.y,'#f5a032',2,60,{life:.4,g:-40});
+    if(f.upadek<=0){
+      f.slaby=0;f.wsciekla=1;
+      f.cd=Math.max(1.1,(f.cd||2.6)*.8);f.cd2=Math.max(.8,(f.cd2||1.5)*.8);
+      f.at=.5;
+      addHit(f.x,f.y-48,'TY MI ZA TO ZAPŁACISZ!','#e04848');
+      fxRing(f.x,f.y-10,54,'#e04848',{life:.5,w:4});
+      addShake(4,.35);SFX.no();
+    }
+    return true;
+  }
+  if(f.wyczerp>0){                                // po piruecie kręci się jej w głowie
+    f.wyczerp-=dt;f.dx=0;f.dy=0;
+    if(f.wyczerp<=0){f.slaby=0;f.at=.4;}
+    return true;
+  }
+  if(f.piruet){
+    const Pi=f.piruet;
+    Pi.t-=dt;Pi.spin+=dt*17;
+    /* jedzie DALEJ w tę samą stronę — ruch i odbicia od ścian robi
+       wspólna pętla, bo tylko ona zna kolizje */
+    f.dx=Pi.dx;f.dy=Pi.dy;
+    if(!reduceMotion&&Math.random()<.6)
+      fxP({x:f.x+(Math.random()-.5)*26,y:f.y+6,vx:0,vy:-14,g:-10,life:.4,life0:.4,
+        sz:1.6,col:'#f2f0f8',add:true,shrink:true});
+    /* TU SIĘ ROZSTRZYGA WALKA: w piruecie nie patrzy pod nogi */
+    const k=kaluzaW(f.x,f.y,4);
+    if(k){pannaWywrotka(f,k);return true;}
+    if(Pi.t<=0){
+      delete f.piruet;
+      f.wyczerp=5;f.slaby=1.6;
+      addHit(f.x,f.y-46,'…ojej, zakręciło mnie','#f2f0f8');
+      fxSparks(f.x,f.y-30,'#f5c542',10,80,{life:.6,g:-30});
+      beep(300,.4,'sine',.06,140);
+    }
+    return true;
+  }
+  /* NORMALNIE OMIJA ROZLANY ALKOHOL — suknia jest za droga. Sprawdzamy punkt,
+     w który właśnie idzie; jeśli tam jest kałuża, skręca w bok. */
+  if((f.dx||f.dy)&&kaluzaW(f.x+f.dx*.35,f.y+f.dy*.35,0)){
+    const a=Math.atan2(f.dy,f.dx)+(((f.x+f.y)|0)%2?1.57:-1.57);
+    const sp=Math.hypot(f.dx,f.dy);
+    f.dx=Math.cos(a)*sp;f.dy=Math.sin(a)*sp;
+    if(Math.random()<.02)addHit(f.x,f.y-40,'NIE W TEJ SUKNI!','#f2f0f8');
+  }
+  return false;
+}
+/* wywrotka: kałuża się zapala i od tej chwili parzy OBOJE */
+function pannaWywrotka(f,k){
+  delete f.piruet;
+  f.upadek=1.8;f.slaby=1.8;
+  const dmg=Math.max(20,Math.round(f.maxHp*.07));
+  f.hp-=dmg;f.flash=.25;
+  addDmgNum(f.x,f.y-26,dmg,'#f5a032',true);
+  kaluzaZapal(k);
+  fxDust(f.x,f.y+8,14);addShake(6.5,.5);addHitStop(.1);
+  addHit(f.x,f.y-46,'AAA, MOJA SUKNIA!','#f5a032');
+  toast('🔥 PANNA MŁODA WPADŁA W SPIRYTUS!<br>Kałuża się PALI — od teraz parzy ją TAK SAMO jak ciebie.',4600);
+  SFX.no();
+  if(f.hp<=0)killFoe(f);
+}
+/* ucieczka z areny cofa też scenografię: beczki wracają na miejsce,
+   a rozlany spirytus znika razem z nimi */
+function weseleReset(f){
+  f.beczki=0;f.brud=0;f.wsciekla=0;f.weszla=0;f.slaby=0;
+  delete f.skok;delete f.piruet;f.upadek=0;f.wyczerp=0;
+  for(const b of BECZKI)b.lezy=false;
+  KALUZE=KALUZE.filter(k=>!k.duza);
+  WELONY=[];
+}
+/* =====================================================================
+   BOSSOWIE Z WŁASNĄ LOGIKĄ KLATKI
+   ---------------------------------------------------------------------
+   Zwrot `true` znaczy: ten boss SAM wie, co robić w tej klatce (stoi
+   i wypuszcza rój, krąży pod stropem, skacze, wiruje) i NIE ma w niej
+   losować kolejnego ataku. `false` = zrobił swoje porządki (progi HP,
+   omijanie kałuż) i dalej leci zwykły cykl ataków.
+   Nowy boss z własnym stanem = wpis TUTAJ, nie kolejne `else if` w pętli.
+   ===================================================================== */
+const BOSS_UPDATE={
+  ul:(f,dt)=>{hiveUpdate(f,dt);return true;},
+  wawelin:(f,dt)=>{if(!f.lot)return false;smokLot(f,dt);return true;},
+  panmlody:panMlodyUpdate,
+  pannamloda:pannaMlodaUpdate,
+};
+/* co posprzątać, gdy gracz ucieknie z areny i walka startuje od nowa */
+const BOSS_RESET={panmlody:weseleReset,pannamloda:weseleReset};
 function updateMiniBlasts(dt){
   for(const b of miniBlasts){
     b.warn-=dt;
     if(b.warn<=0&&!b.done){
       b.done=true;
-      const bc=b.rock?'#8a8494':b.honey?'#f5a032':b.poison?'#7bc950':'#b98cf0';
+      const bc=b.rock?'#8a8494':b.kolec?'#f2f0f8':b.honey?'#f5a032':b.poison?'#7bc950':'#b98cf0';
       fxStarFlash(b.x,b.y-4,b.rock?'#e8e0f4':bc,10,{life:.25});
       fxRing(b.x,b.y,b.r,bc,{life:.3,w:3,ground:true});
       fxSparks(b.x,b.y-4,bc,b.rock?12:8,b.rock?170:120,{life:.45});
@@ -1962,6 +2212,9 @@ function updateMiniBlasts(dt){
         fxDust(b.x,b.y+2,8);
         fxSparks(b.x,b.y-6,'#b98cf0',6,120,{life:.5,g:320});
         addShake(3.4,.24);beep(64,.24,'sawtooth',.1,32);
+      }else if(b.kolec){                // kolec wybija z podłogi
+        fxSparks(b.x,b.y-8,'#f2f0f8',8,150,{life:.4,g:200});
+        addShake(1.8,.14);beep(1500,.1,'square',.05,420);
       }else{addShake(2,.15);beep(b.poison?300:90,.15,'sawtooth',.07,45);}
       if(Math.hypot(P.x-b.x,P.y-b.y)<b.r){
         hurtPlayer({x:b.x,y:b.y,atk:b.atk});
@@ -1974,9 +2227,311 @@ function updateMiniBlasts(dt){
   }
   miniBlasts=miniBlasts.filter(b=>!b.done);
 }
+/* =====================================================================
+   ROZLANY ALKOHOL — kałuże, które zostają (i potrafią się zapalić)
+   ---------------------------------------------------------------------
+   Jedna lista obsługuje wszystko, co się na weselu rozlewa: butelkę rzuconą
+   przez ŚWIADKA (mała, wsiąka po kilku sekundach) i przewrócone beczki
+   z areny PANA MŁODEGO (wielkie, zostają do KOŃCA całej walki — także wtedy,
+   gdy z gruzów pierwszej fazy wychodzi PANNA MŁODA).
+
+   Kałuża może się ZAPALIĆ. Wtedy parzy wszystko, co w niej stoi — gracza
+   TAK SAMO jak pannę młodą. To jest sedno drugiej fazy: ona omija kałuże,
+   dopóki nie wpadnie w nią w piruecie.
+
+   Obrażenia dla gracza idą Z POMINIĘCIEM `hurtPlayer`, bo tam siedzi 1,2 s
+   nietykalności po ciosie — stanie w ogniu ma boleć rytmicznie, a nie raz.
+   ===================================================================== */
+let KALUZE=[];
+const KALUZA_TICK=.55;
+function kaluzaDodaj(x,y,r,dmg,czas,opt){
+  opt=opt||{};
+  KALUZE.push({x,y,r,dmg,t:czas,t0:czas,ogien:0,tick:KALUZA_TICK*.5,
+    pojaw:opt.pojaw!==undefined?opt.pojaw:.35,seed:((x*7+y*13)|0)&255,
+    duza:!!opt.duza,ogienT:0});
+  return KALUZE[KALUZE.length-1];
+}
+/* czy punkt stoi w rozlanym alkoholu (`luz` zwęża kałużę — do sprawdzania,
+   czy DA SIĘ ją ominąć, a nie czy się jej dotyka) */
+function kaluzaW(x,y,luz){
+  for(const k of KALUZE){
+    if(k.pojaw>0)continue;
+    if(Math.hypot(x-k.x,y-k.y)<k.r-(luz||0))return k;
+  }
+  return null;
+}
+function kaluzaZapal(k){
+  if(!k||k.ogien)return;
+  k.ogien=1;k.ogienT=0;
+  fxRing(k.x,k.y,k.r,'#f5a032',{life:.5,w:4,ground:true});
+  fxRing(k.x,k.y,k.r*.6,'#fff2c8',{life:.35,w:3,ground:true});
+  fxSparks(k.x,k.y-4,'#f5a032',20,170,{life:.7,g:-30});
+  addShake(4,.3);worldFlash=Math.max(worldFlash,.28);
+  beep(120,.5,'sawtooth',.09,60);
+  /* ogień przechodzi na sąsiednie kałuże — to wciąż ten sam alkohol */
+  for(const o of KALUZE)
+    if(!o.ogien&&Math.hypot(o.x-k.x,o.y-k.y)<o.r+k.r)setTimeout(()=>kaluzaZapal(o),160);
+}
+function kaluzeUpdate(dt){
+  if(!KALUZE.length)return;
+  for(const k of KALUZE){
+    if(k.pojaw>0){k.pojaw-=dt;continue;}
+    if(k.t!==Infinity)k.t-=dt;
+    if(k.ogien){
+      k.ogienT+=dt;
+      if(!reduceMotion&&Math.random()<.5)
+        fxP({x:k.x+(Math.random()-.5)*k.r*1.7,y:k.y+(Math.random()-.5)*k.r*.9,
+          vx:(Math.random()-.5)*10,vy:-30-Math.random()*40,g:-30,life:.5,life0:.5,sz:1.6,
+          col:Math.random()<.5?'#f5a032':'#6fd8e8',add:true,shrink:true});
+    }
+    k.tick-=dt;
+    if(k.tick>0)continue;
+    k.tick=KALUZA_TICK;
+    const mocny=k.ogien?1.9:1;
+    if(Math.hypot(P.x-k.x,P.y-k.y)<k.r){
+      const dmg=Math.max(1,Math.round(k.dmg*mocny*(100/(100+chDEF(S.ch)))));
+      PHP[S.ch]=Math.max(0,(PHP[S.ch]||0)-dmg);
+      addDmgNum(P.x,P.y-26,'-'+dmg,k.ogien?'#f5a032':'#7bc950',false);
+      hurtFlash=Math.max(hurtFlash,.22);
+      fxSparks(P.x,P.y+4,k.ogien?'#f5a032':'#7bc950',4,70,{life:.3,g:120});
+      if(k.ogien&&Math.random()<.4)addHit(P.x,P.y-36,'PALI SIĘ!','#f5a032');
+      playerDown();
+    }
+    /* PALĄCY SIĘ alkohol nie wybiera: bierze też tych, co go rozlali */
+    if(!k.ogien)continue;
+    for(const f of foes){
+      if(f.dead||f.gone)continue;
+      if(Math.hypot(f.x-k.x,f.y-k.y)>k.r)continue;
+      const fd=Math.max(1,Math.round(k.dmg*(f.boss?1.4:2.2)));
+      f.hp-=fd;f.flash=.12;
+      addDmgNum(f.x,f.y-22,fd,'#f5a032');
+      if(f.hp<=0)killFoe(f);
+    }
+  }
+  KALUZE=KALUZE.filter(k=>k.t>0);
+}
+function drawKaluze(){
+  for(const k of KALUZE){
+    const sx=k.x-camX,sy=k.y-camY;
+    if(sx<-k.r-30||sx>W+k.r+30||sy<-k.r-30||sy>H+k.r+30)continue;
+    /* rozlewa się przez chwilę po upadku, a przy końcu wsiąka */
+    const roz=k.pojaw>0?1-k.pojaw/.35:1;
+    const zanik=(k.t!==Infinity&&k.t<1.4)?k.t/1.4:1;
+    const r=k.r*(.35+.65*roz);
+    cx.save();
+    cx.globalAlpha=zanik;
+    /* NIEREGULARNY kształt: pięć elips z ziarna, żeby kałuża nie była kołem */
+    /* Kształt kałuży to JEDNA ścieżka z pięciu elips i JEDNO wypełnienie.
+       Rysowane osobno nakładały się półprzezroczyście i zamiast rozlanej
+       cieczy wychodził liść koniczyny — po jaśniejszych miejscach na stykach. */
+    const plama=(skala,col)=>{
+      cx.fillStyle=col;
+      cx.beginPath();
+      for(let i=0;i<5;i++){
+        const a=(k.seed+i*67)%360/57.3;
+        const dx=Math.cos(a)*r*.22,dy=Math.sin(a)*r*.11;
+        cx.ellipse(sx+dx,sy+dy,r*skala*(.74+((k.seed+i*29)%24)/100),
+                   r*skala*.48*(.74+((k.seed+i*13)%24)/100),a*.25,0,7);
+      }
+      cx.fill();
+    };
+    if(k.ogien){
+      cx.save();cx.globalCompositeOperation='lighter';
+      cx.globalAlpha=zanik*(.16+Math.abs(Math.sin(anim*4+k.seed))*.08);
+      cx.fillStyle='#f5a032';
+      cx.beginPath();cx.ellipse(sx,sy,r*1.5,r*.85,0,0,7);cx.fill();
+      cx.restore();cx.globalAlpha=zanik;
+      plama(1,'#5a2a10');
+      plama(.82,'rgba(224,102,42,.85)');
+      plama(.6,'rgba(245,197,66,.75)');
+      /* jęzory ognia — chwieją się każdy w swoim rytmie */
+      for(let i=0;i<7;i++){
+        const a=(k.seed+i*53)%360/57.3,u=.35+((k.seed+i*17)%50)/100;
+        const fx2=sx+Math.cos(a)*r*u,fy2=sy+Math.sin(a)*r*u*.5;
+        const h=5+Math.abs(Math.sin(anim*6+i*1.7+k.seed))*7;
+        cx.save();cx.globalCompositeOperation='lighter';
+        cx.fillStyle='#e0662a';cx.beginPath();
+        cx.moveTo(fx2-2.4,fy2);cx.quadraticCurveTo(fx2,fy2-h*.6,fx2,fy2-h);
+        cx.quadraticCurveTo(fx2,fy2-h*.6,fx2+2.4,fy2);cx.closePath();cx.fill();
+        cx.fillStyle='#6fd8e8';cx.beginPath();                 // niebieski rdzeń — to SPIRYTUS
+        cx.moveTo(fx2-1,fy2);cx.quadraticCurveTo(fx2,fy2-h*.3,fx2,fy2-h*.45);
+        cx.quadraticCurveTo(fx2,fy2-h*.3,fx2+1,fy2);cx.closePath();cx.fill();
+        cx.restore();
+      }
+    }else{
+      plama(1,'rgba(24,44,30,.5)');                             // cień pod cieczą
+      plama(.93,'rgba(150,196,130,.44)');
+      plama(.66,'rgba(196,224,176,.26)');
+      /* refleks i bąbelki */
+      cx.fillStyle='rgba(238,246,250,.5)';
+      cx.fillRect(sx-r*.42,sy-r*.16,r*.5,1.2);
+      for(let i=0;i<3;i++){
+        const a=(k.seed+i*91)%360/57.3,u=.3+((k.seed+i*23)%50)/100;
+        const b=.5+.5*Math.sin(anim*2.2+i*2+k.seed);
+        cx.fillStyle='rgba(226,244,220,'+(.25+b*.3)+')';
+        cx.beginPath();cx.arc(sx+Math.cos(a)*r*u,sy+Math.sin(a)*r*u*.5,1+b,0,7);cx.fill();
+      }
+      /* rozbite szkło na brzegu — po czym poznajesz, że to była butelka */
+      if(!k.duza){
+        cx.fillStyle='rgba(207,228,238,.8)';
+        for(let i=0;i<4;i++){
+          const a=(k.seed+i*71)%360/57.3;
+          cx.fillRect(sx+Math.cos(a)*r*.85,sy+Math.sin(a)*r*.45,1.6,1.2);
+        }
+      }
+    }
+    cx.restore();
+  }
+}
+/* =====================================================================
+   BECZKI Z ALKOHOLEM — cztery na arenie PANA MŁODEGO
+   ---------------------------------------------------------------------
+   Stoją jako kafle (93) i są przeszkodą. Co 25% HP pana młodego jedna się
+   PRZEWRACA i wylewa wielką kałużę, która zostaje do końca WALKI — także
+   po zmianie fazy. Kafel jest `anim:true`, więc rysunek leżącej beczki
+   wchodzi bez unieważniania upieczonego kawałka mapy.
+   ===================================================================== */
+let BECZKI=[];
+const beczkaLezy=(tx,ty)=>{
+  for(const b of BECZKI)if(b.tx===tx&&b.ty===ty)return b.lezy;
+  return false;
+};
+/* zbiera beczki z planszy i ustawia je w kolejności od najdalszej od środka
+   areny — dzięki temu pierwsza przewraca się ta z rogu, a ostatnia ta,
+   która najbardziej zawadza */
+function beczkiZMapy(cx2,cy2){
+  BECZKI=[];
+  for(let y=0;y<MH;y++)for(let x=0;x<MW;x++)
+    if(M[y*MW+x]===93)BECZKI.push({tx:x,ty:y,x:x*16+8,y:y*16+8,lezy:false});
+  BECZKI.sort((a,b)=>Math.hypot(b.x-cx2,b.y-cy2)-Math.hypot(a.x-cx2,a.y-cy2));
+}
+function beczkaPrzewroc(cx2,cy2){
+  const b=BECZKI.find(o=>!o.lezy);
+  if(!b)return null;
+  b.lezy=true;
+  /* wylewa się W STRONĘ ŚRODKA areny — kałuża ma leżeć tam, gdzie się walczy,
+     a nie za beczką pod ścianą */
+  const d=Math.max(1,Math.hypot(cx2-b.x,cy2-b.y));
+  const kx=b.x+(cx2-b.x)/d*30,ky=b.y+(cy2-b.y)/d*24;
+  fxRing(b.x,b.y,34,'#7bc950',{life:.5,w:3,ground:true});
+  fxSparks(b.x,b.y-8,'#cfe4ee',18,150,{life:.6,g:280});
+  addShake(4.5,.35);beep(90,.45,'sawtooth',.09,40);
+  toast('🛢️ BECZKA POSZŁA! Rozlany spirytus ZOSTAJE — omijaj kałużę.',3200);
+  return kaluzaDodaj(kx,ky,44,7,Infinity,{duza:true,pojaw:.55});
+}
+/* =====================================================================
+   POCISKI, KTÓRE COŚ PO SOBIE ZOSTAWIAJĄ
+   ---------------------------------------------------------------------
+   Butelka wódki, róża pana młodego i welon panny młodej mają jedno wspólne:
+   są groźne dopiero PO WYLĄDOWANIU. Zamiast trzech gałęzi `if(b.t==='…')`
+   w pętli pocisków stoi tu jeden rejestr — „co zostaje, gdy pocisk gaśnie".
+   ===================================================================== */
+const POCISK_ROZBICIE={
+  /* BUTELKA WÓDKI — rozbija się i zostawia kałużę, która parzy */
+  wodka:b=>{
+    fxSparks(b.x,b.y,'#cfe4ee',12,140,{life:.5,g:300});
+    fxStarFlash(b.x,b.y,'#ffffff',8,{life:.2});
+    beep(1800,.09,'square',.05,600);addShake(1.6,.12);
+    kaluzaDodaj(b.x,b.y,26,Math.max(3,Math.round((b.atk||10)*.34)),7.5);
+    addHit(b.x,b.y-14,'BRZDĘK!','#cfe4ee');
+  },
+  /* RÓŻA PANA MŁODEGO — pęka na płatki lecące na WSZYSTKIE strony */
+  roza:b=>{
+    const n=b.duza?12:9,dmg=Math.max(2,Math.round((b.atk||12)*.6));
+    for(let i=0;i<n;i++){
+      const a=i/n*6.28+(b.x*.01);
+      bossShots.push({x:b.x,y:b.y,dx:Math.cos(a)*104,dy:Math.sin(a)*104,
+        life:1.15,t:'platek',atk:dmg});
+    }
+    fxRing(b.x,b.y,20,'#e04848',{life:.35,w:3});
+    fxSparks(b.x,b.y,'#e88ac8',10,120,{life:.5});
+    beep(660,.12,'triangle',.05,300);
+  },
+  /* WELON — ląduje i przez chwilę leży, zanim wyjdą z niego kolce */
+  welon:b=>{
+    welonPolozony(b.x,b.y,b.kat||0,b.atk||14);
+  },
+};
+/* =====================================================================
+   WELON PANNY MŁODEJ — leży, a potem wychodzą z niego KOLCE
+   ---------------------------------------------------------------------
+   Rzucony welon nie robi w locie NIC. Ląduje, rozkłada się na parkiecie
+   (widać białą koronkę — i masz czas z niej zejść), a po chwili wzdłuż
+   niego wystrzeliwuje SERIA kolców: jeden po drugim, od jednego końca
+   do drugiego. Kto stoi na welonie i patrzy, ten dostaje wszystkie.
+   ===================================================================== */
+let WELONY=[];
+function welonPolozony(x,y,kat,atk){
+  WELONY.push({x,y,kat,atk,t:.95,wyszly:false});
+  fxSparks(x,y,'#f2f0f8',10,90,{life:.5,g:120});
+  beep(520,.18,'sine',.05,260);
+  addHit(x,y-14,'WELON!','#f2f0f8');
+}
+function weloneUpdate(dt){
+  if(!WELONY.length)return;
+  for(const w of WELONY){
+    w.t-=dt;
+    if(w.t>0)continue;
+    w.wyszly=true;
+    for(let i=0;i<7;i++){                       // kolce idą po kolei wzdłuż welonu
+      const d=(i-3)*17;
+      mbKolec(w.x+Math.cos(w.kat)*d,w.y+Math.sin(w.kat)*d*.6,18,w.atk,.14+i*.06);
+    }
+    beep(240,.3,'sawtooth',.07,90);
+  }
+  WELONY=WELONY.filter(w=>!w.wyszly);
+}
+function drawWelony(){
+  for(const w of WELONY){
+    const sx=w.x-camX,sy=w.y-camY;
+    if(sx<-70||sx>W+70||sy<-50||sy>H+50)continue;
+    const k=1-w.t/.95;                          // rozkłada się na podłodze
+    cx.save();cx.translate(sx,sy);cx.rotate(w.kat);cx.scale(1,.55);
+    cx.globalAlpha=.55+k*.3;
+    cx.fillStyle='#f2f0f8';
+    cx.beginPath();cx.ellipse(0,0,58*Math.min(1,k*1.6),15,0,0,7);cx.fill();
+    cx.globalAlpha=.85;
+    cx.strokeStyle='#d8d4e8';cx.lineWidth=1;    // koronka po brzegu
+    cx.beginPath();cx.ellipse(0,0,58*Math.min(1,k*1.6),15,0,0,7);cx.stroke();
+    for(let i=0;i<9;i++){
+      const u=(i-4)/4.4*58*Math.min(1,k*1.6);
+      cx.beginPath();cx.arc(u,13,2.6,0,3.14);cx.stroke();
+      cx.beginPath();cx.arc(u,-13,2.6,3.14,0);cx.stroke();
+    }
+    cx.globalAlpha=.5;cx.fillStyle='#ffffff';
+    cx.fillRect(-40*Math.min(1,k*1.6),-6,26,2);
+    cx.restore();cx.globalAlpha=1;
+    /* ostrzeżenie: kolce idą TĄ linią */
+    if(w.t<.5){
+      cx.save();cx.globalAlpha=.35+Math.sin(anim*24)*.2;
+      cx.strokeStyle='#e04848';cx.lineWidth=1.4;
+      cx.beginPath();
+      cx.moveTo(sx-Math.cos(w.kat)*56,sy-Math.sin(w.kat)*34);
+      cx.lineTo(sx+Math.cos(w.kat)*56,sy+Math.sin(w.kat)*34);
+      cx.stroke();cx.restore();cx.globalAlpha=1;
+    }
+  }
+}
 function drawMiniBlasts(){
   for(const b of miniBlasts){ // ostrzeżenie: pulsujący, kurczący się okrąg
     const sx=b.x-camX,sy=b.y-camY,k=Math.max(0,b.warn/(b.warn0||.8));
+    if(b.kolec){                // KOLEC: najpierw pęknięcie, potem wyskakuje ostrze
+      const u=1-k;
+      cx.globalAlpha=.5+Math.sin(anim*26)*.25;
+      cx.strokeStyle='#e04848';cx.lineWidth=1.2;
+      cx.beginPath();cx.ellipse(sx,sy,b.r*.55,b.r*.3,0,0,7);cx.stroke();
+      cx.globalAlpha=1;
+      cx.fillStyle='#2a2434';
+      cx.beginPath();cx.ellipse(sx,sy,3.4,1.6,0,0,7);cx.fill();
+      const h=u*u*13;                                   // ostrze wychodzi coraz wyżej
+      if(h>.6){
+        cx.fillStyle='#d8d4e8';cx.beginPath();
+        cx.moveTo(sx-3,sy+1);cx.lineTo(sx,sy-h);cx.lineTo(sx+3,sy+1);cx.closePath();cx.fill();
+        cx.fillStyle='#ffffff';cx.beginPath();
+        cx.moveTo(sx-1.2,sy);cx.lineTo(sx,sy-h*.9);cx.lineTo(sx+.6,sy);cx.closePath();cx.fill();
+      }
+      continue;
+    }
     if(b.rock){                 // GŁAZ: cień rośnie, a nad nim leci sam głaz
       cx.globalAlpha=.26+(1-k)*.34;
       cx.fillStyle='#07050e';
@@ -2295,6 +2850,9 @@ function dealDmg(f,chId,mult,opts){
   const tdArm=FOE_TYPES[f.t];
   if(tdArm&&tdArm.armor){dmg*=1-tdArm.armor;                      // elita w pancerzu
     if(Math.random()<.25)addHit(f.x,f.y-30,'PANCERZ!','#c9c4dd');}
+  /* `slaby` = otwarty na cios: panna młoda po piruecie albo leżąca w ogniu.
+     To jest nagroda za dobre ustawienie się, więc ma być widać w liczbach. */
+  if(f.slaby){dmg*=f.slaby;}
   if(f.shield>0){dmg*=.12;addHit(f.x,f.y-30,'MUR!','#c9c4dd');    // MUR Betoniarza
     fxSparks(f.x,f.y-10,'#c9c4dd',4,90,{life:.3});}
   dmg=Math.max(1,Math.round(dmg));
@@ -2732,7 +3290,10 @@ function updateFoes(dt){
         f.shootT=2.6+Math.random()*1.8;
         if(d<240){
           const a=Math.atan2(P.y-f.y,P.x-f.x),st=td.shotType||'laser',sp=st==='snieg'?128:150;
-          bossShots.push({x:f.x,y:f.y-6,dx:Math.cos(a)*sp,dy:Math.sin(a)*sp,life:2.2,t:st,atk:Math.round(td.atk*.9)});
+          /* `shotArc` = pocisk RZUCANY, nie strzelany: gaśnie dokładnie tam, gdzie
+             stał gracz, bo cała groźba siedzi w tym, co zostaje po wylądowaniu. */
+          const zyc=td.shotArc?Math.max(.4,Math.min(2.2,d/sp)):2.2;
+          bossShots.push({x:f.x,y:f.y-6,dx:Math.cos(a)*sp,dy:Math.sin(a)*sp,life:zyc,t:st,atk:Math.round(td.atk*.9)});
           if(td.tri)for(const off of[-.35,.35]) // smoczątko: potrójne ziónięcie
             bossShots.push({x:f.x,y:f.y-6,dx:Math.cos(a+off)*sp,dy:Math.sin(a+off)*sp,life:2.2,t:st,atk:Math.round(td.atk*.8)});
           addHit(f.x,f.y-28,st==='snieg'?'HAŁ!':st==='flash'?'PSTRYK!':'PIF!',st==='snieg'?'#bfe8f4':st==='flash'?'#fff':'#e03028');
@@ -2860,6 +3421,7 @@ function updateFoes(dt){
           bossShots=[];
           /* ul zaczyna od pierwszej fazy, a wypuszczony rój wraca do środka */
           if(f.hive){f.faza=1;f.at=2;for(const o of foes)if(o.swarm)o.dead=true;}
+          if(BOSS_RESET[f.t])BOSS_RESET[f.t](f);   // wesele: beczki wracają, kałuże znikają
           addHit(f.x,f.y-30,'TCHÓRZ!','#f5c542');
           toast('🏃 Uciekłeś z areny! '+f.bn+' wraca na środek — walka OD NOWA!',3600);
         }
@@ -2876,8 +3438,8 @@ function updateFoes(dt){
           fxSparks(f.x,f.y-10,'#e04848',16,150,{life:.6});
           addShake(5,.4);addHitStop(.08);
           toast('⚠️ '+f.bn+' WPADA W SZAŁ!');SFX.no();}}
-      if(f.hive){hiveUpdate(f,dt);}                        // UL: stoi i wypuszcza rój
-      else if(f.lot){smokLot(f,dt);}                       // WAWELIN: jest w powietrzu
+      const bu=BOSS_UPDATE[f.t];
+      if(bu&&bu(f,dt)){}                                   // boss z własną logiką klatki
       else if(f.telT!==undefined){updateBossTelegraph(f,dt);}   // telegraf trwa — żadnego nowego ataku
       else if(f.moves&&f.moves.length){
         /* boss z własnym zestawem ataków: losowanie bez powtórki tego samego
@@ -2949,12 +3511,16 @@ function updateFoes(dt){
   }
   foes=foes.filter(f=>!f.dead);
   updateMiniBlasts(dt);   // telegrafowane wybuchy mini-bossów
+  kaluzeUpdate(dt);       // rozlany alkohol (i to, co się w nim pali)
+  weloneUpdate(dt);       // welon panny młodej — po chwili wychodzą z niego kolce
   // pociski bossów (+ świetlista smuga za każdym)
   for(const b of bossShots){
     b.life-=dt;b.x+=b.dx*dt;b.y+=b.dy*dt;
     if(!reduceMotion){b.trT=(b.trT||0)-dt;
       if(b.trT<=0){b.trT=.035;
-        const tc=b.t==='smokogien'?'#b98cf0':b.t==='ogien'?'#f5a032':b.t==='snieg'?'#bfe8f4':b.t==='laser'?'#e03028':
+        const tc=b.t==='smokogien'?'#b98cf0':b.t==='wodka'?'#cfe4ee':b.t==='tort'?'#f8f4ea':
+                 b.t==='roza'||b.t==='platek'?'#e04848':b.t==='welon'?'#f2f0f8':
+                 b.t==='ogien'?'#f5a032':b.t==='snieg'?'#bfe8f4':b.t==='laser'?'#e03028':
                  b.t==='flash'?'#ffffff':b.t==='kettle'?'#8f88b0':
                  b.t==='fon'?'#6fd8e8':b.t==='konfet'?'#e88ac8':b.t==='zadlo'?'#f5c542':'#6fd8e8';
         fxP({x:b.x,y:b.y,vx:(Math.random()-.5)*14,vy:(Math.random()-.5)*14,g:0,
@@ -2962,6 +3528,10 @@ function updateFoes(dt){
     if(Math.hypot(P.x-b.x,(P.y-8)-b.y)<11){b.life=0;hurtPlayer(b);
       fxStarFlash(b.x,b.y,'#ffffff',7,{life:.15});}
   }
+  /* POCISK, KTÓRY ZGASŁ, MOŻE COŚ PO SOBIE ZOSTAWIĆ — butelka kałużę, róża
+     płatki, welon kolce. Rejestr POCISK_ROZBICIE zamiast trzech gałęzi tutaj. */
+  for(const b of bossShots)
+    if(b.life<=0&&!b.pekl&&POCISK_ROZBICIE[b.t]){b.pekl=1;POCISK_ROZBICIE[b.t](b);}
   bossShots=bossShots.filter(b=>b.life>0);
   // pociski postaci (dorsz Bogdana / serduszko Julki) + smugi
   for(const p of PROJ){
@@ -3616,6 +4186,7 @@ const ARTS={
   lancuchG:{n:'Łańcuch Grubości Palca',slot:1,star:4,st:{atk:14,hp:30},ic:'⛓️'},
   kolczykK:{n:'Kolczyk Krakena',slot:1,star:5,st:{cd:45,atk:8},ic:'🌀'},
   serceSmoka:{n:'Serce Wawelina',slot:1,star:5,st:{atk:19,cd:32},ic:'💜'},
+  obraczki:{n:'Obrączki z Remizy',slot:2,star:5,st:{atk:15,hp:90,cd:22},ic:'💍'},
   skarpety:{n:'Skarpety i Sandały',slot:2,star:2,st:{def:10},ic:'🩴'},
   pasDP:{n:'Pas Mistrza Disco Polo',slot:2,star:3,st:{atk:12},ic:'🕺'},
   nerka:{n:'Nerka Prawdziwego Ziomala',slot:2,star:3,st:{hp:50,def:5},ic:'👝'},
@@ -3958,10 +4529,14 @@ const DOMAINS={
   grota:{r:'tatry',dni:1,x:4,y:10,n:'LODOWA GROTA',floor:17,acc:8,wall:16,
     pietra:['przedsionek','krata','komnaty','zapadnia','skarbiec'],
     foes:['zazdrosnik','dres','balwan'],elite:'golem',mini:['soltys','betoniarz','rolexiarz'],ing:['miod','czosnek','ziolo'],col:'#bfe8f4'},
-  wesele:{r:'chodziez',dni:0,x:85,y:30,n:'WESELE W REMIZIE',floor:37,acc:9,wall:13,
-    pietra:['przedsionek','krata','komnaty','zapadnia','skarbiec'],
-    foes:['hejter','dres','zazdrosnik'],elite:'rycerz',mini:['soltys','dj','komornik'],
-    ing:['ziemniak','czosnek','miod'],col:'#e88ac8'},
+  /* WESELE W REMIZIE — czwarta domena z RĘCZNYMI planszami (js/mapy.js), stąd
+     brak pola `pietra`. Paleta siedzi w PIĘTRACH, bo droga prowadzi z nocnego
+     parkingu przez kuchnię i salę aż na parkiet. Obsadą są GOŚCIE WESELNI,
+     a elitą ŚWIADEK — jedyny, który rzuca butelką i zostawia kałużę. */
+  wesele:{r:'chodziez',dni:0,x:85,y:30,n:'WESELE W REMIZIE',floor:89,acc:88,wall:90,
+    mrok:.45,mrokCol:'24,12,30',
+    foes:['wujek','ciotka','druhna','dzieciak'],elite:'swiadek',
+    mini:['soltys','dj','komornik'],ing:['ziemniak','czosnek','miod'],col:'#e88ac8'},
   pole:{r:'trasa',dni:2,x:56,y:40,n:'POLE NAMIOTOWE O 3 W NOCY',floor:0,acc:28,wall:4,
     pietra:['przedsionek','krata','komnaty','zapadnia','skarbiec'],
     foes:['hejter','pies','golab'],elite:'odyniec',mini:['paparazzo','dj','rolexiarz'],ing:['jagoda','ziemniak','ziolo'],col:'#f5a032'},
@@ -4033,7 +4608,8 @@ const FLOOR_KINDS={
    CZYM piętro jest (czy jest walka, kłódki, zegar), plansza — jak wygląda,
    czym pachnie i kto na niej stoi. Nowe pole dopisuje się TUTAJ, nie w pięciu
    miejscach na krzyż. */
-const FK_WLASNE=['floor','acc','wall','amb','mrok','mrokCol','mgla','kurz','iskry','boss','promienie'];
+const FK_WLASNE=['floor','acc','wall','amb','mrok','mrokCol','mgla','kurz','iskry','disco',
+  'boss','promienie'];
 /* Przy ręcznej planszy `fk` jest scalone z wpisem mapy (nazwa, opis, limit,
    rozmiar) — stąd czytamy je z DOM, a nie prosto z rejestru. */
 const flKind=()=>DOM.fk||FLOOR_KINDS[DOM.kind]||FLOOR_KINDS.komnaty;
@@ -4351,6 +4927,8 @@ const MAPA_ZNAKI={
   'v':25,'z':28,'l':29,'Q':24,'m':64,'e':65,'n':66,'j':67,'g':68,
   /* --- góry i smocza jama (patrz TILES 74-86) --- */
   'a':74,'/':75,'h':76,'t':77,'!':78,'N':79,'V':80,'Y':81,'$':82,';':83,'&':84,'R':85,
+  /* --- wesele w remizie (patrz TILES 88-100) --- */
+  'P':88,']':89,'[':90,'U':91,'K':92,'J':93,'Z':94,'@':95,'"':96,'?':97,'<':98,'(':99,')':100,
 };
 /* do której listy dekoracji trafia znak (animacje i dźwięk czytają gotowe listy,
    zamiast skanować planszę co klatkę) */
@@ -5273,6 +5851,32 @@ function drawDomainDeko(){
     }
     cx.restore();cx.globalAlpha=1;
   }
+  /* --- DYSKOTEKA: kolorowe plamy światła sunące po parkiecie i konfetti
+     spod sufitu. To jest cała różnica między „salą" a „weselem". --- */
+  if(fkD.disco&&!reduceMotion){
+    cx.save();cx.globalCompositeOperation='lighter';
+    const n=Math.round(4*fkD.disco);
+    for(let i=0;i<n;i++){
+      const kol=['#e88ac8','#6fd8e8','#f5c542','#b98cf0','#7bc950','#e04848'][i%6];
+      const a=t*(.45+i*.13)+i*2.1;
+      const x=W/2+Math.cos(a)*(W*.36),y=H*.55+Math.sin(a*1.37+i)*(H*.3);
+      const r=26+Math.sin(t*2+i)*8;
+      cx.globalAlpha=.10+Math.abs(Math.sin(t*3+i))*.06;
+      const gr=cx.createRadialGradient(x,y,2,x,y,r);
+      gr.addColorStop(0,kol);gr.addColorStop(1,kol+'00');
+      cx.fillStyle=gr;cx.beginPath();cx.ellipse(x,y,r,r*.6,0,0,7);cx.fill();
+    }
+    cx.restore();cx.globalAlpha=1;
+    const kn=Math.round(13*fkD.disco);
+    for(let i=0;i<kn;i++){
+      const okres=6+((i*7)%5);
+      const f=((t+i*1.7)%okres)/okres;
+      const x=((i*97)%W)+Math.sin(t*2+i)*10,y=f*(H+30)-20;
+      cx.save();cx.translate(x,y);cx.rotate(t*4+i);
+      cx.fillStyle=['#e88ac8','#f5c542','#6fd8e8','#7bc950','#f2f0f8'][i%5];
+      cx.fillRect(-1.6,-1,3.2,2);cx.restore();
+    }
+  }
   /* --- MROK: delikatna winieta wokół gracza. Rysowana POD postaciami, więc nie
      przygasza ekipy ani liczb obrażeń, tylko domyka nastrój. Siłę i barwę bierze
      domena (`mrok`, `mrokCol`) — w piwnicy jest czarno, w lesie tylko cień koron. --- */
@@ -5531,9 +6135,10 @@ function domLoadFloor(idx){
   DOM.done=false;DOM.wyjT=0;
   DOM.masz=[];DOM.bomby=[];DOM.carry=null;DOM.zap=[];DOM.regen=[];
   DOM.zamki=[];DOM.klucze=[];DOM.mam={};DOM.wejscie=0;DOM.wyjscie=0;DOM.sciezka=[];
-  DOM.deko=DEKO_PUSTE();DOM.reczna=false;
+  DOM.deko=DEKO_PUSTE();DOM.reczna=false;DOM.bossPending=0;
   DOM.wejscieXY=null;DOM.schodyXY=null;
   foes=[];hitFX=[];PROJ=[];bossShots=[];dmgNums=[];miniBlasts=[];foeT=1e9;forage=[];
+  KALUZE=[];WELONY=[];BECZKI=[];       // rozlane wesele nie przechodzi na kolejne piętro
   resetAmbient();
   const reczna=def?domBuildFromMap(cfg,fk,def):(domBuildFloor(cfg,fk,idx),null);
   const ostPietro=domPlanFloor(cfg,fk,idx);
@@ -5699,6 +6304,9 @@ function domBossSpawn(id,rm,i){
     room:i,x:rm.cx,y:rm.cy-12,homeX:rm.cx,homeY:rm.cy,
     hp:maxHp,maxHp,hp0:maxHp,atk:Math.round(td.atk*(1+.15*lvl)*sc.atk*BOSS_ATK_UP),
     dx:0,dy:0,wt:0,stun:0,kb:0,kbx:0,kby:0,flash:0,at:2.6});
+  /* WIELKIE BECZKI z planszy (kafel 93) stają się częścią walki — pan młody
+     przewraca je po kolei. W domenie bez beczek lista po prostu zostaje pusta. */
+  beczkiZMapy(rm.cx,rm.cy);
   fxRing(rm.cx,rm.cy-8,74,'#b98cf0',{life:.6,w:5});
   fxRing(rm.cx,rm.cy+8,60,'#f5a032',{life:.5,w:3,ground:true});
   fxSparks(rm.cx,rm.cy-10,'#b98cf0',24,190,{life:.7});
@@ -5770,7 +6378,7 @@ function domUpdate(dt){
   for(let i=0;i<DOM.rooms.length;i++){
     const rm=DOM.rooms[i];
     if(!rm.spawned||rm.cleared)continue;
-    if(!foes.some(f=>f.room===i&&!f.dead)){
+    if(!DOM.bossPending&&!foes.some(f=>f.room===i&&!f.dead)){
       rm.cleared=true;
       if(i===DOM.wyjscie)domFloorDone();
       else{fxRing(rm.cx,rm.cy,40,DOMAINS[DOM.cur].col,{life:.4,w:2});
@@ -5825,6 +6433,7 @@ function tryExitDomain(){
 }
 function exitDomain(){
   stopBattleMusic();domAmbientStop();
+  KALUZE=[];WELONY=[];BECZKI=[];      // wesele zostaje w remizie
   const backReg=DOM.prevReg||'wawa',bx=DOM.prevX,by=DOM.prevY;
   DOM={cur:null,floor:0,kind:null,fk:null,rooms:[],crystals:[],usedMini:[],
     chest:null,stairs:null,exit2:null,prevReg:null,prevX:0,prevY:0,done:false,
@@ -6087,6 +6696,26 @@ const BOSSES={
     intro2:[['Klaunica','Wróciłeś? Nagranie dalej mam. Jest dowód, że to zrobiłeś, Edward.','k_jestdowod'],
             ['Edek','Chyba ci się z kimś innym pomyliłem.','c_pomylilem'],
             ['Klaunica','No to jedziemy jeszcze raz, blaszaku.']]},
+  /* PAŃSTWO MŁODZI — boss WESELA W REMIZIE, dwuetapowy jak HORDA PSZCZÓŁ:
+     `next` to druga forma z tą samą tożsamością (`bid`), więc łup, film
+     i poziom rewanżu liczą się raz. `r` nie wskazuje żadnego regionu, bo to
+     boss PIĘTRA DOMENY (patrz `boss:'mlodzi'` w js/mapy.js). */
+  mlodzi:{drop:['art','obraczki'],r:'remiza',t:'panmlody',n:'PAN MŁODY',
+    moves:['roze','skoki'],cd:2.5,cd2:1.4,
+    film:'WESELE W REMIZIE POSZŁO NIE TAK (państwo młodzi gonili mnie po parkiecie)',
+    next:{t:'pannamloda',n:'PANNA MŁODA',moves:['welon','piruet'],cd:2.6,cd2:1.5,
+      intro:[['???','…'],
+             ['PANNA MŁODA','Oh honey, my dear! How dare you!','w_howdare'],
+             ['Edek','O matko jedyna, ludzie. Ona mówi po angielsku i jest wściekła.','c_koniecswiata'],
+             ['PANNA MŁODA','TO MIAŁ BYĆ NAJPIĘKNIEJSZY DZIEŃ MOJEGO ŻYCIA! A TY MI GO ROZWALIŁEŚ!'],
+             ['Edek','Nikt nie będzie zaczepiał tu moich ziomali. A mnie tym bardziej. Lecimy!','c_ziomali']]},
+    intro:[['Edek','No i elegancko! Wesele w remizie, ludzie. Tu się dopiero dzieje.','c_elegancko2'],
+           ['PAN MŁODY','A TY CO ZA JEDEN?! KTO CIĘ W OGÓLE ZAPRASZAŁ NA MOJE WESELE?'],
+           ['Edek','Spokojnie panie młody, ja tu tylko materiał kręcę. Kamera, akcja i znikam.','c_kameraakcja'],
+           ['PAN MŁODY','MATERIAŁ?! JA CI DAM MATERIAŁ, BLASZAKU. CHŁOPAKI, TOCZYĆ BECZKI!'],
+           ['Edek','Zobaczcie ludzie — dzisiaj to JA będę królem balu.','c_krolbalu']],
+    intro2:[['PAN MŁODY','TY ZNOWU?! Z TĄ SAMĄ KAMERĄ?!'],
+            ['Edek','No dawaj dawaj człowieku, jedziemy z tym koksem jeszcze raz!','c_spokoj']]},
   /* WAWELIN — jedyny boss, który NIE STOI W ŚWIECIE, tylko na ostatnim
      piętrze domeny (patrz `boss:'wawelin'` w js/mapy.js). Dlatego `r` nie
      wskazuje żadnego regionu: wszystkie pętle po BOSSES filtrują po `b.r===REG`,
@@ -6165,16 +6794,24 @@ function bossStage2(f,nx){
   const td=FOE_TYPES[nx.t],lvl=S.bossLvl[f.bid]||0,sc=bossScale();
   const ex=f.x,ey=f.y;
   bossShots=[];
+  /* BOSS DOMENY: dopóki druga forma nie wyjdzie, komnata NIE MOŻE zaliczyć się
+     jako pusta — inaczej piętro kończy się w chwili śmierci pierwszej formy,
+     jeszcze przed scenką. */
+  DOM.bossPending=1;
   fxRing(ex,ey-8,80,'#f5c542',{life:.7,w:5});
   fxRing(ex,ey+6,64,'#c8935a',{life:.5,w:3,ground:true});
   fxSparks(ex,ey-10,'#f5c542',26,200,{life:.8});
   addShake(6,.5);worldFlash=.6;SFX.no();
   say(nx.intro.map(([who,t,v])=>({who,t,v})),()=>{
-    const maxHp=Math.round(td.hp*(1+.5*lvl)*sc.hp);
+    /* druga forma skaluje się do domeny tak samo jak pierwsza */
+    const pie=(REG==='arena'&&DOM.cur)?1+.12*(S.domLvl[DOM.cur]||0):1;
+    const maxHp=Math.round(td.hp*(1+.5*lvl)*sc.hp*pie);
     foes.push({t:nx.t,boss:true,stage2:true,bid:f.bid,bn:nx.n,moves:nx.moves,
+      cd:nx.cd,cd2:nx.cd2,room:f.room,
       x:ex,y:ey,homeX:f.homeX,homeY:f.homeY,
       hp:maxHp,maxHp,hp0:maxHp,atk:Math.round(td.atk*(1+.15*lvl)*sc.atk*BOSS_ATK_UP),
       dx:0,dy:0,wt:0,stun:0,kb:0,kbx:0,kby:0,flash:0,at:1.6});
+    DOM.bossPending=0;
     fxStarFlash(ex,ey-12,'#fff7d6',16,{life:.35});
     burstConfetti();addShake(5,.4);
     toast('👑 '+nx.n+' WYCHODZI Z ULA!<br>Trzy ataki — ucz się ich albo giń.',3600);
@@ -9185,6 +9822,218 @@ const BOSS_DRAW={
     g.beginPath();g.arc(17.5,0,4,Math.PI,0);g.stroke();
   },
   /* =================================================================
+     PAN MŁODY — pierwsza forma bossa WESELA W REMIZIE
+     -----------------------------------------------------------------
+     Czarny garnitur, biała koszula, mucha i róża w klapie — plus kieliszek,
+     którego nie odstawia nawet w walce. Czyta się po sylwetce: szeroki
+     w barach, przylizany, z czerwoną twarzą.
+     W przysiadzie kuca (widać, że zaraz skoczy), w locie leci nad ziemią,
+     a w fazie szału marynarka idzie na ziemię, rękawy w górę, mucha krzywo.
+     ================================================================= */
+  panmlody(g,f){
+    const fl=P.x<f.x?-1:1,t=anim;
+    const S2=f.skok,h=S2?(S2.h||0):0;
+    const kuca=(S2&&S2.faza==='przysiad')?1:0;
+    const szal=f.ph2?1:0;
+    /* CIEŃ — w locie robi się mały i ciemny, po nim widać, gdzie wyląduje */
+    g.fillStyle='rgba(6,4,12,'+(.4-h*.004).toFixed(3)+')';
+    g.beginPath();g.ellipse(0,10,15-h*.08,5.4-h*.03,0,0,7);g.fill();
+    g.save();
+    g.translate(0,-h);
+    if(kuca)g.scale(1.1,.82);                       // przysiad przed skokiem
+    const od=Math.sin(t*2.4)*1.1;
+    const gar=szal?'#2e2e46':'#23233a',kosz='#f4f1ea',skora='#e8a888';
+    /* NOGI I BUTY */
+    R(g,-8,-14,7,15,gar);R(g,1,-14,7,15,gar);
+    R(g,-9,0,9,4,'#12121a');R(g,0,0,9,4,'#12121a');
+    R(g,-9,3,9,1.4,'#0a0a10');R(g,0,3,9,1.4,'#0a0a10');
+    R(g,-6,-13,1.4,13,'#1a1a2a');R(g,3,-13,1.4,13,'#1a1a2a');   // kant w spodniach
+    /* TUŁÓW */
+    if(szal){                                       // marynarka poszła — same szelki
+      rr(g,-11,-40+od,22,27,3,kosz);
+      R(g,-5,-40+od,3.4,27,'#3a3a5a');R(g,2,-40+od,3.4,27,'#3a3a5a');   // szelki
+      R(g,-11,-18+od,22,3,'#23233a');                                    // pasek
+      R(g,-2,-17.4+od,3,1.8,'#f5c542');
+    }else{
+      rr(g,-12,-40+od,24,27,3,gar);
+      R(g,-4,-40+od,8,27,kosz);                     // koszula
+      R(g,-12,-40+od,3,27,'#191926');R(g,9,-40+od,3,27,'#191926');
+      R(g,-11.4,-38+od,4,4,'#2e2e46');R(g,7.4,-38+od,4,4,'#2e2e46');     // klapy
+    }
+    /* RÓŻA W KLAPIE — czerwona, bo biała ginęła na białej koszuli */
+    g.fillStyle='#a01c1c';g.beginPath();g.arc(fl*8,-35+od,3.2,0,7);g.fill();
+    g.fillStyle='#e04848';g.beginPath();g.arc(fl*8,-35+od,2,0,7);g.fill();
+    g.fillStyle='#f28a8a';g.beginPath();g.arc(fl*8-.8,-35.8+od,.9,0,7);g.fill();
+    R(g,fl*8-.6,-32.6+od,1.2,3,'#3d8a44');
+    /* RĘCE: jedna z kieliszkiem, druga w geście „no dawaj" */
+    const rekaG=(S2?-4:Math.sin(t*3)*2);
+    R(g,-16,-38+od,5,15,szal?kosz:gar);
+    R(g,11,-38+od+rekaG,5,15,szal?kosz:gar);
+    R(g,-16.5,-24+od,6,4,skora);
+    R(g,10.5,-24+od+rekaG,6,4,skora);
+    if(szal){R(g,-16,-38+od,5,5,skora);R(g,11,-38+od+rekaG,5,5,skora);}  // podwinięte rękawy
+    /* KIELISZEK — trzyma go nawet w skoku */
+    const kx=fl>0?14:-14,ky=-26+od+(fl>0?rekaG:0);
+    R(g,kx-2.6,ky-6,5.2,4.6,'#e8f4fa');
+    R(g,kx-2.2,ky-3.4,4.4,2,'#cfe4ee');
+    R(g,kx-.7,ky-1.4,1.4,3,'#e8f4fa');R(g,kx-2.4,ky+1.4,4.8,1.2,'#e8f4fa');
+    /* GŁOWA */
+    rr(g,-9,-58+od,18,19,5,skora);
+    R(g,-9,-58+od,18,5.4,'#2a1a14');                // przylizane włosy
+    R(g,-9,-58+od,18,1.6,'#4a3a2a');
+    R(g,fl*-2,-58+od,2,5.4,'#1a1008');              // przedziałek
+    R(g,-6.4,-50.4+od,4.8,3.4,'#f4f1ea');R(g,1.6,-50.4+od,4.8,3.4,'#f4f1ea'); // białka
+    R(g,fl>0?-3.4:-5.6,-49.6+od,2.2,2.4,'#2a2434');                     // źrenice
+    R(g,fl>0?4.6:2.4,-49.6+od,2.2,2.4,'#2a2434');
+    R(g,-6,-52.4+od,4.4,1.4,'#3a2a1a');R(g,1.6,-52.4+od,4.4,1.4,'#3a2a1a'); // brwi
+    if(szal){R(g,-6,-52.6+od,4.4,1.6,'#2a1a10');R(g,1.6,-52.6+od,4.4,1.6,'#2a1a10');}
+    R(g,-4,-44+od,8,2.6,'#8a2438');                 // otwarte usta — śpiewa albo krzyczy
+    R(g,-3,-46.4+od,6,1.4,'#3a2a1a');               // wąsik
+    /* MUCHA — w szale przekrzywiona, bo już nikt jej nie poprawia */
+    const mu=szal?.45:0;
+    g.save();g.translate(0,-40+od);g.rotate(mu);
+    g.fillStyle='#12121a';
+    g.beginPath();g.moveTo(0,0);g.lineTo(-7,-3.6);g.lineTo(-7,3.6);g.closePath();g.fill();
+    g.beginPath();g.moveTo(0,0);g.lineTo(7,-3.6);g.lineTo(7,3.6);g.closePath();g.fill();
+    R(g,-1.8,-1.6,3.6,3.2,'#2a2a3a');
+    g.restore();
+    if(szal){                                       // POT i para z uszu w fazie szału
+      g.fillStyle='#6fd8e8';
+      R(g,-8,-53+od,1.4,3,'#6fd8e8');R(g,7,-51+od,1.4,3.4,'#6fd8e8');
+      if(!reduceMotion&&Math.floor(t*4)%2){
+        g.fillStyle='rgba(232,236,244,.4)';
+        g.beginPath();g.arc(-11,-56+od,3,0,7);g.fill();
+        g.beginPath();g.arc(11,-56+od,3,0,7);g.fill();
+      }
+    }
+    g.restore();
+  },
+  /* =================================================================
+     PANNA MŁODA — druga forma. To ona jest prawdziwym bossem.
+     -----------------------------------------------------------------
+     Wielka biała suknia (im dalej w walkę, tym brudniejsza — `f.brud`),
+     welon, diadem i bukiet. Ma trzy stany, które MUSZĄ być czytelne
+     z drugiego końca sali: piruet (kręci się i jedzie), zawrót głowy
+     (stoi i się chwieje — bij) oraz wywrotka (leży w płonącym spirytusie).
+     ================================================================= */
+  pannamloda(g,f){
+    const fl=P.x<f.x?-1:1,t=anim;
+    const brud=f.brud||0,kreci=f.piruet?1:0,chwieje=f.wyczerp>0?1:0,lezy=f.upadek>0?1:0;
+    g.fillStyle='rgba(6,4,12,.4)';
+    g.beginPath();g.ellipse(0,10,16,5.6,0,0,7);g.fill();
+    g.save();
+    if(lezy){g.translate(0,6);g.rotate(fl*1.15);}   // wywrotka: leży na boku
+    if(chwieje)g.rotate(Math.sin(t*7)*.11);         // zawrót głowy
+    /* PIRUET: obrót czytamy przez ŚCIŚNIĘCIE w poziomie — sylwetka kręci się
+       wokół pionowej osi, a nie fika w powietrzu */
+    const spin=kreci?Math.cos(f.piruet.spin):1;
+    if(kreci)g.scale(Math.max(.28,Math.abs(spin))*(spin<0?-1:1),1);
+    const od=Math.sin(t*2.2)*1.1;
+    /* PALETA SUKNI — brudzi się progami */
+    const suk=['#f8f6f0','#efe9dc','#e2d8c2','#cfc2a8'][brud];
+    const cien=['#e2ddd2','#d8cfbe','#c8bca4','#b0a288'][brud];
+    const skora='#f0d8b0';
+    /* WELON z tyłu — długi, przezroczysty */
+    g.save();g.globalAlpha=.55;
+    g.fillStyle=suk;g.beginPath();
+    g.moveTo(-fl*4,-52+od);
+    g.quadraticCurveTo(-fl*(26+Math.sin(t*2)*4),-30+od,-fl*(20+Math.sin(t*1.6)*5),6);
+    g.lineTo(-fl*4,4);g.closePath();g.fill();
+    g.restore();
+    /* SUKNIA — dzwon; w piruecie rozkloszowany */
+    const rozk=kreci?9:0;
+    g.fillStyle=suk;g.beginPath();
+    g.moveTo(-9,-32+od);g.lineTo(9,-32+od);
+    g.lineTo(19+rozk,8);g.lineTo(-19-rozk,8);g.closePath();g.fill();
+    g.fillStyle=cien;g.beginPath();
+    g.moveTo(-9,-32+od);g.lineTo(-2,-32+od);g.lineTo(-4,8);g.lineTo(-19-rozk,8);g.closePath();g.fill();
+    g.fillStyle=suk;                                 // falbany
+    for(let i=0;i<3;i++){
+      const y=-16+i*8,w2=11+i*3.4+rozk*(i+1)*.3;
+      g.beginPath();g.ellipse(0,y+od*.4,w2,3.4,0,0,3.15);g.fill();
+    }
+    g.strokeStyle=cien;g.lineWidth=1;
+    for(let i=0;i<3;i++){const y=-16+i*8,w2=11+i*3.4+rozk*(i+1)*.3;
+      g.beginPath();g.ellipse(0,y+od*.4,w2,3.4,0,0,3.15);g.stroke();}
+    /* PLAMY — pojawiają się razem z progami HP */
+    if(brud>0){
+      g.fillStyle='rgba(140,90,40,.5)';
+      g.beginPath();g.ellipse(-7,-6,6,4.4,0,0,7);g.fill();
+      g.beginPath();g.ellipse(9,2,4,3,0,0,7);g.fill();
+    }
+    if(brud>1){
+      g.fillStyle='rgba(60,40,20,.55)';
+      g.beginPath();g.ellipse(4,-18,5,3.4,.4,0,7);g.fill();
+      g.fillStyle=cien;                              // urwany dół sukni
+      for(let i=0;i<6;i++)g.fillRect(-18+i*6.4,6,3.4,3.4);
+    }
+    if(brud>2){
+      g.fillStyle='rgba(30,16,10,.6)';
+      g.beginPath();g.ellipse(-3,-26,7,4,0,0,7);g.fill();
+      g.fillStyle='rgba(224,102,42,.35)';            // przypalenia
+      g.beginPath();g.ellipse(11,-4,4.4,3,0,0,7);g.fill();
+    }
+    /* GORS I RĘCE */
+    rr(g,-8,-44+od,16,13,3,suk);
+    R(g,-8,-44+od,16,1.6,'#ffffff');
+    const rekaG=kreci?-9:(chwieje?Math.sin(t*7)*3:Math.sin(t*3)*1.6);
+    R(g,-13,-43+od+rekaG,4.4,12,skora);
+    R(g,8.6,-43+od-rekaG,4.4,12,skora);
+    /* BUKIET — trzyma go do końca */
+    const bx=fl>0?11:-11,by=-30+od-(fl>0?rekaG:-rekaG);
+    R(g,bx-1,by,2,5,'#3d8a44');
+    for(const[dx,dy,c]of[[-3,-2,'#e88ac8'],[0,-4,'#f4f1ea'],[3,-2,'#e88ac8'],[0,0,'#f5c542']]){
+      g.fillStyle=c;g.beginPath();g.arc(bx+dx,by+dy,2.4,0,7);g.fill();
+    }
+    /* GŁOWA */
+    rr(g,-8,-60+od,16,17,5,skora);
+    const wlos=brud>1?'#8a6a3a':'#c8a858';
+    R(g,-8.6,-60+od,17.2,5,wlos);                    // upięte włosy
+    if(brud>1){                                      // rozczochrana
+      g.fillStyle=wlos;
+      for(let i=0;i<5;i++){
+        g.beginPath();g.moveTo(-7+i*3.4,-58+od);
+        g.lineTo(-9+i*3.6,-64+od-((i*7)%4));g.lineTo(-5+i*3.4,-58+od);g.closePath();g.fill();
+      }
+    }
+    /* DIADEM */
+    g.fillStyle='#f5c542';
+    R(g,-6,-62.4+od,12,1.8,'#f5c542');
+    for(let i=0;i<3;i++)R(g,-4.4+i*3.6,-65+od,1.6,3,'#f5c542');
+    R(g,-.8,-64.4+od,1.6,1.6,'#6fd8e8');
+    /* OCZY — im brudniej, tym bardziej wściekłe */
+    const zle=brud>=2;
+    R(g,-5.8,-53.4+od,4.4,3.4,'#f4f1ea');R(g,1.4,-53.4+od,4.4,3.4,'#f4f1ea');   // białka
+    R(g,fl>0?-3.2:-5,-52.6+od,2,2.4,'#2a2434');                                 // źrenice
+    R(g,fl>0?4:2.2,-52.6+od,2,2.4,'#2a2434');
+    if(zle){R(g,-5.8,-53.4+od,4.4,1.2,'#2a2434');R(g,1.4,-53.4+od,4.4,1.2,'#2a2434');}  // przymrużone
+    if(zle){R(g,-6,-55.4+od,4.4,1.8,'#3a2a1a');R(g,1.6,-55.4+od,4.4,1.8,'#3a2a1a');}
+    else{R(g,-5.8,-55+od,4,1.2,'#8a6a4a');R(g,1.8,-55+od,4,1.2,'#8a6a4a');}
+    R(g,-3,-47.4+od,6,brud>1?2.8:1.8,'#a83a5a');     // usta / krzyk
+    if(brud>0){                                      // rozmazany tusz
+      g.fillStyle='rgba(40,30,50,.45)';
+      R(g,-4.6,-50.6+od,2,3.4,'rgba(40,30,50,.45)');
+      R(g,2.6,-50.6+od,2,3+brud,'rgba(40,30,50,.45)');
+    }
+    if(chwieje){                                     // gwiazdki: TERAZ ją bij
+      for(let i=0;i<4;i++){
+        const a=t*5+i*1.6;
+        g.fillStyle='#f5c542';
+        R(g,Math.cos(a)*13-1.4,-68+Math.sin(a)*3.4,2.8,2.8,'#f5c542');
+      }
+    }
+    if(lezy&&!reduceMotion){                         // ogień na sukni
+      g.save();g.globalCompositeOperation='lighter';
+      for(let i=0;i<4;i++){
+        const u=Math.abs(Math.sin(t*7+i*1.4));
+        g.globalAlpha=.5*u;g.fillStyle=i%2?'#f5a032':'#6fd8e8';
+        g.beginPath();g.arc(-10+i*7,-10-u*8,3.4,0,7);g.fill();
+      }
+      g.restore();
+    }
+    g.restore();
+  },
+  /* =================================================================
      WAWELIN, PRADAWNY SMOK — boss ostatniego piętra SMOCZEJ JAMY
      -----------------------------------------------------------------
      Sylwetka jest budowana od bryły, nie od detalu: masywny korpus,
@@ -9889,6 +10738,135 @@ function drawFoeKomendant(f,sx,sy,b){
   if(Math.floor(anim*8)%2)for(let i=0;i<3;i++)R(cx,9+i*3,-3+i,1.6,1.6,'rgba(245,197,66,.8)');
   cx.restore();
 }
+/* =====================================================================
+   GOŚCIE WESELNI — obsada domeny WESELE W REMIZIE
+   ---------------------------------------------------------------------
+   To nie są potwory, tylko ludzie, którzy się DOBRZE BAWIĄ — i dlatego
+   są groźni. Każdy ma swój numer z polskiego wesela: wujek z krawatem
+   na czole, ciotka rzucająca ciastem, druhna, która wpada w wir tańca,
+   i dzieciak, który biega między stołami. Nad nimi ŚWIADEK — jedyny,
+   który rzuca butelką, a ta rozbija się i zostawia kałużę.
+   ===================================================================== */
+/* --- WUJEK HENIEK: krawat na czole, marynarka na jednym guziku --- */
+function drawFoeWujek(f,sx,sy,bob){
+  const gar='#2a3a68',kosz='#f2f0f8',skora='#e8a888';
+  const chwiej=Math.sin(anim*2.6+f.x*.1)*(reduceMotion?0:1.2);
+  cx.save();cx.translate(sx+8,sy+22);cx.rotate(chwiej*.035);cx.translate(-8,-22);
+  R(cx,sx+4.4,sy+18,3.4,6,'#1a1a24');R(cx,sx+9,sy+18,3.4,6,'#1a1a24');
+  R(cx,sx+4.2,sy+22.6,3.8,1.6,'#0e0e16');R(cx,sx+8.8,sy+22.6,3.8,1.6,'#0e0e16');
+  R(cx,sx+3.6,sy+9+bob,9,9.4,gar);                       // marynarka
+  R(cx,sx+7,sy+9+bob,2.4,9.4,kosz);                      // rozpięta koszula
+  R(cx,sx+3.6,sy+9+bob,1.6,9.4,'#1e2a4e');R(cx,sx+11.4,sy+9+bob,1.6,9.4,'#1e2a4e');
+  R(cx,sx+7.4,sy+13+bob,1.6,1.6,'#f5c542');              // guzik
+  rr(cx,sx+4.6,sy+1.6+bob,6.8,7,2.2,skora);              // twarz — czerwona
+  R(cx,sx+4.6,sy+1.4+bob,6.8,1.8,'#4a3a2a');             // resztka włosów
+  R(cx,sx+3.4,sy+2.4+bob,9.2,2.2,'#a03030');             // KRAWAT NA CZOLE
+  R(cx,sx+11.4,sy+3+bob,2.4,4.4,'#a03030');
+  R(cx,sx+5.4,sy+5+bob,1.4,1.2,'#2a2434');R(cx,sx+8.6,sy+5+bob,1.4,1.2,'#2a2434');
+  R(cx,sx+5,sy+6.4+bob,6,1.2,'#3a2a1a');                 // WĄS
+  R(cx,sx+6.4,sy+7.8+bob,3.2,1.4,'#8a2438');             // otwarte usta — śpiewa
+  const reka=Math.sin(anim*3.4+f.x)*(reduceMotion?0:2);
+  R(cx,sx+12.4,sy+9+bob+reka,2.4,4.4,skora);             // ręka z kieliszkiem
+  R(cx,sx+12,sy+6.4+bob+reka,3.2,2.8,'#e8f4fa');
+  R(cx,sx+12.2,sy+8+bob+reka,2.8,1.2,'#cfe4ee');
+  cx.restore();
+}
+/* --- CIOTKA Z TORTEM: trwała, kwiecista sukienka, talerzyk w dłoni --- */
+function drawFoeCiotka(f,sx,sy,bob){
+  const suk='#7a2a4a',wlos='#c8a858',skora='#e8c9a0';
+  R(cx,sx+5,sy+19,2.8,5,'#3a2a34');R(cx,sx+8.4,sy+19,2.8,5,'#3a2a34');
+  cx.fillStyle=suk;cx.beginPath();                        // sukienka
+  cx.moveTo(sx+5,sy+8.6+bob);cx.lineTo(sx+11.4,sy+8.6+bob);
+  cx.lineTo(sx+13.4,sy+19.4);cx.lineTo(sx+2.8,sy+19.4);cx.closePath();cx.fill();
+  cx.fillStyle='#9a3a5e';cx.beginPath();
+  cx.moveTo(sx+5,sy+8.6+bob);cx.lineTo(sx+8.2,sy+8.6+bob);
+  cx.lineTo(sx+8.2,sy+19.4);cx.lineTo(sx+2.8,sy+19.4);cx.closePath();cx.fill();
+  for(let i=0;i<4;i++)R(cx,sx+3.6+((i*5)%9),sy+11+i*2.2,1.8,1.6,'#f2c8e0');   // kwiatki
+  rr(cx,sx+4.8,sy+1.6+bob,6.6,7,2.2,skora);
+  rr(cx,sx+3.8,sy-.2+bob,8.6,4.4,2.4,wlos);               // TRWAŁA
+  R(cx,sx+3.2,sy+2+bob,1.8,4,wlos);R(cx,sx+11.2,sy+2+bob,1.8,4,wlos);
+  for(let i=0;i<4;i++)R(cx,sx+4+i*2.2,sy-.6+bob,1.6,1.6,'#d8b868');
+  R(cx,sx+5.6,sy+4.6+bob,1.4,1.2,'#2a2434');R(cx,sx+9,sy+4.6+bob,1.4,1.2,'#2a2434');
+  R(cx,sx+6.4,sy+6.6+bob,3.4,1.2,'#a83a5a');              // szminka
+  R(cx,sx+3.4,sy+5.4+bob,1.4,1.4,'#f5c542');R(cx,sx+11.4,sy+5.4+bob,1.4,1.4,'#f5c542'); // kolczyki
+  const reka=Math.sin(anim*4+f.x)*(reduceMotion?0:1.6);
+  R(cx,sx+12,sy+9.4+bob,2.2,4,skora);                     // talerzyk z ciastem
+  cx.fillStyle='#ffffff';cx.beginPath();cx.ellipse(sx+13.6,sy+8+bob+reka,3.4,1.8,0,0,7);cx.fill();
+  R(cx,sx+12.2,sy+6+bob+reka,2.8,2.2,'#e8c9a0');
+  R(cx,sx+12.2,sy+6+bob+reka,2.8,.9,'#f2f0f8');
+}
+/* --- DRUHNA: różowa sukienka, wianek, kręci się w kółko --- */
+function drawFoeDruhna(f,sx,sy,bob){
+  const suk='#e88ac8',skora='#f0d8b0',wlos='#8a5a2e';
+  const wir=Math.sin(anim*7+f.x*.2)*(reduceMotion?0:2.4);
+  cx.save();cx.translate(sx+8,sy+20);cx.rotate(wir*.05);cx.translate(-8,-20);
+  R(cx,sx+5.4,sy+19,2.6,5,'#e0d0d8');R(cx,sx+8.2,sy+19,2.6,5,'#e0d0d8');
+  cx.fillStyle=suk;cx.beginPath();                         // sukienka rozkloszowana
+  cx.moveTo(sx+5.4,sy+8+bob);cx.lineTo(sx+10.8,sy+8+bob);
+  cx.lineTo(sx+14+wir*.4,sy+19.6);cx.lineTo(sx+2.2+wir*.4,sy+19.6);cx.closePath();cx.fill();
+  cx.fillStyle='#f2a8d8';cx.beginPath();
+  cx.moveTo(sx+5.4,sy+8+bob);cx.lineTo(sx+8.2,sy+8+bob);
+  cx.lineTo(sx+8.2,sy+19.6);cx.lineTo(sx+2.2+wir*.4,sy+19.6);cx.closePath();cx.fill();
+  R(cx,sx+4.6,sy+13.6,7,1.4,'#f8d8ea');                    // falbanka
+  rr(cx,sx+4.8,sy+1.8+bob,6.4,6.8,2.2,skora);
+  rr(cx,sx+4,sy+.6+bob,8,3.4,1.8,wlos);
+  R(cx,sx+3.6,sy+2.6+bob,1.6,5.4,wlos);R(cx,sx+11.2,sy+2.6+bob,1.6,5.4,wlos);
+  for(let i=0;i<4;i++)R(cx,sx+4.2+i*2,sy-.4+bob,1.6,1.6,['#f2f0f8','#f5c542','#f2f0f8','#e88ac8'][i]); // WIANEK
+  R(cx,sx+5.6,sy+4.6+bob,1.2,1.2,'#2a2434');R(cx,sx+9,sy+4.6+bob,1.2,1.2,'#2a2434');
+  R(cx,sx+6.6,sy+6.4+bob,2.8,1,'#c85a8a');
+  R(cx,sx+2.6,sy+8.6+bob,2,3.6,skora);R(cx,sx+11.4,sy+8.6+bob,2,3.6,skora);
+  cx.restore();
+}
+/* --- DZIECIAK: mucha, balonik, zero wyczucia zagrożenia --- */
+function drawFoeDzieciak(f,sx,sy,bob){
+  const kosz='#f2f0f8',skora='#f0d8b0';
+  const bieg=Math.sin(anim*11+f.x*.3)*(reduceMotion?0:1.6);
+  R(cx,sx+5.6,sy+19,2.4,5,'#2a2a34');R(cx,sx+8.4,sy+19,2.4,5,'#2a2a34');
+  R(cx,sx+5.2,sy+12+bob,5.8,7.4,'#3a3a5a');                // spodnie na szelkach
+  R(cx,sx+5.2,sy+8+bob,5.8,4.4,kosz);
+  R(cx,sx+6,sy+8+bob,1,4.4,'#3a3a5a');R(cx,sx+10,sy+8+bob,1,4.4,'#3a3a5a');
+  R(cx,sx+6.6,sy+8.4+bob,3,1.4,'#a03030');                 // MUCHA
+  rr(cx,sx+5,sy+2.4+bob,6,6.2,2,skora);
+  R(cx,sx+5,sy+2+bob,6,2,'#6a4a2a');
+  R(cx,sx+6,sy+5+bob,1.2,1.2,'#2a2434');R(cx,sx+8.8,sy+5+bob,1.2,1.2,'#2a2434');
+  R(cx,sx+6.8,sy+6.8+bob,2.4,1.2,'#8a2438');
+  const bx=sx+13+bieg*.6,by=sy+1+bob-Math.abs(bieg)*.8;    // BALONIK na sznurku
+  cx.strokeStyle='#c9c4dd';cx.lineWidth=.7;
+  cx.beginPath();cx.moveTo(sx+11.4,sy+10+bob);cx.lineTo(bx+1.6,by+4);cx.stroke();
+  cx.fillStyle='#e04848';cx.beginPath();cx.ellipse(bx+1.6,by+1.6,3.2,3.8,0,0,7);cx.fill();
+  cx.fillStyle='#f28a8a';cx.beginPath();cx.ellipse(bx+.6,by+.4,1.2,1.4,0,0,7);cx.fill();
+  R(cx,sx+11,sy+9.6+bob,2,3,skora);
+}
+/* --- ŚWIADEK Z BUTELKĄ: szarfa, kwiat w klapie i pełna flaszka --- */
+function drawFoeSwiadek(f,sx,sy,bob){
+  const gar='#23233a',kosz='#f2f0f8',skora='#e8c9a0';
+  cx.fillStyle='rgba(0,0,0,.3)';cx.beginPath();cx.ellipse(sx+8,sy+24,7,2.4,0,0,7);cx.fill();
+  R(cx,sx+4,sy+19,3.6,5.4,'#12121a');R(cx,sx+8.6,sy+19,3.6,5.4,'#12121a');
+  R(cx,sx+3.2,sy+8.4+bob,9.8,11,gar);                      // garnitur
+  R(cx,sx+7.2,sy+8.4+bob,2.4,11,kosz);
+  R(cx,sx+7.6,sy+9+bob,1.6,3.6,'#a03030');                 // krawat
+  cx.fillStyle='#f5c542';cx.beginPath();                    // SZARFA ŚWIADKA
+  cx.moveTo(sx+3.2,sy+9.6+bob);cx.lineTo(sx+6,sy+8.4+bob);
+  cx.lineTo(sx+13,sy+16.4+bob);cx.lineTo(sx+10.6,sy+18+bob);cx.closePath();cx.fill();
+  cx.fillStyle='#c89a1e';cx.beginPath();
+  cx.moveTo(sx+3.2,sy+9.6+bob);cx.lineTo(sx+4.4,sy+9+bob);
+  cx.lineTo(sx+11.4,sy+17.2+bob);cx.lineTo(sx+10.6,sy+18+bob);cx.closePath();cx.fill();
+  R(cx,sx+4.4,sy+10.4+bob,2.2,2.2,'#e88ac8');              // kwiat w klapie
+  R(cx,sx+5,sy+11+bob,1,1,'#f5c542');
+  rr(cx,sx+4.6,sy+1.4+bob,7,7.4,2.2,skora);
+  R(cx,sx+4.4,sy+1+bob,7.4,2.4,'#2a1a14');                 // przylizane włosy
+  R(cx,sx+4.4,sy+1+bob,7.4,.9,'#4a3a2a');
+  R(cx,sx+5.6,sy+4.6+bob,1.4,1.2,'#2a2434');R(cx,sx+9,sy+4.6+bob,1.4,1.2,'#2a2434');
+  R(cx,sx+6.4,sy+7+bob,3.4,1.2,'#8a2438');
+  /* BUTELKA — unosi ją tuż przed rzutem (chargeT ustawia wspólna pętla) */
+  const gora=(f.chargeT>0)?-4.4:0;
+  const bx=sx+12.6,by=sy+8+bob+gora;
+  R(cx,sx+11.6,sy+9.4+bob+gora*.6,2.4,4,skora);
+  R(cx,bx,by,3.6,7.4,'#cfe4ee');R(cx,bx+.6,by+1.6,2.4,5.4,'#eef6fa');
+  R(cx,bx+1,by-2.2,1.6,2.6,'#cfe4ee');
+  R(cx,bx+.4,by+2.4,2.8,2.6,'#e04848');                    // czerwona etykieta
+  if(f.chargeT>0){cx.fillStyle='#f5c542';cx.beginPath();cx.arc(bx+1.8,by-2.6,2.2,0,7);cx.fill();}
+}
 /* --- ELITY DOMEN: więksi, groźniejsi, z własnym look'iem --- */
 function drawFoeRycerz(f,sx,sy,b){ // KLAWIATUROWY RYCERZ — hejter w zbroi z klawiatur
   const cxr=sx+8;
@@ -10111,7 +11089,9 @@ const FOE_DRAW={pszczola:drawFoePszczola,pies:drawFoeDog,oburzona:drawFoeLady,zl
   soltys:drawMbSoltys,paparazzo:drawMbPaparazzo,betoniarz:drawMbBetoniarz,dj:drawMbDj,
   komornik:drawMbKomornik,smog:drawMbSmog,rolexiarz:drawMbRolexiarz,
   policjant:drawFoePolicjant,prewencja:drawFoePrewencja,drogowka:drawFoeDrogowka,
-  policjantka:drawFoePolicjantka,komendant:drawFoeKomendant};
+  policjantka:drawFoePolicjantka,komendant:drawFoeKomendant,
+  wujek:drawFoeWujek,ciotka:drawFoeCiotka,druhna:drawFoeDruhna,
+  dzieciak:drawFoeDzieciak,swiadek:drawFoeSwiadek};
 function drawNPC(c,n,sx,sy){
   if(n.robo){ // Dych jako NPC (zanim dołączy do ekipy)
     drawDychBody(c,sx,sy,0,Math.floor(anim*2)%2);
@@ -10616,7 +11596,11 @@ const MAPCOL={0:'#2f6b3a',1:'#b39a68',2:'#454552',3:'#2f6db0',4:'#173a20',5:'#9a
      a skarb i szczelina świecą, bo po nich orientujesz się w komnacie */
   74:'#5a5468',75:'#7a7488',76:'#4a7a46',77:'#2c5030',78:'#a8a2bc',79:'#8a6a40',
   80:'#6a6276',81:'#cfc8b4',82:'#f5c542',83:'#e04848',84:'#8a5fd0',85:'#1a1424',86:'#3a3048',
-  87:'#dfe6f2'};
+  87:'#dfe6f2',
+  /* WESELE — na minimapie parkiet jest ciepły, stoły białe, a beczki, wóz
+     i wieża rzucają się w oczy, bo po nich orientujesz się w sali */
+  88:'#a07240',89:'#8e8a86',90:'#c4bdad',91:'#f4f1ea',92:'#e6e1d6',93:'#7a5a36',94:'#e88ac8',
+  95:'#2a2a34',96:'#f5c542',97:'#ffffff',98:'#b02020',99:'#a01c1c',100:'#b8b4ae'};
 const mapColor=v=>MAPCOL[v]||(v>=10&&v<=15?'#6a6a80':'#2f6b3a');
 function drawMapOverlay(){
   cx.fillStyle='rgba(9,7,18,.93)';cx.fillRect(0,0,W,H);
@@ -10671,7 +11655,10 @@ const TCOL={0:'#2e5a34',1:'#a08a5a',2:'#3a3a48',7:'#2e5a34',8:'#d8c084',9:'#8a6a
   /* góry i smocza jama */
   74:'#544f61',75:'#6b6576',76:'#4a6a44',77:'#6b6576',78:'#6b6576',79:'#0b0d12',
   80:'#332a40',81:'#332a40',82:'#332a40',83:'#332a40',84:'#332a40',85:'#231b2e',86:'#332a40',
-  87:'#6b6576'};
+  87:'#6b6576',
+  /* wesele w remizie */
+  88:'#8a5f34',89:'#8e8a86',90:'#d8d2c4',91:'#8e8a86',92:'#8e8a86',93:'#8e8a86',94:'#8e8a86',
+  95:'#8e8a86',96:'#8e8a86',97:'#8e8a86',98:'#8e8a86',99:'#8e8a86',100:'#8e8a86'};
 /* podłoże pod asset (trawa/piasek/śnieg wg regionu) — spójne tło dekoracji */
 function baseTile(){return REG==='morze'?8:REG==='tatry'?17:0;}
 /* PODKŁAD POD ASSETEM ŚWIATA. Poza domeną to trawa/piach/śnieg regionu, ale
@@ -11704,6 +12691,284 @@ const TILES={
       if((tx*3+ty*7)%3===0){R(g,sx+3,sy+12,2,1.2,'#443a52');R(g,sx+10,sy+6,1.6,1,'#4e4460');}
       if((tx*11+ty*5)%9===0)R(g,sx+7,sy+13,2.4,1.6,'#5a3f6e');      // odprysk łuski
   }},
+  /* ------------------------------------------------------------------
+     WESELE W REMIZIE (88-100) — remiza przebrana na wesele. Cała rzecz
+     polega na tym, że to NIE jest sala weselna: to garaż OSP z lamperią
+     i lastryko, w którym postawiono stoły, powieszono girlandy i wstawiono
+     wieżę. Kafle mają nieść jedno i drugie naraz.
+     ------------------------------------------------------------------ */
+  88:{paint(g,sx,sy,tx,ty){// PARKIET — klepka w jodełkę, wyślizgana do połysku
+      R(g,sx,sy,16,16,'#8a5f34');
+      const kier=((tx+ty)&1)===0;                                 // jodełka: co drugi kafel obrót
+      /* Odcienie klepek trzymamy BLISKO siebie. Przy szerokim rozstrzale
+         parkiet zaczynał krzyczeć przez cały ekran i zjadał sylwetki. */
+      const desk=['#8f6538','#8a5f34','#936a3b','#865c33'];
+      for(let i=0;i<4;i++){
+        const c=desk[(tx*3+ty*5+i)%4];
+        if(kier)R(g,sx,sy+i*4,16,3.6,c); else R(g,sx+i*4,sy,3.6,16,c);
+      }
+      g.strokeStyle='rgba(60,38,18,.26)';g.lineWidth=.7;
+      for(let i=0;i<4;i++){
+        g.beginPath();
+        if(kier){g.moveTo(sx,sy+i*4+3.8);g.lineTo(sx+16,sy+i*4+3.8);}
+        else{g.moveTo(sx+i*4+3.8,sy);g.lineTo(sx+i*4+3.8,sy+16);}
+        g.stroke();
+      }
+      if((tx*7+ty*11)%5===0)R(g,sx+3,sy+6,6,1,'rgba(255,240,210,.07)');   // odblask
+      if((tx*13+ty*3)%9===0)R(g,sx+9,sy+11,4,1.4,'rgba(0,0,0,.09)');      // rysa po obcasie
+  }},
+  89:{paint(g,sx,sy,tx,ty){// POSADZKA REMIZY — lastryko: szare, w cętki, z dylatacją
+      R(g,sx,sy,16,16,'#8e8a86');
+      R(g,sx,sy,16,16,['rgba(255,255,255,.02)','rgba(0,0,0,.035)','rgba(0,0,0,.015)',
+                       'rgba(240,236,228,.025)','rgba(0,0,0,.025)'][(tx*5+ty*11+((tx*ty)%7))%5]);
+      const cet=(a,b,w,h,c)=>R(g,sx+a,sy+b,w,h,c);
+      if((tx*5+ty*3)%2===0){cet(2,3,1.8,1.4,'#6e6a68');cet(11,9,1.4,1.4,'#a8a49e');}
+      if((tx*3+ty*7)%3===0){cet(7,5,1.4,1.2,'#5e5a58');cet(4,12,2,1.4,'#a8a49e');}
+      if((tx*11+ty*5)%4===0){cet(12,3,1.6,1.6,'#6e6a68');cet(6,10,1.2,1.2,'#b4b0aa');}
+      if(tx%6===0)R(g,sx,sy,.9,16,'#6e6a68');                     // dylatacja co 6 kafli
+      if(ty%6===0)R(g,sx,sy,16,.9,'#6e6a68');
+  }},
+  90:{paint(g,sx,sy,tx,ty){// ŚCIANA REMIZY — lamperia: olejna na dole, wapno na górze
+      const sc=(dx,dy)=>{const v=at(tx+dx,ty+dy);return v===90||SOLID(v);};
+      R(g,sx,sy,16,16,'#d8d2c4');                                 // wapno
+      R(g,sx,sy,16,16,['rgba(255,255,255,.03)','rgba(0,0,0,.03)',
+                       'rgba(0,0,0,.015)','rgba(200,190,170,.05)'][(tx*7+ty*13)%4]);
+      if(!sc(0,1)){                                               // dolna krawędź = lamperia
+        R(g,sx,sy+7,16,9,'#4e6a4a');                              // olejna, wojskowa zieleń
+        R(g,sx,sy+7,16,1,'#6f8a68');
+        R(g,sx,sy+6,16,1.2,'#a03030');                            // czerwony pasek OSP
+        if((tx*3+ty)%4===0)R(g,sx+3,sy+10,4,1,'rgba(0,0,0,.2)');  // odprysk
+      }
+      if(!sc(0,-1)){R(g,sx,sy,16,1.4,'#f0ece0');R(g,sx,sy+1.4,16,.8,'#bdb6a6');}
+      if(!sc(-1,0))R(g,sx,sy,1.2,16,'#bdb6a6');
+      if(!sc(1,0))R(g,sx+14.8,sy,1.2,16,'#bdb6a6');
+      if((tx*5+ty*7)%11===0)R(g,sx+4,sy+3,5,1,'#c2bbaa');         // pęknięcie tynku
+  }},
+  91:{paint(g,sx,sy,tx,ty){// STÓŁ WESELNY — biały obrus, a na nim CAŁE wesele
+      podklad(g,sx,sy,tx,ty);
+      const s=(dx,dy)=>at(tx+dx,ty+dy)===91;
+      g.fillStyle='rgba(0,0,0,.26)';R(g,sx,sy+13,16,3,'rgba(0,0,0,.26)');
+      R(g,sx,sy+1,16,13,'#f4f1ea');                               // obrus
+      R(g,sx,sy+1,16,1.4,'#ffffff');
+      if(!s(0,1)){                                                // falbana zwisająca z brzegu
+        R(g,sx,sy+11,16,3.4,'#e6e1d6');
+        for(let i=0;i<4;i++)R(g,sx+i*4+1,sy+12.6,2.4,1.8,'#d8d2c4');
+      }
+      if(!s(0,-1))R(g,sx,sy+.6,16,1,'#c9c2b2');
+      const w=(tx*7+ty*11)%5;
+      if(w===0){                                                  // talerz i sztućce
+        g.fillStyle='#ffffff';g.beginPath();g.ellipse(sx+8,sy+7,4.6,3.4,0,0,7);g.fill();
+        g.fillStyle='#d8d2c4';g.beginPath();g.ellipse(sx+8,sy+7,2.8,2,0,0,7);g.fill();
+        R(g,sx+2,sy+5.6,1,3.4,'#b8b4ae');R(g,sx+13,sy+5.6,1,3.4,'#b8b4ae');
+      }else if(w===1){                                            // BUTELKA WÓDKI i kieliszki
+        R(g,sx+6.4,sy+2.4,3.2,7.6,'#cfe4ee');R(g,sx+6.4,sy+4.6,3.2,5.4,'#eef6fa');
+        R(g,sx+7.2,sy+.8,1.6,2,'#cfe4ee');R(g,sx+6.6,sy+5,2.8,2.4,'#e04848');   // czerwona etykieta
+        R(g,sx+2,sy+7,2,3,'#e8f4fa');R(g,sx+12,sy+7,2,3,'#e8f4fa');
+        R(g,sx+2,sy+8.6,2,1.4,'#cfe4ee');R(g,sx+12,sy+8.6,2,1.4,'#cfe4ee');
+      }else if(w===2){                                            // półmisek i schabowy
+        g.fillStyle='#ffffff';g.beginPath();g.ellipse(sx+8,sy+7.5,6,4,0,0,7);g.fill();
+        g.fillStyle='#c8843c';g.beginPath();g.ellipse(sx+6.6,sy+7,3,2,0,0,7);g.fill();
+        g.fillStyle='#e0a860';g.beginPath();g.ellipse(sx+6.2,sy+6.4,1.6,1,0,0,7);g.fill();
+        R(g,sx+10,sy+6.4,3,2.4,'#e8e0c0');                        // ziemniaki
+        R(g,sx+9.6,sy+9,3.4,1.4,'#7bc950');                       // ogórek
+      }else if(w===3){                                            // kwiaty w wazonie
+        R(g,sx+7,sy+5.6,2.4,5,'#cfe4ee');
+        for(const[dx,dy,c]of[[-2.6,-1,'#e88ac8'],[0,-2.6,'#f2f0f8'],[2.6,-1.4,'#e88ac8'],[1,-4,'#f5c542']]){
+          g.fillStyle=c;g.beginPath();g.arc(sx+8.2+dx,sy+4+dy,1.8,0,7);g.fill();
+        }
+        R(g,sx+7.8,sy+2,.9,4,'#4e7a3e');
+      }else if((tx+ty)%2===0){                                    // koperta i talerzyk z ciastem
+        R(g,sx+3,sy+6,6,4,'#f8f4ea');R(g,sx+3,sy+6,6,.9,'#e0d8c8');
+        g.strokeStyle='#d0c8b4';g.lineWidth=.7;
+        g.beginPath();g.moveTo(sx+3,sy+6);g.lineTo(sx+6,sy+8.4);g.lineTo(sx+9,sy+6);g.stroke();
+        R(g,sx+10.4,sy+7,4,3,'#e8c9a0');R(g,sx+10.4,sy+7,4,1,'#c8a070');
+      }
+  }},
+  92:{paint(g,sx,sy,tx,ty){// KRZESŁO — pod białym pokrowcem, z kokardą (bo ciotka tak chciała)
+      podklad(g,sx,sy,tx,ty);
+      g.fillStyle='rgba(0,0,0,.24)';g.beginPath();g.ellipse(sx+8,sy+14.4,5.4,2,0,0,7);g.fill();
+      R(g,sx+3.6,sy+1,8.8,12,'#f4f1ea');                          // pokrowiec
+      R(g,sx+3.6,sy+1,8.8,1.2,'#ffffff');
+      R(g,sx+3.6,sy+11.4,8.8,1.6,'#e2ddd2');
+      R(g,sx+4.4,sy+2.6,7.2,4.4,'#eae5da');                       // oparcie w cieniu
+      const kol=['#e88ac8','#b98cf0','#f5c542','#6fd8e8'][(tx*5+ty*3)%4];
+      R(g,sx+3.2,sy+8,9.6,1.8,kol);                               // wstążka
+      g.fillStyle=kol;                                            // kokarda
+      g.beginPath();g.moveTo(sx+8,sy+8.9);g.lineTo(sx+5,sy+7);g.lineTo(sx+5,sy+10.8);g.closePath();g.fill();
+      g.beginPath();g.moveTo(sx+8,sy+8.9);g.lineTo(sx+11,sy+7);g.lineTo(sx+11,sy+10.8);g.closePath();g.fill();
+      R(g,sx+7.2,sy+8,1.6,2,'#ffffff');
+      R(g,sx+4.2,sy+13,1.4,2,'#b8b4ae');R(g,sx+10.4,sy+13,1.4,2,'#b8b4ae');   // nogi
+  }},
+  93:{anim:true,paint(g,sx,sy,tx,ty){// BECZKA Z ALKOHOLEM — kipi; na arenie bossa DA SIĘ ją przewrócić
+      podklad(g,sx,sy,tx,ty);
+      const lezy=beczkaLezy(tx,ty);
+      g.fillStyle='rgba(0,0,0,.3)';g.beginPath();g.ellipse(sx+8,sy+14.4,7,2.4,0,0,7);g.fill();
+      if(lezy){                                                   // PRZEWRÓCONA: leży bokiem, pusta
+        rr(g,sx+.5,sy+6,15,8,3,'#6e5030');
+        R(g,sx+.5,sy+6,15,1.4,'#8a6a44');
+        R(g,sx+3,sy+6,1.6,8,'#4a3220');R(g,sx+11,sy+6,1.6,8,'#4a3220');
+        g.fillStyle='#241c14';g.beginPath();g.ellipse(sx+1.6,sy+10,1.8,3.6,0,0,7);g.fill();
+        R(g,sx+5,sy+3.6,7,2,'rgba(0,0,0,.18)');
+        return;
+      }
+      rr(g,sx+1.6,sy+2,12.8,12.4,2.4,'#7a5a36');                  // klepki
+      R(g,sx+1.6,sy+2,12.8,1.4,'#96724a');
+      for(let i=0;i<4;i++)R(g,sx+2.6+i*3,sy+2,.9,12.4,'#5f4528');
+      R(g,sx+1.2,sy+4.4,13.6,1.8,'#4a4356');                      // obręcze
+      R(g,sx+1.2,sy+10.4,13.6,1.8,'#4a4356');
+      R(g,sx+1.2,sy+4.4,13.6,.6,'#8e88a4');R(g,sx+1.2,sy+10.4,13.6,.6,'#8e88a4');
+      const b=Math.abs(Math.sin(anim*2.2+tx*1.3));                 // KIPI
+      g.fillStyle='#d8e8f0';g.beginPath();g.ellipse(sx+8,sy+2.6,5.6,2.2,0,0,7);g.fill();
+      g.fillStyle='#eef6fa';g.beginPath();g.ellipse(sx+8,sy+2.2,5.6-b*.8,1.8,0,0,7);g.fill();
+      for(let i=0;i<3;i++){
+        const f=(anim*.9+i*.37+tx*.11)%1;
+        g.fillStyle='rgba(232,244,250,'+(.8*(1-f))+')';
+        g.fillRect(sx+4+i*3+Math.sin(f*7+i)*1.6,sy+1.6-f*7,1.2,1.2);
+      }
+      R(g,sx+4,sy+7,3,1,'#96724a');                               // napis kredą
+      R(g,sx+9,sy+7,2.4,1,'#96724a');
+  }},
+  94:{anim:true,paint(g,sx,sy,tx,ty){// GOŚĆ WESELNY — stoi, kiwa się i kibicuje (żywa ściana areny)
+      podklad(g,sx,sy,tx,ty);
+      const w=(tx*7+ty*11)%4,faza=anim*3.4+tx*.9+ty*.6;
+      const kiw=Math.sin(faza),reka=Math.sin(faza*2)>.3;           // co jakiś czas ręce w górę
+      g.fillStyle='rgba(0,0,0,.26)';g.beginPath();g.ellipse(sx+8,sy+14.6,4.6,1.8,0,0,7);g.fill();
+      g.save();g.translate(sx+8,sy+14);g.rotate(kiw*.09);g.translate(-8,-14);
+      const ubior=['#2a3a68','#7a2a4a','#3a5a3a','#5a3a7a'][w];    // garnitur / sukienka
+      const skora=['#e8c9a0','#d8b890','#e8c9a0','#f0d8b0'][w];
+      const wlos=['#3a2a1a','#c8a858','#5a3a20','#2a1a14'][w];
+      R(g,sx+5.6,sy+11.6,1.8,2.4,'#1a1a24');R(g,sx+8.6,sy+11.6,1.8,2.4,'#1a1a24');
+      if(w===1||w===3){                                           // sukienka
+        g.fillStyle=ubior;g.beginPath();
+        g.moveTo(sx+4.4,sy+12);g.lineTo(sx+11.6,sy+12);g.lineTo(sx+10.4,sy+5.4);g.lineTo(sx+5.6,sy+5.4);g.closePath();g.fill();
+      }else{
+        R(g,sx+5.2,sy+5.4,5.6,6.8,ubior);                         // marynarka
+        R(g,sx+7.4,sy+5.4,1.2,6.8,'#f2f0f8');                     // koszula
+        R(g,sx+7.2,sy+6,1.6,2.4,['#a03030','#2a4a8a','#3a7a4a','#c8a858'][w]); // krawat
+      }
+      rr(g,sx+6,sy+1.4,4,4.4,1.6,skora);                          // głowa
+      R(g,sx+6,sy+1.2,4,1.8,wlos);
+      R(g,sx+6.8,sy+3.4,.9,.9,'#2a2434');R(g,sx+8.4,sy+3.4,.9,.9,'#2a2434');
+      R(g,sx+7,sy+4.6,2,.7,'#a86a5a');                            // uśmiech
+      const ry=reka?sy+2.4:sy+7;                                  // RĘCE: w górę albo z kieliszkiem
+      R(g,sx+3.8,ry,1.6,4.4,skora);R(g,sx+10.6,ry,1.6,4.4,skora);
+      if(!reka){R(g,sx+3.2,sy+6.4,2.6,2,'#e8f4fa');R(g,sx+3.6,sy+8,1.8,1,'#cfe4ee');}
+      g.restore();
+  }},
+  95:{anim:true,paint(g,sx,sy,tx,ty){// GŁOŚNIK — wieża zespołu, dudni basem
+      podklad(g,sx,sy,tx,ty);
+      const b=Math.abs(Math.sin(anim*5.2+tx));
+      g.fillStyle='rgba(0,0,0,.3)';g.beginPath();g.ellipse(sx+8,sy+14.6,6.6,2.2,0,0,7);g.fill();
+      R(g,sx+1.4,sy+.6,13.2,14,'#1a1a24');
+      R(g,sx+1.4,sy+.6,13.2,1.2,'#3a3a48');R(g,sx+1.4,sy+13.4,13.2,1.2,'#0e0e16');
+      g.fillStyle='#2a2a34';g.beginPath();g.arc(sx+8,sy+9.4,4.4+b*.5,0,7);g.fill();   // WOOFER
+      g.fillStyle='#12121a';g.beginPath();g.arc(sx+8,sy+9.4,3.2+b*.4,0,7);g.fill();
+      g.fillStyle='#3a3a48';g.beginPath();g.arc(sx+8,sy+9.4,1.4,0,7);g.fill();
+      R(g,sx+3.4,sy+2.4,9.2,4,'#2a2a34');                         // tweeter za kratką
+      for(let i=0;i<5;i++)R(g,sx+3.4+i*2,sy+2.4,.9,4,'#12121a');
+      if(b>.6){g.fillStyle='#7bc950';R(g,sx+12,sy+2.6,1.4,1.4,'#7bc950');}  // dioda
+      g.save();g.globalCompositeOperation='lighter';               // fala basu
+      g.globalAlpha=.10+b*.10;g.fillStyle='#b98cf0';
+      g.beginPath();g.arc(sx+8,sy+9.4,10+b*5,0,7);g.fill();g.restore();
+  }},
+  96:{anim:true,paint(g,sx,sy,tx,ty){// GIRLANDA — lampki i wstążki pod stropem (deptalna)
+      podklad(g,sx,sy,tx,ty);
+      g.strokeStyle='#3a3a48';g.lineWidth=1;                      // kabel w łuku
+      g.beginPath();g.moveTo(sx,sy+1);g.quadraticCurveTo(sx+8,sy+5.4,sx+16,sy+1);g.stroke();
+      for(let i=0;i<4;i++){
+        const u=(i+.5)/4,lx=sx+u*16,ly=sy+1+Math.sin(u*3.14)*4.4;
+        const kol=['#e04848','#f5c542','#7bc950','#6fd8e8','#e88ac8'][(tx*3+ty*5+i)%5];
+        const mig=.55+.45*Math.abs(Math.sin(anim*3+i*1.7+tx));
+        g.save();g.globalCompositeOperation='lighter';
+        g.globalAlpha=.22*mig;g.fillStyle=kol;
+        g.beginPath();g.arc(lx,ly+2,5.5,0,7);g.fill();g.restore();
+        g.fillStyle=kol;g.beginPath();g.ellipse(lx,ly+2,1.6,2,0,0,7);g.fill();
+        g.fillStyle='rgba(255,255,255,.7)';g.fillRect(lx-.5,ly+1.2,1,1);
+      }
+      if((tx+ty)%2===0){                                          // biała wstążka zwisająca
+        g.fillStyle='rgba(244,241,234,.75)';
+        g.beginPath();g.moveTo(sx+11,sy+3);g.lineTo(sx+12.6,sy+3);
+        g.lineTo(sx+12,sy+9+Math.sin(anim*2+tx)*1.4);g.closePath();g.fill();
+      }
+  }},
+  97:{paint(g,sx,sy,tx,ty){// TORT WESELNY — trzy piętra i para na czubku
+      podklad(g,sx,sy,tx,ty);
+      g.fillStyle='rgba(0,0,0,.26)';g.beginPath();g.ellipse(sx+8,sy+14.6,6.4,2.2,0,0,7);g.fill();
+      R(g,sx+1.6,sy+10.4,12.8,4,'#f8f4ea');R(g,sx+1.6,sy+10.4,12.8,1,'#ffffff');
+      R(g,sx+3.4,sy+6.4,9.2,4,'#f8f4ea');R(g,sx+3.4,sy+6.4,9.2,1,'#ffffff');
+      R(g,sx+5.2,sy+2.8,5.6,3.6,'#f8f4ea');R(g,sx+5.2,sy+2.8,5.6,1,'#ffffff');
+      for(const[y,n]of[[13.4,6],[9.4,4],[5.8,3]])                 // lukier kapiący z pięter
+        for(let i=0;i<n;i++)R(g,sx+2.6+i*(12/n),sy+y,1.8,1.4,'#ede7d8');
+      R(g,sx+2.6,sy+12,2,1.4,'#e88ac8');R(g,sx+11,sy+12,2,1.4,'#e88ac8');   // różyczki
+      R(g,sx+6.4,sy+8,1.8,1.4,'#e88ac8');R(g,sx+9.4,sy+8,1.8,1.4,'#f5c542');
+      R(g,sx+6.6,sy+.4,1.6,2.6,'#1a1a24');                        // figurki: pan i pani
+      R(g,sx+8.4,sy+.4,1.8,2.6,'#f4f1ea');
+      R(g,sx+6.8,sy-.4,1.2,1.2,'#e8c9a0');R(g,sx+8.6,sy-.4,1.2,1.2,'#e8c9a0');
+  }},
+  98:{paint(g,sx,sy,tx,ty){// WÓZ STRAŻACKI — trzy kafle w rzędzie: kabina, cysterna, tył
+      podklad(g,sx,sy,tx,ty);
+      const lewy=at(tx-1,ty)!==98,prawy=at(tx+1,ty)!==98;
+      const czesc=lewy?0:prawy?2:1;
+      g.fillStyle='rgba(0,0,0,.3)';R(g,sx,sy+13.4,16,2.6,'rgba(0,0,0,.3)');
+      R(g,sx,sy+3.4,16,9.6,'#b02020');                            // pudło
+      R(g,sx,sy+3.4,16,1.2,'#d84040');R(g,sx,sy+11.6,16,1.4,'#801414');
+      R(g,sx,sy+9,16,1.6,'#f4f1ea');                              // biały pas odblaskowy
+      if(czesc===0){                                              // KABINA
+        R(g,sx+2,sy+4.4,11,4,'#2a3a5a');R(g,sx+2.6,sy+4.8,4.6,3.2,'#7ba8d0');
+        R(g,sx+8,sy+4.8,4.4,3.2,'#7ba8d0');
+        R(g,sx+1,sy+1.4,7,2,'#2a4a8a');                           // belka świetlna
+        if(!reduceMotion&&Math.floor(anim*3)%2)R(g,sx+1,sy+1.4,3.4,2,'#4a8ae8');
+        else R(g,sx+4.6,sy+1.4,3.4,2,'#e04848');
+      }else if(czesc===1){                                        // CYSTERNA i drzwiczki
+        R(g,sx+1,sy+4.6,6.4,6.4,'#8a1818');R(g,sx+8.6,sy+4.6,6.4,6.4,'#8a1818');
+        R(g,sx+1,sy+4.6,6.4,1,'#c83030');R(g,sx+8.6,sy+4.6,6.4,1,'#c83030');
+        R(g,sx+3.4,sy+6.4,1.4,3,'#5a0e0e');R(g,sx+11,sy+6.4,1.4,3,'#5a0e0e');
+      }else{                                                      // TYŁ: zwijadło i węże
+        g.fillStyle='#e8e4d8';g.beginPath();g.arc(sx+7,sy+8,4.4,0,7);g.fill();
+        g.fillStyle='#b02020';g.beginPath();g.arc(sx+7,sy+8,2.6,0,7);g.fill();
+        R(g,sx+12,sy+5,3,6,'#f5c542');
+        R(g,sx+1,sy+5.4,2.6,5,'#2a2a34');
+      }
+      R(g,sx+2,sy+12.6,4.4,3.4,'#1a1a24');                        // koła
+      R(g,sx+10,sy+12.6,4.4,3.4,'#1a1a24');
+      R(g,sx+3.2,sy+13.4,2,2,'#5c5c6e');R(g,sx+11.2,sy+13.4,2,2,'#5c5c6e');
+  }},
+  99:{paint(g,sx,sy,tx,ty){// SZAFKA STRAŻACKA — hełmy, wąż i topór za szybą
+      podklad(g,sx,sy,tx,ty);
+      R(g,sx+.6,sy+.6,14.8,14.4,'#a01c1c');
+      R(g,sx+.6,sy+.6,14.8,1.2,'#d84040');R(g,sx+.6,sy+13.4,14.8,1.6,'#701010');
+      R(g,sx+2,sy+2.4,11.6,10.4,'#2a2a34');                       // szyba
+      R(g,sx+2,sy+2.4,11.6,4.4,'rgba(160,200,230,.18)');
+      g.fillStyle='#f5c542';g.beginPath();g.arc(sx+5.4,sy+5.6,2.6,3.14,0);g.fill();   // hełm
+      R(g,sx+2.6,sy+5.4,5.6,1.2,'#f5c542');
+      g.strokeStyle='#e8e4d8';g.lineWidth=1.6;                    // zwinięty wąż
+      g.beginPath();g.arc(sx+10.4,sy+6,2.6,0,7);g.stroke();
+      g.strokeStyle='#b8b4ae';g.lineWidth=1;
+      g.beginPath();g.arc(sx+10.4,sy+6,1.2,0,7);g.stroke();
+      R(g,sx+3,sy+9.6,8.6,1.2,'#8a5a2e');                         // topór
+      g.fillStyle='#c9c4dd';g.beginPath();
+      g.moveTo(sx+10.6,sy+8.4);g.lineTo(sx+13,sy+9);g.lineTo(sx+13,sy+11.4);g.lineTo(sx+10.6,sy+11.6);g.closePath();g.fill();
+      R(g,sx+7,sy+.9,2,1.4,'#f4f1ea');                            // uchwyt
+  }},
+  100:{anim:true,paint(g,sx,sy,tx,ty){// KUCHENKA I GARY — tu się dzieje cały obiad
+      podklad(g,sx,sy,tx,ty);
+      R(g,sx+.6,sy+3,14.8,12,'#b8b4ae');
+      R(g,sx+.6,sy+3,14.8,1.4,'#dcd8d2');R(g,sx+.6,sy+13.6,14.8,1.4,'#8a8680');
+      R(g,sx+2,sy+9,11.6,4,'#2a2a34');                            // piekarnik
+      R(g,sx+2.6,sy+9.6,10.4,2,'#4a4a58');R(g,sx+6.4,sy+11.6,3.4,.9,'#c9c4dd');
+      const kip=Math.abs(Math.sin(anim*3.4+tx));
+      g.fillStyle='#3a3a48';g.beginPath();g.ellipse(sx+5,sy+5.4,3.6,2.4,0,0,7);g.fill();   // GAR
+      g.fillStyle='#5c5c6e';g.beginPath();g.ellipse(sx+5,sy+4.6-kip*.5,3.6,2.2,0,0,7);g.fill();
+      R(g,sx+.8,sy+4.6,1.6,1,'#3a3a48');R(g,sx+7.8,sy+4.6,1.6,1,'#3a3a48');
+      g.fillStyle='#e0a860';g.beginPath();g.ellipse(sx+5,sy+4.4-kip*.5,2.4,1.4,0,0,7);g.fill();
+      g.fillStyle='#3a3a48';g.beginPath();g.ellipse(sx+11.4,sy+6,2.8,1.8,0,0,7);g.fill();  // drugi gar
+      g.fillStyle='#5c5c6e';g.beginPath();g.ellipse(sx+11.4,sy+5.4,2.8,1.6,0,0,7);g.fill();
+      for(let i=0;i<3;i++){                                       // PARA
+        const f=(anim*.55+i*.34+tx*.13)%1;
+        g.fillStyle='rgba(232,236,244,'+(.34*(1-f))+')';
+        g.beginPath();g.arc(sx+5+Math.sin(f*6+i)*3,sy+3-f*9,1.6+f*2.4,0,7);g.fill();
+      }
+  }},
 };
 /* Baner „POLAND ROCK" rozpięty nad bramą pola. Wywołuje go każdy z czterech
    kafli bramy dla SWOJEGO wycinka; `napis` to fragment tekstu do wypisania
@@ -11910,6 +13175,125 @@ const SKINY={
       }else R(g,sx+3,sy+12,3,1.6,'#8a5fd0');                         // żyłka minerału w bloku
     },
   },
+  /* WESELE W REMIZIE — ta sama mechanika w skórze wesela. Betonowy pustak
+     jest tu SKRZYNKĄ WÓDKI (rusza ją tylko butla gazowa), przepaść to KANAŁ
+     NAPRAWCZY w garażu, a kłódka — kotara z szarfą, której nikt nie odsunie
+     bez zgody ciotki od kopert. */
+  wesele:{
+    39(g,sx,sy,tx,ty){                     // skrzynia → PUDŁO NA KOPERTY
+      domFloorBase(g,sx,sy,tx,ty);
+      g.fillStyle='rgba(0,0,0,.24)';g.beginPath();g.ellipse(sx+8,sy+14.4,6,2,0,0,7);g.fill();
+      rr(g,sx+1.6,sy+4,12.8,10.4,1.6,'#f4f1ea');
+      R(g,sx+1.6,sy+4,12.8,1.2,'#ffffff');R(g,sx+1.6,sy+13,12.8,1.4,'#d8d2c4');
+      R(g,sx+6.4,sy+4,3.2,10.4,'#e88ac8');                        // wstążka
+      R(g,sx+1.6,sy+8,12.8,2,'#e88ac8');
+      g.fillStyle='#e88ac8';                                      // kokarda
+      g.beginPath();g.moveTo(sx+8,sy+8.9);g.lineTo(sx+4.6,sy+6.6);g.lineTo(sx+4.6,sy+11);g.closePath();g.fill();
+      g.beginPath();g.moveTo(sx+8,sy+8.9);g.lineTo(sx+11.4,sy+6.6);g.lineTo(sx+11.4,sy+11);g.closePath();g.fill();
+      R(g,sx+4.4,sy+2.4,7.2,2.4,'#f8f4ea');                       // koperta wystaje wierzchem
+      R(g,sx+4.4,sy+2.4,7.2,.8,'#e0d8c8');
+    },
+    41(g,sx,sy,tx,ty){                     // pustak → SKRZYNKA WÓDKI (tylko butla)
+      domFloorBase(g,sx,sy,tx,ty);
+      g.fillStyle='rgba(0,0,0,.28)';g.beginPath();g.ellipse(sx+8,sy+14.4,7,2.2,0,0,7);g.fill();
+      rr(g,sx+.6,sy+3.4,14.8,11,1.2,'#6e5030');                   // drewniana skrzynka
+      R(g,sx+.6,sy+3.4,14.8,1.4,'#8a6a44');
+      R(g,sx+.6,sy+8.4,14.8,1.2,'#4e3820');
+      R(g,sx+.6,sy+13,14.8,1.4,'#4e3820');
+      for(let i=0;i<4;i++){                                       // butelki w środku
+        const bx=sx+2+i*3.4;
+        R(g,bx,sy+4.6,2.4,4.4,'#cfe4ee');R(g,bx+.4,sy+5.6,1.6,3.2,'#eef6fa');
+        R(g,bx+.6,sy+3.4,1.2,1.6,'#cfe4ee');
+        if((tx+ty+i)%2===0)R(g,bx+.3,sy+6.4,1.8,1.6,'#e04848');   // etykietka
+      }
+      R(g,sx+2.6,sy+10.4,10.8,1.8,'#8a6a44');                     // napis kredą
+      R(g,sx+3.4,sy+10.8,3,1,'#c8b898');R(g,sx+8,sy+10.8,4,1,'#c8b898');
+    },
+    42(g,sx,sy,tx,ty){                     // filar → SŁUP W SALI, z lamperią jak ściana
+      domFloorBase(g,sx,sy,tx,ty);
+      g.fillStyle='rgba(0,0,0,.3)';g.beginPath();g.ellipse(sx+8,sy+14.6,6,2.2,0,0,7);g.fill();
+      R(g,sx+2.4,sy-1,11.2,16,'#d8d2c4');
+      R(g,sx+2.4,sy+7,11.2,7.4,'#4e6a4a');                        // lamperia
+      R(g,sx+2.4,sy+6,11.2,1.2,'#a03030');
+      R(g,sx+2.4,sy-1,1.6,16,'#f0ece0');R(g,sx+12,sy-1,1.6,16,'#bdb6a6');
+      R(g,sx+1.4,sy+13.6,13.2,2,'#c4bdad');                       // cokół
+      if((tx+ty)%2===0){R(g,sx+4,sy+1,8,3.4,'#f2f0f8');           // kartka „PROSIMY NIE TAŃCZYĆ"
+        R(g,sx+4.8,sy+2,6.4,.8,'#8a8680');R(g,sx+4.8,sy+3.2,4.4,.8,'#8a8680');}
+    },
+    43(g,sx,sy,tx,ty){                     // krucha płyta → DESKA NAD KANAŁEM
+      R(g,sx,sy,16,16,'#12121a');
+      const most=v=>v===43||v===79;
+      const poz=most(at(tx-1,ty))||most(at(tx+1,ty));
+      g.save();g.translate(sx+8,sy+8);if(!poz)g.rotate(Math.PI/2);g.translate(-8,-8);
+      R(g,0,2.6,16,11,'#8a6a44');
+      R(g,0,2.6,16,1.2,'#a8845a');R(g,0,12.4,16,1.2,'#5f4528');
+      R(g,0,7.4,16,.9,'#6e5030');
+      if((tx*5+ty)%3===0)R(g,3+((ty*7)%8),3.4,1.4,9.4,'#5f4528');  // pęknięcie w desce
+      R(g,1,3.4,1.4,1.4,'#4a4356');R(g,13.6,11,1.4,1.4,'#4a4356'); // wkręty
+      g.restore();
+    },
+    44(g,sx,sy,tx,ty){                     // przepaść → KANAŁ NAPRAWCZY pod wozem
+      R(g,sx,sy,16,16,'#0e0f14');
+      const brzeg=(dx,dy)=>!PIT(at(tx+dx,ty+dy));
+      if(brzeg(0,-1)){                                            // krawędź wyłożona kaflami
+        R(g,sx,sy,16,4.4,'#8e8a86');R(g,sx,sy,16,1.2,'#b4b0aa');
+        R(g,sx,sy+3.6,16,1.2,'#f5c542');                          // żółty pas ostrzegawczy
+        for(let i=0;i<4;i++)R(g,sx+i*4,sy+3.6,2,1.2,'#2a2a34');
+      }
+      if(brzeg(0,1)){R(g,sx,sy+11.6,16,4.4,'#6e6a68');R(g,sx,sy+14.6,16,1.4,'#8e8a86');}
+      if(brzeg(-1,0))R(g,sx,sy,2.6,16,'#6e6a68');
+      if(brzeg(1,0))R(g,sx+13.4,sy,2.6,16,'#6e6a68');
+      /* na dnie: kałuża oleju i drabinka */
+      if((tx*7+ty*5)%6===0){g.fillStyle='rgba(60,50,30,.5)';
+        g.beginPath();g.ellipse(sx+8,sy+9,5,2.4,0,0,7);g.fill();}
+      if((tx*3+ty*11)%9===0){R(g,sx+5,sy+2,1.4,12,'#4a4356');R(g,sx+9.6,sy+2,1.4,12,'#4a4356');
+        for(let i=0;i<3;i++)R(g,sx+5,sy+3.4+i*4,6,1.2,'#5c5c6e');}
+      if((tx*11+ty*3)%7===0)R(g,sx+3,sy+11,3,1.4,'#2a2a34');
+    },
+    45(g,sx,sy,tx,ty){                     // maszyna → BUTLA GAZOWA z kuchni
+      domFloorBase(g,sx,sy,tx,ty);
+      g.fillStyle='rgba(0,0,0,.3)';g.beginPath();g.ellipse(sx+8,sy+14.5,5.4,2,0,0,7);g.fill();
+      rr(g,sx+3.4,sy+3.6,9.2,10.8,3,'#a01c1c');
+      R(g,sx+4.4,sy+4.4,2.4,9,'#c83030');                         // połysk
+      R(g,sx+3.4,sy+11,9.2,1.4,'#701010');
+      R(g,sx+6.6,sy+.6,2.8,3.4,'#8e8a86');                        // zawór
+      R(g,sx+5.4,sy+1.4,5.2,1.2,'#b4b0aa');
+      R(g,sx+9.4,sy+2,3.4,1.2,'#5c5c6e');
+      R(g,sx+5,sy+6.4,6,2.4,'#f4f1ea');                           // naklejka
+      R(g,sx+5.6,sy+7,4.8,1.2,'#a01c1c');
+    },
+    56(g,sx,sy,tx,ty){                     // kaganek → ŚWIECZNIK, bo na weselu nie ma pochodni
+      domFloorBase(g,sx,sy,tx,ty);
+      g.fillStyle='rgba(0,0,0,.26)';g.beginPath();g.ellipse(sx+8,sy+14.4,4.6,1.8,0,0,7);g.fill();
+      R(g,sx+5.4,sy+12,5.2,2.4,'#c89a1e');                        // podstawa
+      R(g,sx+7.2,sy+6,1.6,6.4,'#e0b62c');                         // trzon
+      R(g,sx+3.4,sy+5.4,9.2,1.6,'#e0b62c');                       // ramię
+      for(const dx of[-4,0,4]){
+        R(g,sx+7.4+dx,sy+2.6,1.2,3,'#f4f1ea');                    // świece
+        R(g,sx+7.2+dx,sy+2,1.6,1,'#ffffff');
+      }
+      /* płomyki rysuje drawDomainDeko (lista `lampy`) — tu tylko knoty */
+      R(g,sx+3.4,sy+5.4,9.2,.7,'#f5c542');
+    },
+    48(g,sx,sy,tx,ty,col){                 // kłódka → KOTARA Z SZARFĄ w drzwiach sali
+      domFloorBase(g,sx,sy,tx,ty);
+      R(g,sx,sy,16,16,'#3a2436');
+      for(let i=0;i<4;i++){                                       // fałdy materiału
+        const c=i%2?'#5a3a52':'#4a2e44';
+        R(g,sx+i*4,sy,3.4,16,c);
+        R(g,sx+i*4,sy,.9,16,'#6e4a64');
+      }
+      R(g,sx,sy,16,2,'#2a1a28');                                  // karnisz
+      R(g,sx,sy+7,16,2.2,alpha(col,.85));                         // szarfa w kolorze klucza
+      R(g,sx,sy+7,16,.7,'#ffffff');
+      if((tx+ty)%2===0){                                          // kokarda co drugi kafel
+        g.fillStyle=col;
+        g.beginPath();g.moveTo(sx+8,sy+8.1);g.lineTo(sx+4.4,sy+5.6);g.lineTo(sx+4.4,sy+10.6);g.closePath();g.fill();
+        g.beginPath();g.moveTo(sx+8,sy+8.1);g.lineTo(sx+11.6,sy+5.6);g.lineTo(sx+11.6,sy+10.6);g.closePath();g.fill();
+        R(g,sx+7,sy+7,2,2.4,'#f4f1ea');
+      }else R(g,sx+6,sy+12,4,2.4,'#f2c8e0');                      // kwiatek wpięty w kotarę
+    },
+  },
 };
 /* zwraca true, jeśli skin domeny sam pomalował kafel */
 function domSkin(v,g,sx,sy,tx,ty,extra){
@@ -11951,7 +13335,7 @@ function domZamekPaint(g,sx,sy,tx,ty,col){
     R(g,sx+7.4,sy+7,1.2,2,'#2a2440');
   }
 }
-const TILE_ANIM=new Uint8Array(96);
+const TILE_ANIM=new Uint8Array(128);
 for(const k in TILES)if(TILES[k].anim)TILE_ANIM[k]=1;
 
 /* =====================================================================
@@ -12234,6 +13618,8 @@ function drawWorld(){
       R(cx,sx-1,sy-9,1.4,3,'#e8dcff');
     }
   }
+  drawKaluze();   // rozlany alkohol — leży NA podłodze, pod wszystkim innym
+  drawWelony();   // welon rozłożony na parkiecie
   drawFXunder();  // kurz i pyły przy ziemi — pod sprite'ami
   drawMiniBlasts();  // ostrzeżenia przed wybuchami mini-bossów
   /* aura mocy pod bossem (złota; czerwona i szybsza w fazie szału) */
@@ -12369,6 +13755,43 @@ function drawWorld(){
       cx.fillStyle='#e04848';cx.beginPath();cx.arc(sx,sy,5.5*fl,0,7);cx.fill();
       cx.fillStyle='#f5a032';cx.beginPath();cx.arc(sx,sy,3.5*fl,0,7);cx.fill();
       cx.fillStyle='#fff7d6';cx.beginPath();cx.arc(sx-1,sy-1,1.6,0,7);cx.fill();
+    }else if(b.t==='wodka'){        // BUTELKA W LOCIE — koziołkuje, aż się rozbije
+      cx.save();cx.translate(sx,sy);cx.rotate(anim*8+sx*.1);
+      R(cx,-2,-5,4,9,'#cfe4ee');R(cx,-1.4,-3,2.8,6.4,'#eef6fa');
+      R(cx,-.9,-7.2,1.8,2.4,'#cfe4ee');
+      R(cx,-1.6,-1.6,3.2,2.8,'#e04848');
+      cx.fillStyle='rgba(255,255,255,.7)';cx.fillRect(-1.6,-4,.9,5);
+      cx.restore();
+    }else if(b.t==='tort'){         // KAWAŁEK TORTU rzucony przez ciotkę
+      cx.save();cx.translate(sx,sy);cx.rotate(anim*5+sy*.1);
+      cx.fillStyle='#f8f4ea';cx.beginPath();
+      cx.moveTo(-4.4,-3.4);cx.lineTo(4.4,-1.4);cx.lineTo(0,4.4);cx.closePath();cx.fill();
+      cx.fillStyle='#e88ac8';cx.beginPath();
+      cx.moveTo(-4.4,-3.4);cx.lineTo(4.4,-1.4);cx.lineTo(2.4,.6);cx.lineTo(-3.4,-1.6);cx.closePath();cx.fill();
+      cx.fillStyle='#e04848';cx.beginPath();cx.arc(-1.4,-2.4,1.2,0,7);cx.fill();
+      cx.restore();
+    }else if(b.t==='roza'){         // RÓŻA PANA MŁODEGO — leci i zaraz pęknie
+      cx.save();cx.translate(sx,sy);cx.rotate(anim*4);
+      cx.strokeStyle='#3d8a44';cx.lineWidth=1.4;
+      cx.beginPath();cx.moveTo(0,0);cx.lineTo(0,7);cx.stroke();
+      cx.fillStyle='#3d8a44';cx.beginPath();
+      cx.moveTo(0,4);cx.lineTo(4,5.4);cx.lineTo(0,6);cx.closePath();cx.fill();
+      cx.fillStyle='#a01c1c';cx.beginPath();cx.arc(0,-1,4.4,0,7);cx.fill();
+      cx.fillStyle='#e04848';cx.beginPath();cx.arc(0,-1,3,0,7);cx.fill();
+      cx.fillStyle='#f28a8a';cx.beginPath();cx.arc(-.8,-1.8,1.4,0,7);cx.fill();
+      cx.restore();
+    }else if(b.t==='platek'){       // PŁATEK z rozbitej róży
+      cx.save();cx.translate(sx,sy);cx.rotate(Math.atan2(b.dy,b.dx)+Math.sin(anim*9)*.4);
+      cx.fillStyle='#e04848';cx.beginPath();cx.ellipse(0,0,4,2.2,0,0,7);cx.fill();
+      cx.fillStyle='#f28a8a';cx.beginPath();cx.ellipse(-.8,-.4,2,1.1,0,0,7);cx.fill();
+      cx.restore();
+    }else if(b.t==='welon'){        // WELON w locie — biała chusta w powietrzu
+      cx.save();cx.translate(sx,sy);cx.rotate(Math.atan2(b.dy,b.dx));
+      cx.globalAlpha=.9;cx.fillStyle='#f2f0f8';
+      cx.beginPath();cx.ellipse(0,0,8,4.4+Math.sin(anim*10)*1.4,0,0,7);cx.fill();
+      cx.strokeStyle='#d8d4e8';cx.lineWidth=.8;
+      cx.beginPath();cx.ellipse(0,0,8,4.4,0,0,7);cx.stroke();
+      cx.globalAlpha=1;cx.restore();
     }else if(b.t==='smokogien'){   // SMOCZY OGIEŃ — fioletowy rdzeń w pomarańczowym płomieniu
       const fl=1+Math.sin(anim*20+sx)*.28,ang=Math.atan2(b.dy,b.dx);
       cx.save();cx.globalCompositeOperation='lighter';

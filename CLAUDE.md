@@ -89,12 +89,26 @@ wygląda i czym pachnie: `floor`/`acc`/`wall`, `amb`, `mrok`/`mrokCol`, `kurz`,
 dopisuje się TAM, a `domMotyw()` czyta najpierw piętro, potem domenę. Dzięki temu
 jedna domena prowadzi z lasu w skały i do jaskini.
 
+**Rozlany alkohol i inne kałuże.** `KALUZE` to jedna lista dla wszystkiego, co
+się rozlewa (butelka świadka, przewrócone beczki bossa). Kałuża z `t:Infinity`
+zostaje do końca walki, także po zmianie fazy; `kaluzaZapal()` podpala ją i wtedy
+parzy WSZYSTKO, co w niej stoi — bossa włącznie. Obrażenia dla gracza NIE idą
+przez `hurtPlayer` (tam jest 1,2 s nietykalności po ciosie), tylko własnym
+tyknięciem co 0,55 s.
+
+**Boss z własnym stanem klatki** = wpis w `BOSS_UPDATE` (klucz to typ z
+`FOE_TYPES`). Zwrot `true` znaczy „ten boss sam wie, co robi w tej klatce" —
+skacze, wiruje, leży, krąży pod stropem — i wtedy nie losuje kolejnego ataku.
+`BOSS_RESET` mówi, co posprzątać, gdy gracz ucieknie z areny.
+
 **Boss na piętrze domeny** (`boss:'wawelin'`) to zwykły wpis w `BOSSES` — ta sama
 tożsamość `bid`, więc łup, film, poziom rewanżu i pasek HP działają bez wyjątków.
 Dwie rzeczy MUSZĄ się zgadzać: jego `r` nie może wskazywać istniejącego regionu
 (inaczej stanie znacznikiem na mapie świata i dostanie arenę w terenie), a foe
 musi dostać pole `room` — bez niego komnata liczy się jako pusta i piętro zalicza
-się samo, zanim boss zdąży ryknąć.
+się samo, zanim boss zdąży ryknąć. Przy bossie DWUFAZOWYM (`next`) dochodzi
+trzecia: `DOM.bossPending` na czas scenki, bo między śmiercią pierwszej formy
+a wyjściem drugiej komnata jest przez chwilę pusta.
 
 **Zapis.** `DEFAULT_SAVE` dokłada brakujące pola przy KAŻDYM wczytaniu, więc
 migracje sprawdzaj na obiekcie **wczytanym**, nie na scalonym — inaczej warunek
@@ -133,6 +147,7 @@ Pełny opis w `TESTOWANIE.md` (tam też skróty `?test=…` i komendy konsoli).
 
 ```bash
 ./testy/sprawdz.sh test_jama.js       # SMOCZA JAMA: 5 plansz w grze + ataki WAWELINA
+./testy/sprawdz.sh test_wesele.js     # WESELE: kałuże, beczki i obie fazy PAŃSTWA MŁODYCH
 ./testy/sprawdz.sh test_menu.js       # menu: zakładki, sterowanie, zapis, zdarzenia
 ./testy/sprawdz.sh test_brama.js      # brama Poland Rocka: widoczność i przejezdność
 ./testy/sprawdz.sh test_czcionki.js   # polskie znaki: ogonki, kreski, spójność
@@ -156,18 +171,18 @@ których nie było.
 
 ## Aktualny stan treści
 
-8 postaci · 8 żywiołów · 24 zadania · 6 regionów + arena · 7 domen · 9 bossów ·
-46 typów wrogów · 88 kafli · 37 NPC · 19 broni · 51 ubrań · 158 klipów audio.
+8 postaci · 8 żywiołów · 24 zadania · 6 regionów + arena · 7 domen · 10 bossów ·
+52 typy wrogów · 101 kafli · 37 NPC · 19 broni · 51 ubrań · 159 klipów audio.
 
 - **Regiony:** Warszawa, Chodzież, Polskie Morze, Kraków, Tatry, Trasa na Poland Rock
 - **Postacie:** Edek, Dych Dziki, Grażynka 3000, Jarek Zegarek, Zenek Spawacz, Julka z Tindera,
   Rybak Bogdan, Karmazynowa Liri (żywioł OSTRZE, kosa; baner po Edku)
-- **Domeny:** Piwnica Hejterów, Dziki Las, **Smocza Jama** (te trzy z RĘCZNIE
-  rysowanymi planszami po 5 pięter), Zatopione Molo, Lodowa Grota, Wesele w Remizie,
-  Pole Namiotowe. Pozostałe cztery wciąż losują piętra — do czasu, aż dostaną swoje mapy.
+- **Domeny:** Piwnica Hejterów, Dziki Las, **Smocza Jama**, **Wesele w Remizie**
+  (te cztery z RĘCZNIE rysowanymi planszami po 5 pięter), Zatopione Molo,
+  Lodowa Grota, Pole Namiotowe. Pozostałe trzy wciąż losują piętra.
 - **Bossowie:** Król Dzików, Mega Dres, Kraken, Horda Pszczół, Smok Wawelski,
-  Pan Laweta 3000, Klaunica, Yeti + **WAWELIN** (jedyny boss stojący nie w świecie,
-  tylko na ostatnim piętrze domeny)
+  Pan Laweta 3000, Klaunica, Yeti + bossowie PIĘTER DOMEN: **WAWELIN** (Smocza Jama)
+  i **PAŃSTWO MŁODZI** (Wesele — dwie fazy: pan młody, potem panna młoda)
 - **Menu główne:** pełnoekranowe, koncept „plan zdjęciowy Edka" — Edek w zimnym
   świetle po lewej, monitor z zakładkami po prawej (Zagraj / Jak grać / Sterowanie / Dźwięk)
 
