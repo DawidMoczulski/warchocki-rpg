@@ -165,10 +165,20 @@ Po wejściu zrób **Ctrl+F5**, na ekranie tytułowym pojawi się plakietka
 | `?test=wesele` | CHODZIEŻ, pod portalem WESELA W REMIZIE (domena Grażynki) |
 | `?test=las` | CHODZIEŻ, pod portalem DZIKIEGO LASU — ręcznie rysowane plansze, wiatr i ptaki |
 | `?test=domenaboss` | jak `domena`, ale poziom 10 każdej domeny — pełna obsada mini-bossów |
+| `?test=moc` | **WZMOCNIONA EKIPA DO TESTÓW WALKI** — Edek i Liri (plus Dych) na poz. 40, wzniesienie 3, konstelacje C6, talenty 10/10/10, sygnaturowe bronie 5⭐ i pełne komplety artefaktów z bossów. Stawia pod WESELEM W REMIZIE, domeny otwarte niezależnie od dnia |
 | `?test=reset` | kasuje zapis (start od zera) |
 
 Skrót nadpisuje zapis raz i dokłada: Dycha do ekipy, poziom 25 postaciom, 500 💎.
 Żeby powtórzyć dany fragment — po prostu wejdź na ten adres jeszcze raz.
+
+Wpis skrótu jest w całości deklaratywny (`TEST_SETUPS` w `game.js`) i rozumie:
+`q` (questy), `reg`/`at` (gdzie postawić), `lvl`, `asc` (wzniesienie ponad to,
+czego wymaga sam poziom), `con`, `tal`, `ekipa`, `gra`, `bron`, `art` (artefakty
+w kolejności slotów), `mats`, `rolex`, `baner`, `zawsze` (domeny otwarte), `dom`
+(poziom domen). **Nowy skrót to nowy wiersz w rejestrze, nie kod.**
+Pilnuje tego `test_skroty.js`: literówka w id broni czy artefaktu niczym nie
+rzuca — postać po prostu wchodzi do walki z pustą ręką, a człowiek testuje
+nie to, co chciał.
 
 ## Gra lokalnie (z dysku)
 
@@ -272,6 +282,7 @@ node testy/test_mapy.js               # ręczne plansze domen: format i zdrowy r
 ./testy/sprawdz.sh test_wesele.js     # WESELE: plansze, kałuże, beczki i obie fazy PAŃSTWA MŁODYCH
 ./testy/sprawdz.sh test_regiony.js    # czy w KAŻDYM regionie da się dojść do domen, drzwi i aren
 ./testy/sprawdz.sh test_sylwetki.js   # czy każdy wróg, boss i animowany kafel rysuje się TAM, GDZIE STOI
+./testy/sprawdz.sh test_skroty.js     # skróty ?test=…: czy każdy wpis wskazuje na coś, co ISTNIEJE
 ./testy/sprawdz.sh test_liri.js       # umiejętności KAŻDEJ postaci: [E], [Q], ikony orbów
 ```
 

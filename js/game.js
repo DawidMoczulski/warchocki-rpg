@@ -197,6 +197,8 @@ loadSave();
      ?test=stop     — przed łapaniem stopa (graty spakowane)
      ?test=policja  — pod bramkami, finałowa obława gotowa do odpalenia
      ?test=pole     — wszystko zrobione, jesteś na polu festiwalowym
+     ?test=moc      — WZMOCNIONA EKIPA: Edek i Liri poz. 40, maks. talenty,
+                      sygnaturowe bronie 5⭐ i artefakty z bossów
      ?test=reset    — kasuje zapis                                                */
 const TEST_SETUPS={
   seria:{q:{dych:2},reg:'trasa',at:[3,27]},
@@ -217,6 +219,16 @@ const TEST_SETUPS={
   wesele:{q:{dych:2},reg:'chodziez',at:[85,32],zawsze:1,lvl:50},    // pod WESELEM W REMIZIE
   las:{q:{dych:2},reg:'chodziez',at:[42,12],zawsze:1,lvl:50},       // pod DZIKIM LASEM
   domenaboss:{q:{dych:2},reg:'wawa',at:[39,42],zawsze:1,lvl:70,dom:10}, // pełna obsada mini-bossów
+  /* WZMOCNIONA EKIPA DO TESTÓW WALKI. Edek i Liri na 40. poziomie, talenty
+     i konstelacje na maksa, sygnaturowe bronie 5⭐ i komplet artefaktów z bossów.
+     Startujesz pod WESELEM W REMIZIE, domeny otwarte niezależnie od dnia. */
+  moc:{q:{dych:2},reg:'chodziez',at:[85,32],zawsze:1,lvl:40,asc:3,
+    ekipa:['liri'],gra:'edek',con:6,tal:10,
+    bron:{edek:'rolexM',liri:'kosamCiekla',dych:'butelkaD'},
+    art:{edek:['kiel','serceSmoka','luska'],
+         liri:['rogiK','kolczykK','obraczki'],
+         dych:['koronaP','kolczykK','hakL']},
+    mats:{sr:400,ch:220,di:24},rolex:10},
   /* KARMAZYNOWA LIRI — pełny build do testów: poz. 90, C6, talenty 10, Ciekła Kosa */
   liri:{q:{dych:2},reg:'wawa',at:[39,44],lvl:90,zawsze:1,
     ekipa:['liri'],gra:'liri',con:6,tal:10,bron:{liri:'kosamCiekla'},
@@ -241,11 +253,14 @@ const TEST_SETUPS={
     if(!S.chars[id])S.chars[id]=newChar();
     if(!S.party.includes(id)&&S.party.length<3)S.party.push(id);
   }
-  /* uczciwa walka: poziom 25 + wzniesienie, które ten poziom w ogóle dopuszcza */
+  /* uczciwa walka: poziom 25 + wzniesienie, które ten poziom w ogóle dopuszcza.
+     `asc` pozwala wznieść WYŻEJ, niż wymaga sam poziom — to normalny stan w grze
+     (wznosisz się, zanim dobijesz do nowego capa), a w teście daje mocniejszą
+     postać bez podbijania poziomu ponad to, o co prosił Dawid. */
   for(const id of S.party){const c=S.chars[id];
     if(!c)continue;
     if(c.lvl<(t.lvl||25))c.lvl=(t.lvl||25);
-    c.asc=Math.max(c.asc||0,ascFromLvl(c.lvl));
+    c.asc=Math.max(c.asc||0,t.asc||0,ascFromLvl(c.lvl));
     if(!c.tal)c.tal={n:1,e:1,q:1};if(c.con===undefined)c.con=0;}
   S.quests=Object.assign({},S.quests,t.q);
   S.visited[t.reg]=1;S.introDone=true;
@@ -257,6 +272,17 @@ const TEST_SETUPS={
     if(!S.gear[id])S.gear[id]={w:null,a:[null,null,null]};
     S.gear[id].w=w;
   }
+  /* `art` zakłada artefakty — w KOLEJNOŚCI SLOTÓW (talizman, biżuteria, gadżet),
+     bo panel postaci trzyma je właśnie tak. Pole jest generyczne, jak `bron`. */
+  for(const id of Object.keys(t.art||{})){
+    if(!S.gear[id])S.gear[id]={w:null,a:[null,null,null]};
+    (t.art[id]||[]).forEach((a,i)=>{
+      if(!a)return;
+      S.gearOwn[a]=(S.gearOwn[a]||0)+1;
+      S.gear[id].a[i]=a;
+    });
+  }
+  if(t.mats)S.mats=Object.assign({},S.mats,t.mats);   // czym ulepszać dalej w grze
   if(t.con||t.tal)for(const id of S.party){const c=S.chars[id];if(!c)continue;
     if(t.con)c.con=Math.max(c.con||0,t.con);
     if(t.tal)c.tal={n:t.tal,e:t.tal,q:t.tal};}

@@ -175,6 +175,7 @@ Pełny opis w `TESTOWANIE.md` (tam też skróty `?test=…` i komendy konsoli).
 ./testy/sprawdz.sh test_jama.js       # SMOCZA JAMA: 5 plansz w grze + ataki WAWELINA
 ./testy/sprawdz.sh test_wesele.js     # WESELE: kałuże, beczki i obie fazy PAŃSTWA MŁODYCH
 ./testy/sprawdz.sh test_regiony.js    # czy w KAŻDYM regionie da się dojść do domen i drzwi
+./testy/sprawdz.sh test_skroty.js     # skróty ?test=…: czy wskazują na istniejące bronie/artefakty
 ./testy/sprawdz.sh test_sylwetki.js   # czy każdy wróg/boss/kafel rysuje się TAM, GDZIE STOI
 ./testy/sprawdz.sh test_menu.js       # menu: zakładki, sterowanie, zapis, zdarzenia
 ./testy/sprawdz.sh test_brama.js      # brama Poland Rocka: widoczność i przejezdność
