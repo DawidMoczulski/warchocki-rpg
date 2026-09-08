@@ -101,6 +101,20 @@ tyknięciem co 0,55 s.
 skacze, wiruje, leży, krąży pod stropem — i wtedy nie losuje kolejnego ataku.
 `BOSS_RESET` mówi, co posprzątać, gdy gracz ucieknie z areny.
 
+**Smycz bossa ma sens TYLKO w świecie.** `BOSS_LEASH` (320 px) pilnuje, żeby
+gracz nie zgubił bossa w otwartym terenie za areną. Na piętrze domeny CAŁE PIĘTRO
+jest areną — nie ma stamtąd dokąd uciec, a parkiet czy jama bywają większe niż
+320 px, więc walka resetowała się w połowie sali. Dlatego boss domeny dostaje
+własny `leashR` (`leashDomeny()`), który obejmuje całą planszę; ten sam promień
+trzyma motyw areny w `bossOnArena`.
+
+**Marker komnaty finałowej łatwo zgubić przy edycji planszy.** Na arenie oczepin
+`B` zjadło późniejsze wypełnienie parkietu — została jedna komnata, więc
+`DOM.wyjscie===DOM.wejscie` i boss budził się graczowi przy samym wejściu (a nie
+na środku sali). Objaw dla gracza: „walka resetuje się, jak pójdę dalej", bo
+smycz liczyła się od wejścia. Pilnują tego testy `boss budzi się na ŚRODKU`
+i `po CAŁEJ arenie da się chodzić bez resetu walki`.
+
 **Boss na piętrze domeny** (`boss:'wawelin'`) to zwykły wpis w `BOSSES` — ta sama
 tożsamość `bid`, więc łup, film, poziom rewanżu i pasek HP działają bez wyjątków.
 Dwie rzeczy MUSZĄ się zgadzać: jego `r` nie może wskazywać istniejącego regionu

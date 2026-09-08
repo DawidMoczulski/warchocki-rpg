@@ -1267,6 +1267,12 @@ let hurtT=0,atkT=0,atkAnim=0,atkDir=0,spcT=0,dashT=0,dashDir=0;
 let fallT=0;   // krótka blokada zaraz po wpadnięciu w przepaść (domFall)
 let odganiamAt=0;   // cooldown klipu „Odganiam się" (czas w `anim`)
 const BOSS_LEASH=320; /* promień areny bossa (px) — dalej = boss wraca na środek i walka od nowa (arena jest duża i murowana) */
+/* …ale TYLKO w świecie, gdzie za areną jest otwarty teren i dałoby się bossa
+   zgubić. Na piętrze domeny CAŁE PIĘTRO jest areną: nie ma stamtąd dokąd uciec
+   (wyjście i tak restartuje domenę), a parkiet czy jama bywają większe niż 320 px.
+   Dlatego boss domeny dostaje własny `leashR` obejmujący całą planszę —
+   inaczej walka resetowała się graczowi w połowie sali. */
+const leashDomeny=()=>Math.hypot(MW*16,MH*16)+64;
 const DV=[[0,1],[-1,0],[1,0],[0,-1]]; // wektory kierunków (dół/lewo/prawo/góra)
 /* ekipa: reszta drużyny idzie za graczem (max 2 z tyłu) */
 const FOLW=[{x:0,y:0,dir:0,frame:0},{x:0,y:0,dir:0,frame:0}];
@@ -3426,7 +3432,7 @@ function updateFoes(dt){
             vy:-26-Math.random()*30,g:-40,life:.6,life0:.6,sz:1.7,
             col:pickA(td.zar||['#e04848','#f5a032']),add:true,shrink:true});}}
       const hd=Math.hypot(P.x-f.homeX,P.y-f.homeY);
-      if(hd>BOSS_LEASH){
+      if(hd>(f.leashR||BOSS_LEASH)){
         if(!f.leash){
           f.leash=true;
           f.hp=f.maxHp;f.hp0=f.maxHp;f.ph2=false;f.stun=0;f.burn=0;f.aura=null;f.kb=0;f.hold=0;
@@ -6313,7 +6319,7 @@ function domBossSpawn(id,rm,i){
   const mvT={};
   for(const m of(b.moves||[]))if(MOVE_CD[m])mvT[m]=anim+MOVE_CD[m]*.55;  // długi atak nie na otwarcie
   foes.push({t:b.t,boss:true,bid:id,bn:b.n,batk:b.batk,moves:b.moves,cd:b.cd,cd2:b.cd2,mvT,
-    room:i,x:rm.cx,y:rm.cy-12,homeX:rm.cx,homeY:rm.cy,
+    room:i,leashR:leashDomeny(),x:rm.cx,y:rm.cy-12,homeX:rm.cx,homeY:rm.cy,
     hp:maxHp,maxHp,hp0:maxHp,atk:Math.round(td.atk*(1+.15*lvl)*sc.atk*BOSS_ATK_UP),
     dx:0,dy:0,wt:0,stun:0,kb:0,kbx:0,kby:0,flash:0,at:2.6});
   /* WIELKIE BECZKI z planszy (kafel 93) stają się częścią walki — pan młody
@@ -6787,7 +6793,9 @@ function bossOnArena(){
   for(const f of foes){
     if(!f.boss)continue;
     const A=arenaOfBoss(f.bid);
-    if(!A)return Math.hypot(P.x-f.x,P.y-f.y)<420;   // boss bez areny: promień awaryjny
+    /* boss bez wpisu areny: promień awaryjny — a dla bossa domeny cała plansza,
+       bo motyw ma grać tak długo, jak długo trwa walka */
+    if(!A)return Math.hypot(P.x-f.x,P.y-f.y)<(f.leashR||420);
     const tx=P.x/16,ty=P.y/16;
     if(tx>=A.ai[0]-2&&tx<=A.ai[2]+3&&ty>=A.ai[1]-2&&ty<=A.ai[3]+3)return true;
   }
@@ -6819,7 +6827,7 @@ function bossStage2(f,nx){
     const pie=(REG==='arena'&&DOM.cur)?1+.12*(S.domLvl[DOM.cur]||0):1;
     const maxHp=Math.round(td.hp*(1+.5*lvl)*sc.hp*pie);
     foes.push({t:nx.t,boss:true,stage2:true,bid:f.bid,bn:nx.n,moves:nx.moves,
-      cd:nx.cd,cd2:nx.cd2,room:f.room,
+      cd:nx.cd,cd2:nx.cd2,room:f.room,leashR:f.leashR,
       x:ex,y:ey,homeX:f.homeX,homeY:f.homeY,
       hp:maxHp,maxHp,hp0:maxHp,atk:Math.round(td.atk*(1+.15*lvl)*sc.atk*BOSS_ATK_UP),
       dx:0,dy:0,wt:0,stun:0,kb:0,kbx:0,kby:0,flash:0,at:1.6});

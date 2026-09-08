@@ -111,6 +111,31 @@ T('kaluza daleko od gracza nie ma prawa go dosiegnac',()=>{
   eq(PHP[S.ch],hp0);
 });
 
+
+/* ---------------- ARENA: CAŁA ma być do walki ---------------- */
+/* Smycz bossa (`BOSS_LEASH`) ma sens w ŚWIECIE, gdzie za areną jest otwarty
+   teren. Na piętrze domeny całe piętro JEST areną — a parkiet i jama są
+   większe niż 320 px, więc walka resetowała się graczowi w połowie sali.
+   Test przechodzi po KAŻDYM chodnym kaflu i patrzy, czy boss się nie leczy. */
+function chodzPoCalejArenie(id){
+  const i=DOM.wyjscie,rm=DOM.rooms[i];
+  domBossSpawn(id,rm,i);
+  przeklikaj();
+  const f=foes.find(x=>x.bid===id);
+  f.hp=Math.round(f.maxHp*.5);
+  const hp0=f.hp,W0=MW,H0=MH;
+  let reset=0,poza=0,naj=0;
+  for(let y=1;y<H0-1;y++)for(let x=1;x<W0-1;x++){
+    if(SOLID(at(x,y))||PIT(at(x,y)))continue;
+    P.x=x*16+8;P.y=y*16+8;
+    initPartyHP(true);hurtT=0;                  // gracz ma przeżyć całą wycieczkę
+    naj=Math.max(naj,Math.hypot(P.x-f.homeX,P.y-f.homeY));
+    updateWorld(1/60);
+    if(REG!=='arena'){poza++;break;}
+    if(f.hp>hp0){reset++;f.hp=hp0;}
+  }
+  return{reset,poza,naj:Math.round(naj)};
+}
 /* ---------------- PAN MŁODY ---------------- */
 function obudzMlodych(){
   pietro(4);
@@ -256,4 +281,20 @@ T('pokonani mlodzi placa jak boss i konczy sie pietro',()=>{
   DOM.grace=0;DOM.rooms[DOM.wyjscie].spawned=true;
   domUpdate(.1);
   ok(DOM.done&&DOM.chest,'po mlodych ma lecieć skrzynia');
+});
+
+T('boss budzi sie na SRODKU parkietu, nie przy wejsciu',()=>{
+  pietro(4);
+  const wej=DOM.rooms[DOM.wejscie],wyj=DOM.rooms[DOM.wyjscie];
+  ok(DOM.wejscie!==DOM.wyjscie,
+     'komnata finalowa NIE moze byc ta sama co wejsciowa — boss budzilby sie graczowi na plecach');
+  ok(wyj.cx>MW*16*.35&&wyj.cx<MW*16*.65,'komnata bossa ma byc na srodku sali, jest w '+wyj.cx);
+  ok(Math.hypot(wyj.cx-wej.cx,wyj.cy-wej.cy)>200,'boss ma czekac DALEJ niz przy samym wejsciu');
+});
+T('po CALEJ arenie oczepin da sie chodzic bez resetu walki',()=>{
+  pietro(4);
+  const w=chodzPoCalejArenie('mlodzi');
+  ok(w.naj>BOSS_LEASH,'test ma sens tylko wtedy, gdy arena jest WIEKSZA niz smycz ('+w.naj+' px)');
+  eq(w.reset,0,'walka zresetowala sie w trakcie spaceru po arenie');
+  eq(w.poza,0,'chodzenie po arenie wyrzucilo z domeny');
 });
