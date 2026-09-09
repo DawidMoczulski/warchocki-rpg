@@ -1,4 +1,5 @@
-/* REGIONY — czy da się DOJŚĆ tam, gdzie gra każe iść.
+/* REGIONY I DOMENY — czy da się DOJŚĆ tam, gdzie gra każe iść,
+   i czy na podłodze leży dokładnie to, co ma leżeć.
    Uruchamianie: ./testy/sprawdz.sh test_regiony.js
 
    Powód istnienia: wschodnia Chodzież była odcięta pasem drzew i dojście do
@@ -67,4 +68,38 @@ T('szosa na wschod Chodziezy jest DROGA, a nie tunelem przez las',()=>{
   eq(waskie,0,'kolumn szosy zwezonych do szczeliny');
   eq(at(60,14),2,'szosa ma byc asfaltem tam, gdzie kiedyś stał las');
   eq(at(86,25),1,'zjazd na remize ma byc drogą, nie wydeptana scieżką');
+});
+
+/* ---------------- DOMENY: nic do zbierania z podłogi ---------------- */
+/* Zioła, miody i owoce zostają w ŚWIECIE — tam zbieranie jest zajęciem samym
+   w sobie. W domenie rozpraszały: gracz w środku walki kucał nad ziółkiem.
+   Jedyne, co ma leżeć na ziemi w domenie, to SKRZYNIE — te się rozwala. */
+T('w ZADNEJ domenie i na zadnym pietrze nie ma nic do zbierania',()=>{
+  domAlways=1;
+  let ziola=0,krysztaly=0,pieter=0,gdzie=[];
+  for(const id of Object.keys(DOMAINS)){
+    scene='world';dlgQ=[];enterDomain(id);scene='world';dlgQ=[];
+    for(let i=0;i<domPietra(id).length;i++){
+      domLoadFloor(i);pieter++;
+      if(forage.length||DOM.crystals.length)gdzie.push(id+' p.'+(i+1));
+      ziola+=forage.length;krysztaly+=DOM.crystals.length;
+    }
+    exitDomain();
+  }
+  ok(pieter>=30,'test ma przejsc wszystkie pietra, przeszedl '+pieter);
+  eq(ziola,0,'zbieralne surowce w domenach: '+gdzie.join(', '));
+  eq(krysztaly,0,'krysztaly w domenach: '+gdzie.join(', '));
+});
+T('w SWIECIE zbieranie zostaje nietkniete',()=>{
+  setRegion('chodziez');
+  ok(forage.length>0,'na mapie swiata surowce maja rosnac dalej, jest '+forage.length);
+});
+T('skrzynia domeny placi za to, co dawaly krysztaly',()=>{
+  domAlways=1;
+  scene='world';dlgQ=[];enterDomain('wesele');scene='world';dlgQ=[];
+  DOM.chest={x:P.x,y:P.y,open:false};
+  const ch0=S.mats.ch,mk=matOfDom('wesele'),m0=matIle(mk);
+  domOpenChest();
+  ok(S.mats.ch-ch0>=6,'skrzynia ma przejac zysk z krysztalow, dala '+(S.mats.ch-ch0));
+  ok(matIle(mk)>m0,'unikalny surowiec domeny dalej leci ze skrzyni');
 });

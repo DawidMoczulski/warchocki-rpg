@@ -5080,6 +5080,9 @@ function domMostki(cfg,fk,rooms,kraw){
 const MAPA_ZNAKI={
   '#':'wall', '.':'floor', ',':'acc',
   'S':'floor', '>':'floor', 'k':'floor','r':'floor','b':'floor',
+  /* `*` i `%` (kryształ, surowiec) NIE MAJĄ już znaczenia — w domenach nie ma
+     nic do zbierania z podłogi. Zostają jako zwykła podłoga, żeby stary znak
+     w planszy nie wywrócił parsera. */
   '*':'floor', '%':'floor',
   'A':'floor','B':'floor','C':'floor','D':'floor','E':'floor','F':'floor','H':'floor',
   ' ':44, '_':70,
@@ -5135,7 +5138,6 @@ function domBuildFromMap(cfg,fk,def){
   const mapa=def.mapa;
   const pokoje=[],klucze=[],zamkiKafle=[],maszyny=[],deko=DEKO_PUSTE();
   let spawn=null,schody=null;
-  const surowce=[],krysztaly=[];
   for(let y=0;y<MH;y++){
     const wiersz=mapa[y]||'';
     for(let x=0;x<MW;x++){
@@ -5149,8 +5151,6 @@ function domBuildFromMap(cfg,fk,def){
       else if(MAPA_ZAMEK[z])zamkiKafle.push([x,y]);
       else if(MAPA_KOMNATY.indexOf(z)>=0)pokoje.push({z,tx:x,ty:y});
       else if(z==='M')maszyny.push([x,y]);
-      else if(z==='*')krysztaly.push([x,y]);
-      else if(z==='%')surowce.push([x,y]);
       const kub=MAPA_DEKO[z];
       if(kub)deko[kub].push([x,y]);
     }
@@ -5185,7 +5185,6 @@ function domBuildFromMap(cfg,fk,def){
   for(let y=0;y<MH;y++)for(let x=0;x<MW;x++){
     const h=BLOK_HP[at(x,y)];if(h)dhpSet(x,y,h);
   }
-  return{surowce,krysztaly};
 }
 /* kafle kłódek zlepiamy w bramy: sąsiedztwo 4-kierunkowe + ten sam kolor */
 function domZamkiZKafli(kafle){
@@ -6304,7 +6303,7 @@ function domLoadFloor(idx){
   foes=[];hitFX=[];PROJ=[];bossShots=[];dmgNums=[];miniBlasts=[];foeT=1e9;forage=[];
   KALUZE=[];WELONY=[];BECZKI=[];KULE=[];   // rozlane wesele nie przechodzi na kolejne piętro
   resetAmbient();
-  const reczna=def?domBuildFromMap(cfg,fk,def):(domBuildFloor(cfg,fk,idx),null);
+  if(def)domBuildFromMap(cfg,fk,def);else domBuildFloor(cfg,fk,idx);
   const ostPietro=domPlanFloor(cfg,fk,idx);
   const lvl=S.domLvl[DOM.cur]||0;
   /* gracz startuje tam, gdzie autor postawił `S` (albo w komnacie wejściowej
@@ -6335,26 +6334,12 @@ function domLoadFloor(idx){
     domNaprawKlucze(cfg,fk); // twarda gwarancja: każdy klucz do wzięcia przed swoją kłódką
     domZweryfikujZamki(cfg,fk);  // …i że kłódka, która została, naprawdę czegoś broni
   }
-  /* surowce do ZBIERANIA + kryształy domeny */
-  if(reczna){
-    for(const[x,y]of reczna.surowce)forage.push({x:x*16+8,y:y*16+8,type:domPick(cfg.ing),ready:true,t:0});
-    const ile=1+Math.min(2,lvl);
-    reczna.krysztaly.slice(0,ile).forEach(([x,y])=>DOM.crystals.push({x:x*16+8,y:y*16+8,taken:false}));
-  }else{
-    /* mapa kafli, na których gracz NA PEWNO stanie (bez liczenia na kładki) */
-    const chodne=domPrzejezdne(true,false,true);
-    const put=(arr,room,mk)=>{const rm=DOM.rooms[Math.min(room,DOM.rooms.length-1)];
-      for(let a=0;a<40;a++){
-        const x=rm.cx+(domRng()-.5)*rm.r*1.4,y=rm.cy+(domRng()-.5)*rm.r*1.1;
-        const tx=Math.floor(x/16),ty=Math.floor(y/16);
-        if(tx<0||ty<0||tx>=MW||ty>=MH)continue;
-        if(SOLID(at(tx,ty))||PIT(at(tx,ty))||at(tx,ty)===43)continue;
-        if(!chodne[ty*MW+tx])continue;
-        if(Math.hypot(x-rm.cx,y-rm.cy)<20)continue;
-        arr.push(mk(x,y));return;}};
-    for(let i=0;i<4;i++)put(forage,i%DOM.rooms.length,(x,y)=>({x,y,type:domPick(cfg.ing),ready:true,t:0}));
-    for(let i=0;i<1+Math.min(2,lvl);i++)put(DOM.crystals,(i+1)%DOM.rooms.length,(x,y)=>({x,y,taken:false}));
-  }
+  /* ŻADNYCH ZBIERANYCH RZECZY NA PODŁODZE DOMENY (decyzja Dawida). Zioła, miody
+     i owoce zostają w ŚWIECIE — tam zbieranie jest zajęciem samym w sobie.
+     W domenie rozprasza: gracz w środku walki kuca nad ziółkiem. Jedyne, co
+     zostaje na ziemi, to SKRZYNIE — te się rozwala, a nie zbiera.
+     `forage` i `DOM.crystals` zostają puste; rysowanie i podpowiedzi [E] same
+     się wyłączają, bo chodzą po tych listach. */
   if(def){
     const bledy=domSprawdzMape();
     if(bledy.length)console.error('MAPA '+DOM.cur+' piętro '+(idx+1)+': '+bledy.join(' | '));
@@ -6567,7 +6552,11 @@ function domOpenChest(){
   if(!DOM.chest||DOM.chest.open)return;
   DOM.chest.open=true;
   const id=DOM.cur,lvl=S.domLvl[id]||0;
-  const sr=10+lvl*4,ch=3+lvl*2,di=lvl>=1?1:0,dd=20+lvl*8;
+  /* Kryształy zniknęły z podłóg, więc to, co dawały (2-3 ⚙️ za sztuka, 1-3 sztuki
+     na przebieg), dokłada teraz skrzynia. Inaczej sprzątnięcie klutteru po cichu
+     obcięłoby zysk z całej domeny — a to nie było zamówienie. */
+  const zaKrysztaly=3*(1+Math.min(2,lvl));
+  const sr=10+lvl*4,ch=3+lvl*2+zaKrysztaly,di=lvl>=1?1:0,dd=20+lvl*8;
   S.mats.sr+=sr;S.mats.ch+=ch;S.mats.di+=di;S.dia+=dd;
   /* UNIKALNY SUROWIEC — nie do zdobycia nigdzie indziej */
   const mk=matOfDom(id),mn=mk?3+lvl:0;

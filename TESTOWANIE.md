@@ -58,6 +58,18 @@ Wykrycie „gracz w rogu" nie mierzy odległości, tylko czy panna młoda NAPRAW
 posuwa się do przodu (`f.utk`) — licznik zeruje wszystko, co i tak każe jej stać
 (telegraf, piruet, zawrót głowy), żeby nie brać bezruchu z ataku za utknięcie.
 
+### W domenie nie ma nic do zbierania z podłogi
+
+Zioła, miody i owoce (`forage`) oraz kryształy domeny (`DOM.crystals`) zostały
+z domen **usunięte** — zbieranie zostaje w ŚWIECIE, gdzie jest zajęciem samym
+w sobie; w domenie tylko rozpraszało w środku walki. Jedyne, co leży na ziemi,
+to SKRZYNIE i BECZKI — te się rozwala, a nie zbiera.
+
+To, co dawały kryształy, dokłada teraz **skrzynia na końcu domeny** (`zaKrysztaly`
+w `domOpenChest`), żeby sprzątnięcie klutteru po cichu nie obcięło zysku
+z całego przebiegu. Znaki `*` i `%` zniknęły z plansz w `js/mapy.js`;
+w `MAPA_ZNAKI` zostały jako zwykła podłoga, żeby stary znak nie wywrócił parsera.
+
 ### Rozlany alkohol (`KALUZE`) — wspólny mechanizm wesela
 
 Wszystko, co się rozlewa, siedzi w jednej liście: butelka rzucona przez ŚWIADKA
@@ -116,7 +128,7 @@ otwarte jest wszystko, doba skacze o **4:00 rano** czasu lokalnego.
 
 Każda domena daje **jeden unikalny surowiec**, wymagany przy wzniesieniach
 przypisanej postaci (pierwszy próg to poz. 20, potem 40 i dalej). Nie ma go
-w sklepach ani u bossów — tylko w skrzyni na końcu domeny i w jej kryształach.
+w sklepach ani u bossów — **tylko w skrzyni na końcu domeny**.
 
 **Skróty i komendy (konsola, F12):**
 
@@ -400,7 +412,7 @@ Co te testy faktycznie wyłapały przy budowie DOMEN 3.0:
   odblokowywały i gracz zostawał na dole **na zawsze**;
 - maszyny bombowe (kafel SOLID) lądowały na spawnie, na schodach i na środkach
   komnat — start w ścianie i nieosiągalne wyjście;
-- surowce i kryształy rodziły się na wysepkach odciętych przepaścią;
+- surowce i kryształy rodziły się na wysepkach odciętych przepaścią (dziś nie ma ich w domenach w ogóle);
 - droga do ostatniej komnaty potrafiła prowadzić wyłącznie przez kruchą płytę,
   która zawala się pod stopami;
 - wyrównanie dla starych zapisów nigdy się nie naliczało, bo `DEFAULT_SAVE`

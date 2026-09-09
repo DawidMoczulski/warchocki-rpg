@@ -181,7 +181,11 @@ var MAPY={
 | `k` `r` `b` | klucz złoty / czerwony / niebieski | `1` `2` `3` | KŁÓDKA w tych kolorach | `M` | maszyna bombowa |
 | `X` | skrzynia (cios) | `O` | beczka (wybucha) | `=` | pustak (TYLKO bomba) |
 | `I` | filar (wieczny) | `-` | krucha płyta | ` ` | przepaść |
-| `_` | dno rozpadliny z wodą (też przepaść!) | `*` | kryształ domeny | `%` | surowiec do zebrania |
+| `_` | dno rozpadliny z wodą (też przepaść!) | | | | |
+
+> **Znaki `*` i `%` (kryształ, surowiec) już nie działają.** W domenach nie ma
+> nic do zbierania z podłogi — zostają skrzynie i beczki, czyli to, co się
+> rozwala. Zbieranie ziół żyje dalej w ŚWIECIE.
 
 **Wyposażenie wnętrz** (piwnica, ruiny):
 
