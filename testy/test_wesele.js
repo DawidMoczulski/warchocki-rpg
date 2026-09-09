@@ -298,3 +298,77 @@ T('po CALEJ arenie oczepin da sie chodzic bez resetu walki',()=>{
   eq(w.reset,0,'walka zresetowala sie w trakcie spaceru po arenie');
   eq(w.poza,0,'chodzenie po arenie wyrzucilo z domeny');
 });
+
+/* ---------------- ZGŁOSZENIA Z GRY ---------------- */
+T('mocny cios NIE moze przeskoczyc beczki (zgloszenie: jedna zostala stac)',()=>{
+  const f=obudzMlodych();KALUZE=[];
+  /* jeden cios z 100% na 40% — przeskakuje DWA progi naraz */
+  f.hp=Math.round(f.maxHp*.4);oddech();
+  eq(BECZKI.filter(b=>b.lezy).length,2,'przy przeskoku dwoch progow maja pojsc DWIE beczki');
+  eq(KALUZE.filter(k=>k.duza).length,2,'…i zostac po nich dwie kaluze');
+});
+T('po upadku pana mlodego NIE zostaje ANI JEDNA stojaca beczka',()=>{
+  /* najgorszy przypadek: gracz zbija go z pelnego HP jednym ciosem */
+  const f=obudzMlodych();KALUZE=[];
+  f.hp=1;dealDmg(f,'edek',9);
+  przeklikaj();
+  const p2=foes.find(x=>x.bid==='mlodzi'&&x.stage2);
+  P.x=p2.x+60;P.y=p2.y;nieumieralny();
+  oddech();
+  eq(BECZKI.filter(b=>b.lezy).length,4,'wszystkie cztery beczki maja lezec');
+  eq(KALUZE.filter(k=>k.duza).length,4,'…i zostawic cztery kaluze');
+});
+T('BIALE KULE: krecą sie ODWROTNIE niz kosy Liri i po coraz wiekszym okregu',()=>{
+  const f=pannaMloda(true);
+  KULE=[];
+  BOSS_MOVES.kule(f);
+  ok(KULE.length>=7,'ma polecec caly wianek kul, jest '+KULE.length);
+  const k=KULE[0],a0=k.ang,r0=k.r;
+  przewin(20);
+  ok(k.ang<a0,'kula ma isc w PRZECIWNA strone niz kosy Liri (te ida `ang+=`)');
+  ok(k.r>r0+10,'okrag ma sie ROZKRECAC, promien '+Math.round(r0)+' -> '+Math.round(k.r));
+  /* a kosy Liri dla porownania krecą sie w druga strone */
+  spawnKosy(4);
+  const kk=KOSY[0],ka=kk.ang;
+  updateKosy(1/60);
+  ok(kk.ang>ka,'kontrola: kosy Liri ida `ang+=` — inaczej test niczego nie dowodzi');
+});
+T('biale kule BOLA, gdy sie w nie wejdzie',()=>{
+  const f=pannaMloda(true);
+  KULE=[];foes=[];nieumieralny();
+  oddech();                                 // przeczekaj hit-stop po scence
+  KULE.push({cx:P.x,cy:P.y-8,ang:0,r:0,obr:0,roz:0,atk:40,life:3,hit:0});
+  nieumieralny();
+  const hp0=PHP[S.ch];
+  przewin(10);
+  ok(PHP[S.ch]<hp0,'kula w gracza ma zabolec');
+});
+T('GWIZD: gdy nie moze dojsc do gracza, wola druhny',()=>{
+  const f=pannaMloda(true);
+  KULE=[];WELONY=[];
+  foes=foes.filter(x=>x===f);
+  /* stawiamy gracza daleko i UNIERUCHAMIAMY panne mloda — dokladnie tak,
+     jak wyglada schowanie sie w rogu, do ktorego ona nie wejdzie */
+  P.x=f.x+180;P.y=f.y;nieumieralny();
+  f.at=99;
+  for(let i=0;i<200;i++){f.x=f.homeX;f.y=f.homeY;updateWorld(1/60);nieumieralny();}
+  const druhny=foes.filter(x=>x.t==='druhna');
+  ok(druhny.length>=4,'ma wybiec 4-5 druhen, wybieglo '+druhny.length);
+  ok(druhny.every(x=>x.summon),'druhny z gwizdka to slugusy — nie moga sypac lupem');
+  ok(druhny.every(x=>x.room===f.room),'druhny musza liczyc sie do wyczyszczenia komnaty');
+});
+T('GWIZD nie odpala sie, gdy walka toczy sie normalnie',()=>{
+  const f=pannaMloda(true);
+  foes=foes.filter(x=>x===f);
+  P.x=f.x+26;P.y=f.y;nieumieralny();      // gracz OBOK — jest do kogo podejsc
+  f.at=99;
+  for(let i=0;i<200;i++){updateWorld(1/60);nieumieralny();P.x=f.x+26;P.y=f.y;}
+  eq(foes.filter(x=>x.t==='druhna').length,0,'przy normalnej walce druhny maja NIE wychodzic');
+});
+T('panna mloda ma teraz CZTERY rodzaje atakow',()=>{
+  const mv=BOSSES.mlodzi.next.moves;
+  eq(mv.length,3,'w puli losowanych: welon, piruet, kule');
+  for(const m of mv)ok(BOSS_MOVES[m],'brak ataku '+m);
+  ok(BOSS_MOVES.gwizd,'gwizd jest poza pula — odpala go sytuacja, nie losowanie');
+  ok(!mv.includes('gwizd'),'gwizd NIE moze byc w puli, bo ma byc odpowiedzia na chowanie sie');
+});

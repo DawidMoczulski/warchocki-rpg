@@ -101,6 +101,10 @@ tyknięciem co 0,55 s.
 skacze, wiruje, leży, krąży pod stropem — i wtedy nie losuje kolejnego ataku.
 `BOSS_RESET` mówi, co posprzątać, gdy gracz ucieknie z areny.
 
+**Progi HP bossa licz PĘTLĄ, nie pojedynczym `if`.** Jeden mocny cios potrafi
+przeskoczyć dwa progi naraz (z 80% na 40%) — przy `if(prog>f.beczki)` jedna
+beczka zostawała wtedy stać do końca walki. Im mocniejsza ekipa, tym częściej.
+
 **Smycz bossa ma sens TYLKO w świecie.** `BOSS_LEASH` (320 px) pilnuje, żeby
 gracz nie zgubił bossa w otwartym terenie za areną. Na piętrze domeny CAŁE PIĘTRO
 jest areną — nie ma stamtąd dokąd uciec, a parkiet czy jama bywają większe niż

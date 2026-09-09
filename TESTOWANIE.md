@@ -37,6 +37,27 @@ pięć razy powtarzać tę samą salę.
 
 Pozostałe trzy domeny **nadal się losują** — do czasu, aż dostaną swoje mapy.
 
+### PAŃSTWO MŁODZI — co robią
+
+**PAN MŁODY** (faza 1): rzuca różami, które pękają dopiero tam, gdzie spadną,
+albo skacze pod gracza kilka razy pod rząd. Co 25% HP przewraca się jedna
+z czterech beczek — a jeśli jeden cios przeskoczy dwa progi naraz, lecą DWIE.
+Po jego upadku na arenie nie zostaje ani jedna stojąca beczka.
+
+**PANNA MŁODA** (faza 2) ma cztery ataki — trzy w puli losowanej i jeden
+sytuacyjny:
+
+| atak | co robi |
+|---|---|
+| `welon` | rzuca welonem; ten leży chwilę na parkiecie, potem wychodzi z niego seria kolców w poprzek |
+| `piruet` | jedzie przez salę, odbijając się od ścian; kończy 5-sekundowym zawrotem głowy (okno na obrażenia ×1,6). Wjazd w rozlany spirytus = wywrotka i pożar |
+| `kule` | staje w miejscu i puszcza wianek białych świateł, który rozkręca się coraz szerszym okręgiem — **w stronę przeciwną niż kosy Liri** |
+| `gwizd` | **poza pulą**: odpala go sytuacja. Panna młoda jest za szeroka, żeby wejść w każdy kąt sali; jeśli przez 2 s ani się nie ruszy, ani nie zbliży do gracza, gwiżdże i wybiegają 4–5 druhen, które wejdą wszędzie |
+
+Wykrycie „gracz w rogu" nie mierzy odległości, tylko czy panna młoda NAPRAWDĘ
+posuwa się do przodu (`f.utk`) — licznik zeruje wszystko, co i tak każe jej stać
+(telegraf, piruet, zawrót głowy), żeby nie brać bezruchu z ataku za utknięcie.
+
 ### Rozlany alkohol (`KALUZE`) — wspólny mechanizm wesela
 
 Wszystko, co się rozlewa, siedzi w jednej liście: butelka rzucona przez ŚWIADKA

@@ -1880,6 +1880,49 @@ const BOSS_MOVES={
     addHit(f.x,f.y-48,'ŁAP WELON!','#f2f0f8');
     beep(880,.18,'sine',.06,420);
   },
+  /* GWIZD NA DRUHNY — panna młoda jest ZA DUŻA, żeby wejść w każdy kąt sali.
+     Gdy gracz schowa się tam, gdzie ona nie wejdzie, nie stoi bezradnie:
+     gwiżdże, a z sali wybiegają druhny — one wejdą wszędzie. Ten atak NIE jest
+     w puli losowanych; odpala go sytuacja (patrz `f.utk` w pannaMlodaUpdate). */
+  gwizd:f=>{
+    bossHold(f,f.ph2?.8:1.05);
+    const n=f.ph2?5:4,td=FOE_TYPES.druhna;
+    let ile=0;
+    for(let i=0;i<n+2&&ile<n;i++){
+      const a=i/n*6.283+Math.random()*.6;
+      const r=54+Math.random()*46;
+      const x=Math.max(20,Math.min(MW*16-20,P.x+Math.cos(a)*r));
+      const y=Math.max(20,Math.min(MH*16-20,P.y+Math.sin(a)*r));
+      if(SOLID(at(Math.floor(x/16),Math.floor(y/16))))continue;
+      const h=Math.round(td.hp*1.45*(1+.3*(S.domLvl.wesele||0)));
+      foes.push({t:'druhna',summon:true,room:f.room,x,y,
+        hp:h,hp0:h,atk:Math.round(td.atk*1.2),
+        dx:0,dy:0,wt:.2,stun:.35+ile*.09,kb:0,kbx:0,kby:0,flash:0});
+      fxRing(x,y,18,'#e88ac8',{life:.4,w:2});
+      fxSparks(x,y-8,'#e88ac8',7,100,{life:.45});
+      ile++;
+    }
+    fxRing(f.x,f.y-14,52,'#f2f0f8',{life:.45,w:3});
+    addHit(f.x,f.y-50,'DRUHNY, DO MNIE!','#e88ac8');
+    toast('👰 FWIIIT! Panna młoda gwizdnęła po druhny — w rogu się nie przeczekasz.',3200);
+    beep(2300,.16,'square',.05,2900);
+    setTimeout(()=>beep(2700,.2,'square',.05,2100),150);
+    SFX.no();
+  },
+  /* BIAŁE KULE — staje w miejscu i puszcza wokół siebie wianek świateł, który
+     rozkręca się coraz szerszym okręgiem (w drugą stronę niż kosy Liri). */
+  kule:f=>{
+    const n=f.ph2?9:7,dmg=Math.round(f.atk*.75),zyc=f.ph2?2.6:3;
+    bossHold(f,zyc*.8);                       // stoi przez prawie cały atak
+    for(let i=0;i<n;i++)
+      KULE.push({cx:f.x,cy:f.y-10,ang:i/n*6.283,r:15,
+        obr:f.ph2?3:2.4,roz:f.ph2?74:60,atk:dmg,life:zyc,hit:0});
+    fxRing(f.x,f.y-10,28,'#f2f0f8',{life:.4,w:3});
+    fxRing(f.x,f.y+6,40,'#e88ac8',{life:.35,w:2,ground:true});
+    fxSparks(f.x,f.y-14,'#ffffff',14,130,{life:.5});
+    addHit(f.x,f.y-50,'PATRZCIE NA MNIE!','#f2f0f8');
+    beep(1300,.35,'sine',.06,700);
+  },
   /* PIRUET — zakręca się i JEDZIE przez salę, odbijając się od ścian. Kończy
      się pięciosekundowym zawrotem głowy: to jest okno na obrażenia. A jeśli po
      drodze wjedzie w rozlany spirytus — wywraca się i wszystko staje w ogniu. */
@@ -2092,9 +2135,12 @@ function updateBossTelegraph(f,dt){
    ===================================================================== */
 /* --- PAN MŁODY: cztery beczki i seria skoków ------------------------- */
 function panMlodyUpdate(f,dt){
-  /* PROGI BECZEK — 75%, 50%, 25%. Czwarta idzie, gdy on pada (patrz niżej). */
+  /* PROGI BECZEK — 75%, 50%, 25%. Czwarta idzie, gdy on pada (patrz niżej).
+     PĘTLA, nie pojedyncze `if`: jeden mocny cios potrafi przeskoczyć DWA progi
+     naraz (z 80% na 40%) i wtedy jedna beczka zostawała stać do końca walki.
+     Im mocniejsza ekipa, tym częściej — Dawid trafił na to za drugim razem. */
   const prog=f.hp>f.maxHp*.75?0:f.hp>f.maxHp*.5?1:f.hp>f.maxHp*.25?2:3;
-  if(prog>(f.beczki||0)){f.beczki=prog;beczkaPrzewroc(f.homeX,f.homeY);}
+  while((f.beczki||0)<prog){f.beczki=(f.beczki||0)+1;beczkaPrzewroc(f.homeX,f.homeY);}
   const S2=f.skok;
   if(!S2)return false;
   f.dx=0;f.dy=0;S2.t-=dt;
@@ -2139,9 +2185,12 @@ const BRUD_TXT=[null,
   {t:'Falbany urwane, welon krzywo. Robi się gorąco.',c:'#c8a858'},
   {t:'Z sukni został ochłap. Teraz już naprawdę się wścieka!',c:'#e04848'}];
 function pannaMlodaUpdate(f,dt){
-  if(!f.weszla){                                  // wejście = CZWARTA beczka na ziemię
+  if(!f.weszla){
     f.weszla=1;f.brud=0;
-    beczkaPrzewroc(f.homeX,f.homeY);
+    /* upadek pana młodego to 0% jego HP: idzie CZWARTA beczka — a razem z nią
+       wszystko, co on zdążył przeskoczyć jednym mocnym ciosem. Po tej pętli
+       na arenie NIE MA już stojącej beczki, cokolwiek działo się wcześniej. */
+    while(beczkaPrzewroc(f.homeX,f.homeY));
   }
   /* SUKNIA CORAZ BRUDNIEJSZA, ATAKI CORAZ SZYBSZE */
   const b=f.hp>f.maxHp*.75?0:f.hp>f.maxHp*.5?1:f.hp>f.maxHp*.25?2:3;
@@ -2193,6 +2242,23 @@ function pannaMlodaUpdate(f,dt){
     }
     return true;
   }
+  /* GRACZ W ROGU. Nie mierzymy odległości, tylko to, czy ona NAPRAWDĘ POSUWA SIĘ
+     do przodu: panna młoda jest za szeroka, żeby wejść w każdy kąt sali, więc
+     potrafi utknąć o metr od gracza i machać rękami. Jeśli przez dwie sekundy
+     ani się nie ruszyła, ani nie zbliżyła — gwiżdże po druhny, a te wejdą
+     wszędzie. Licznik zeruje wszystko, co i tak każe jej stać (telegraf,
+     piruet, zawrót głowy), żeby nie brać bezruchu z ataku za utknięcie. */
+  const dGracz=Math.hypot(P.x-f.x,P.y-f.y);
+  if(!f.utk)f.utk={x:f.x,y:f.y,t:0,d:dGracz};
+  if(f.hold>0||f.telT!==undefined)f.utk.t=0;
+  else if(Math.hypot(f.x-f.utk.x,f.y-f.utk.y)>20||dGracz<f.utk.d-16){
+    f.utk={x:f.x,y:f.y,t:0,d:dGracz};
+  }else f.utk.t+=dt;
+  if(f.utk.t>2&&dGracz>34){
+    f.utk={x:f.x,y:f.y,t:0,d:dGracz};
+    BOSS_MOVES.gwizd(f);
+    return true;
+  }
   /* NORMALNIE OMIJA ROZLANY ALKOHOL — suknia jest za droga. Sprawdzamy punkt,
      w który właśnie idzie; jeśli tam jest kałuża, skręca w bok. */
   if((f.dx||f.dy)&&kaluzaW(f.x+f.dx*.35,f.y+f.dy*.35,0)){
@@ -2224,7 +2290,7 @@ function weseleReset(f){
   delete f.skok;delete f.piruet;f.upadek=0;f.wyczerp=0;
   for(const b of BECZKI)b.lezy=false;
   KALUZE=KALUZE.filter(k=>!k.duza);
-  WELONY=[];
+  WELONY=[];KULE=[];
 }
 /* =====================================================================
    BOSSOWIE Z WŁASNĄ LOGIKĄ KLATKI
@@ -2496,6 +2562,59 @@ const POCISK_ROZBICIE={
     welonPolozony(b.x,b.y,b.kat||0,b.atk||14);
   },
 };
+/* =====================================================================
+   BIAŁE KULE PANNY MŁODEJ — obracają się po CORAZ WIĘKSZYM okręgu
+   ---------------------------------------------------------------------
+   Panna młoda staje w miejscu i wypuszcza wokół siebie wianek świateł.
+   Krążą w stronę PRZECIWNĄ niż kosy Liri (tamte idą `ang+=`, te `ang-=`)
+   i z każdą chwilą odchodzą dalej od niej — więc nie da się ich przeczekać
+   w bezruchu ani obiec dookoła: trzeba wyjść ze środka albo przeskoczyć
+   między nimi, dopóki szpary są jeszcze wąskie.
+   ===================================================================== */
+let KULE=[];
+function kuleUpdate(dt){
+  if(!KULE.length)return;
+  for(const k of KULE){
+    k.life-=dt;
+    k.ang-=dt*k.obr;                 // ODWROTNIE niż u Liri
+    k.r+=dt*k.roz;                   // …i coraz szerszym okręgiem
+    k.x=k.cx+Math.cos(k.ang)*k.r;
+    k.y=k.cy+Math.sin(k.ang)*k.r*.62;
+    if(!reduceMotion&&Math.random()<.5)
+      fxP({x:k.x,y:k.y,vx:0,vy:0,g:0,life:.24,life0:.24,sz:2.4,
+        col:'#f2f0f8',add:true,shrink:true});
+    if(k.hit>0){k.hit-=dt;continue;}
+    if(Math.hypot(P.x-k.x,(P.y-8)-k.y)<12){
+      k.hit=.9;hurtPlayer({x:k.x,y:k.y,atk:k.atk});
+      fxStarFlash(k.x,k.y,'#ffffff',8,{life:.2});
+    }
+  }
+  KULE=KULE.filter(k=>k.life>0);
+}
+function drawKule(){
+  for(const k of KULE){
+    const sx=k.x-camX,sy=k.y-camY;
+    if(sx<-20||sx>W+20||sy<-20||sy>H+20)continue;
+    const zanik=Math.min(1,k.life/.4),puls=1+Math.sin(anim*14+k.ang)*.12;
+    /* Poświata idzie w CHŁODNY błękit, nie w biel. Biały blask w trybie
+       `lighter` na brązowym parkiecie robi się beżową obwarzankiem — dopiero
+       niebieski daje na drewnie czyste, zimne światło. */
+    cx.save();cx.globalCompositeOperation='lighter';
+    cx.globalAlpha=.26*zanik;
+    cx.fillStyle='#6a86e0';cx.beginPath();cx.arc(sx,sy,12*puls,0,7);cx.fill();
+    cx.globalAlpha=.42*zanik;
+    cx.fillStyle='#9fb6f0';cx.beginPath();cx.arc(sx,sy,6.4*puls,0,7);cx.fill();
+    cx.restore();
+    cx.globalAlpha=zanik;
+    cx.fillStyle='#dfe6ff';cx.beginPath();cx.arc(sx,sy,4.6*puls,0,7);cx.fill();
+    cx.fillStyle='#ffffff';cx.beginPath();cx.arc(sx,sy,3.2*puls,0,7);cx.fill();
+    cx.fillStyle='#eef2ff';cx.beginPath();cx.arc(sx-1.1,sy-1.3,1.5,0,7);cx.fill();
+    cx.globalAlpha=.7*zanik;                      // ostry rant — odcina kulę od podłogi
+    cx.strokeStyle='#c8d6ff';cx.lineWidth=1;
+    cx.beginPath();cx.arc(sx,sy,4.8*puls,0,7);cx.stroke();
+    cx.globalAlpha=1;
+  }
+}
 /* =====================================================================
    WELON PANNY MŁODEJ — leży, a potem wychodzą z niego KOLCE
    ---------------------------------------------------------------------
@@ -3556,6 +3675,7 @@ function updateFoes(dt){
   foes=foes.filter(f=>!f.dead);
   updateMiniBlasts(dt);   // telegrafowane wybuchy mini-bossów
   kaluzeUpdate(dt);       // rozlany alkohol (i to, co się w nim pali)
+  kuleUpdate(dt);         // białe kule panny młodej
   weloneUpdate(dt);       // welon panny młodej — po chwili wychodzą z niego kolce
   // pociski bossów (+ świetlista smuga za każdym)
   for(const b of bossShots){
@@ -6182,7 +6302,7 @@ function domLoadFloor(idx){
   DOM.deko=DEKO_PUSTE();DOM.reczna=false;DOM.bossPending=0;
   DOM.wejscieXY=null;DOM.schodyXY=null;
   foes=[];hitFX=[];PROJ=[];bossShots=[];dmgNums=[];miniBlasts=[];foeT=1e9;forage=[];
-  KALUZE=[];WELONY=[];BECZKI=[];       // rozlane wesele nie przechodzi na kolejne piętro
+  KALUZE=[];WELONY=[];BECZKI=[];KULE=[];   // rozlane wesele nie przechodzi na kolejne piętro
   resetAmbient();
   const reczna=def?domBuildFromMap(cfg,fk,def):(domBuildFloor(cfg,fk,idx),null);
   const ostPietro=domPlanFloor(cfg,fk,idx);
@@ -6477,7 +6597,7 @@ function tryExitDomain(){
 }
 function exitDomain(){
   stopBattleMusic();domAmbientStop();
-  KALUZE=[];WELONY=[];BECZKI=[];      // wesele zostaje w remizie
+  KALUZE=[];WELONY=[];BECZKI=[];KULE=[];   // wesele zostaje w remizie
   const backReg=DOM.prevReg||'wawa',bx=DOM.prevX,by=DOM.prevY;
   DOM={cur:null,floor:0,kind:null,fk:null,rooms:[],crystals:[],usedMini:[],
     chest:null,stairs:null,exit2:null,prevReg:null,prevX:0,prevY:0,done:false,
@@ -6747,7 +6867,7 @@ const BOSSES={
   mlodzi:{drop:['art','obraczki'],r:'remiza',t:'panmlody',n:'PAN MŁODY',
     moves:['roze','skoki'],cd:2.5,cd2:1.4,
     film:'WESELE W REMIZIE POSZŁO NIE TAK (państwo młodzi gonili mnie po parkiecie)',
-    next:{t:'pannamloda',n:'PANNA MŁODA',moves:['welon','piruet'],cd:2.6,cd2:1.5,
+    next:{t:'pannamloda',n:'PANNA MŁODA',moves:['welon','piruet','kule'],cd:2.6,cd2:1.5,
       intro:[['???','…'],
              ['PANNA MŁODA','Oh honey, my dear! How dare you!','w_howdare'],
              ['Edek','O matko jedyna, ludzie. Ona mówi po angielsku i jest wściekła.','c_koniecswiata'],
@@ -13667,6 +13787,7 @@ function drawWorld(){
       R(cx,sx-1,sy-9,1.4,3,'#e8dcff');
     }
   }
+  drawKule();     // białe kule panny młodej — świecą NAD parkietem
   drawKaluze();   // rozlany alkohol — leży NA podłodze, pod wszystkim innym
   drawWelony();   // welon rozłożony na parkiecie
   drawFXunder();  // kurz i pyły przy ziemi — pod sprite'ami
